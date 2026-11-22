@@ -17,7 +17,6 @@ const STEP_SAMPLES: usize = SPEED as usize * SAMPLES_PER_TICK as usize;
 
 const FIRST_SONG_ROW: usize = 2;
 const FIRST_CHAIN_ROW: usize = 2;
-const FIRST_STRIP_ROW: usize = 21;
 const FIRST_STEP_ROW: usize = 5;
 const CHAIN_COLUMN: usize = 29;
 const PHRASE_COLUMN: usize = 63;
@@ -85,12 +84,11 @@ fn the_song_pane_marks_the_row_being_played() {
 }
 
 #[test]
-fn the_chain_pane_marks_the_entry_being_played_and_its_chain_row() {
+fn the_chain_pane_marks_the_entry_being_played() {
     let (app, _) = played(&[PLAY_SONG], 2);
 
     assert_eq!(pane_text(&app, CHAIN_COLUMN, FIRST_CHAIN_ROW), "0");
     assert_eq!(pane_text(&app, CHAIN_COLUMN, FIRST_CHAIN_ROW + 1), ">");
-    assert_eq!(pane_text(&app, CHAIN_COLUMN, FIRST_STRIP_ROW + 1), ">");
 }
 
 #[test]

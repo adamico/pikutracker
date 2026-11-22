@@ -5,18 +5,13 @@ use super::{
 use crate::app::Direction;
 use crate::app::layout::Area;
 use crate::app::selection::{CellPosition, CellRange};
-use crate::project::{CHAIN_ENTRIES, Chain, ChainEntry, ChainId, PhraseId, Project, TRACKS};
+use crate::project::{CHAIN_ENTRIES, Chain, ChainEntry, ChainId, PhraseId, Project};
 use crate::screen::grid::{Grid, Style};
 use std::ops::RangeInclusive;
 
 const COARSE_TRANSPOSE: i32 = 12;
 const HEADER_ROWS: usize = 2;
-const STRIP_TITLE_ROW: usize = 19;
-const STRIP_HEADING_ROW: usize = 20;
-const STRIP_FIRST_ROW: usize = 21;
-const STRIP_FIRST_TRACK_COLUMN: usize = 2;
-const STRIP_TRACK_WIDTH: usize = 3;
-const STRIP_TICKS_COLUMN: usize = 27;
+const TICKS_COLUMN: usize = 16;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum EntryCell {
@@ -206,6 +201,7 @@ impl ChainPane {
         let title = format!("CHAIN {number}  T{} ROW {song_row:02X}", track + 1);
         draw_title(grid, area.column, 0, &title, focused);
         grid.put(area.column, 1, "K PH TSP FILL", HEADING);
+        grid.put(area.column + TICKS_COLUMN, 1, "TICK", HEADING);
 
         for index in 0..CHAIN_ENTRIES {
             let row = HEADER_ROWS + index;
@@ -228,9 +224,8 @@ impl ChainPane {
             if out_of_range {
                 draw_out_of_range_flag(grid, area.column, row);
             }
+            draw_ticks(grid, area.column + TICKS_COLUMN, row, project, song_row, index);
         }
-
-        draw_chain_row_strip(grid, area, project, song_row, playing_entry);
     }
 }
 
@@ -307,55 +302,19 @@ fn cell_text(cell: EntryCell, entry: ChainEntry) -> (String, Style) {
     }
 }
 
-fn draw_chain_row_strip(
+fn draw_ticks(
     grid: &mut Grid,
-    area: Area,
+    column: usize,
+    row: usize,
     project: &Project,
     song_row: usize,
-    playing_entry: Option<usize>,
+    chain_row: usize,
 ) {
-    draw_title(grid, area.column, STRIP_TITLE_ROW, "CHAIN ROWS", false);
-    let heading = "K T1 T2 T3 T4 T5 T6 T7 T8  TICK";
-    grid.put(area.column, STRIP_HEADING_ROW, heading, HEADING);
-
-    for k in 0..CHAIN_ENTRIES {
-        let row = STRIP_FIRST_ROW + k;
-        draw_row_label(
-            grid,
-            area.column,
-            row,
-            &format!("{k:X}"),
-            playing_entry == Some(k),
-        );
-        for track in 0..TRACKS {
-            let column = area.column + STRIP_FIRST_TRACK_COLUMN + track * STRIP_TRACK_WIDTH;
-            draw_strip_entry(
-                grid,
-                column,
-                row,
-                project.chain_row_entry(song_row, track, k),
-            );
-        }
-        let ticks = project.chain_row_ticks(song_row, k);
-        let (text, style) = if ticks > 0 {
-            (format!("{ticks:>4}"), VALUE)
-        } else {
-            ("   -".to_owned(), EMPTY)
-        };
-        grid.put(area.column + STRIP_TICKS_COLUMN, row, &text, style);
-    }
-}
-
-fn draw_strip_entry(grid: &mut Grid, column: usize, row: usize, entry: Option<ChainEntry>) {
-    let Some(entry) = entry else {
-        grid.put(column, row, "--", EMPTY);
-        return;
-    };
-    let number = format!("{:02X}", entry.phrase().number());
-    if entry.fill() {
-        grid.put(column, row, &number, FILL);
-        grid.put(column + number.len(), row, "F", FILL);
+    let ticks = project.chain_row_ticks(song_row, chain_row);
+    let (text, style) = if ticks > 0 {
+        (format!("{ticks:>4}"), VALUE)
     } else {
-        grid.put(column, row, &number, VALUE);
-    }
+        ("   -".to_owned(), EMPTY)
+    };
+    grid.put(column, row, &text, style);
 }
