@@ -55,6 +55,7 @@
         // "InsertRow": "Insert",
         // "DeleteRow": "Ctrl+Delete",
         // "ChangeSpeed": "Ctrl+Shift+T",
+        // "ScaleSpeed": "Alt+T",
         // "PurgeUnused": "Ctrl+Shift+P",
 
         // Views

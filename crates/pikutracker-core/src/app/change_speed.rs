@@ -10,12 +10,36 @@ const MAX_SPEED: u32 = 255;
 const ARPEGGIO_SPEED: u8 = 8;
 const BAD_SPEED: &str = "SPEED MUST BE 01-FF  ";
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum SpeedChange {
+    Set,
+    Scale,
+}
+
+impl SpeedChange {
+    const fn verb(self) -> &'static str {
+        match self {
+            SpeedChange::Set => "SETS",
+            SpeedChange::Scale => "SCALES",
+        }
+    }
+
+    fn new_speed_and_exactness(self, speed: u8, new: u8, shown: u8) -> (u8, bool) {
+        match self {
+            SpeedChange::Set => (new, true),
+            SpeedChange::Scale => scaled_speed_and_exactness(speed, new, shown),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(super) struct SpeedEntry {
+    change: SpeedChange,
     shown: PhraseId,
     shown_speed: u8,
     phrases: Vec<PhraseId>,
     used_elsewhere: usize,
+    in_selection: bool,
     digits: Vec<u8>,
     refused: bool,
     text: String,
@@ -23,15 +47,19 @@ pub(super) struct SpeedEntry {
 
 impl SpeedEntry {
     fn new(
+        change: SpeedChange,
         shown: PhraseId,
         shown_speed: u8,
         (phrases, used_elsewhere): (Vec<PhraseId>, usize),
+        in_selection: bool,
     ) -> Self {
         let mut entry = Self {
+            change,
             shown,
             shown_speed,
             phrases,
             used_elsewhere,
+            in_selection,
             digits: Vec::new(),
             refused: false,
             text: String::new(),
@@ -51,10 +79,17 @@ impl SpeedEntry {
             .map(|digit| format!("{digit:X}"))
             .collect();
         self.text = format!(
-            "{}NEW SPEED FOR PHRASE {:02X} (NOW {:02X}): {typed:_<width$}  ENTER APPLY  ESC CANCEL",
+            "{}PHRASE {:02X} SPEED (NOW {:02X}): {typed:_<width$}  {} {}: {}  ENTER APPLY  ESC CANCEL",
             if self.refused { BAD_SPEED } else { "" },
             self.shown.number(),
             self.shown_speed,
+            self.change.verb(),
+            counted(self.phrases.len(), "PHRASE"),
+            if self.in_selection {
+                "SELECTION"
+            } else {
+                "WHOLE SONG"
+            },
             width = SPEED_HEX_DIGITS,
         );
     }
@@ -114,20 +149,27 @@ fn whole_song() -> CellRange {
 }
 
 impl App {
-    pub(super) fn ask_for_speed(&mut self) {
+    pub(super) fn ask_for_speed(&mut self, change: SpeedChange) {
         let Some(shown) = self.phrase_under_cursor() else {
             self.remark = Some(NO_PHRASE_HERE);
             return;
         };
         let shown_speed = self.project.phrase(shown).speed();
-        self.speed_entry = Some(SpeedEntry::new(shown, shown_speed, self.speed_scope()));
+        let (scope, in_selection) = self.speed_scope();
+        self.speed_entry = Some(SpeedEntry::new(
+            change,
+            shown,
+            shown_speed,
+            scope,
+            in_selection,
+        ));
     }
 
-    fn speed_scope(&self) -> (Vec<PhraseId>, usize) {
+    fn speed_scope(&self) -> ((Vec<PhraseId>, usize), bool) {
         match (self.focus, self.selected_cells()) {
-            (Focus::Song, Some(cells)) => self.song_scope(cells),
-            (Focus::Chain, Some(cells)) => self.chain_scope(cells),
-            _ => self.song_scope(whole_song()),
+            (Focus::Song, Some(cells)) => (self.song_scope(cells), true),
+            (Focus::Chain, Some(cells)) => (self.chain_scope(cells), true),
+            _ => (self.song_scope(whole_song()), false),
         }
     }
 
@@ -208,15 +250,22 @@ impl App {
         let (mut changed, mut inexact, mut crossed) = (0, 0, 0);
         for id in &entry.phrases {
             let before = self.project.phrase(*id).speed();
-            let (after, exact) = scaled_speed_and_exactness(before, new, entry.shown_speed);
+            let (after, exact) =
+                entry
+                    .change
+                    .new_speed_and_exactness(before, new, entry.shown_speed);
             self.project.phrase_mut(*id).set_speed(i32::from(after));
             changed += usize::from(after != before);
             inexact += usize::from(!exact);
             crossed += usize::from(crossed_arpeggio_speed(before, after));
         }
         self.selection_start = None;
+        let inexact_count = match entry.change {
+            SpeedChange::Set => String::new(),
+            SpeedChange::Scale => format!("  {inexact} INEXACT"),
+        };
         let summary = format!(
-            "{} CHANGED  {inexact} INEXACT  {} USED ELSEWHERE  {crossed} CROSSED SPEED 8",
+            "{} CHANGED{inexact_count}  {} USED ELSEWHERE  {crossed} CROSSED SPEED 8",
             counted(changed, "PHRASE"),
             entry.used_elsewhere,
         );

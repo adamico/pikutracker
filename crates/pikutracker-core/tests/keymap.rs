@@ -5,6 +5,7 @@ const NONE: Modifiers = Modifiers::NONE;
 const CTRL: Modifiers = Modifiers::CTRL;
 const SHIFT: Modifiers = Modifiers::SHIFT;
 const CTRL_SHIFT: Modifiers = Modifiers::CTRL_SHIFT;
+const ALT: Modifiers = Modifiers::ALT;
 
 fn action(key: Key, modifiers: Modifiers) -> Option<Action> {
     Keymap::pc_tracker().action_for(KeyPress::new(key, modifiers))
@@ -47,6 +48,7 @@ fn the_pc_tracker_preset_matches_the_keys_table() {
         (Key::Insert, NONE, Action::InsertRow),
         (Key::Delete, CTRL, Action::DeleteRow),
         (Key::Char('t'), CTRL_SHIFT, Action::ChangeSpeed),
+        (Key::Char('t'), ALT, Action::ScaleSpeed),
         (Key::Char('p'), CTRL_SHIFT, Action::PurgeUnused),
         (Key::Char('t'), CTRL, Action::ToggleCart),
         (Key::Char('l'), CTRL, Action::ToggleLog),

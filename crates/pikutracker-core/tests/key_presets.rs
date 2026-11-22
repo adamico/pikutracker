@@ -136,6 +136,13 @@ fn the_m8_style_preset_matches_the_keys_table() {
             Action::ToggleLog,
         ),
         anywhere(
+            Trigger::Chord {
+                held: z,
+                key: Key::Char('t'),
+            },
+            Action::ScaleSpeed,
+        ),
+        anywhere(
             Trigger::Press(Key::Char('d'), Modifiers::CTRL_SHIFT),
             Action::DeepClone,
         ),

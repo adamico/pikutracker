@@ -24,6 +24,7 @@ pub(super) fn bindings() -> Vec<Binding> {
         (OPTION, Key::Char('l'), Action::ToggleLog),
         (OPTION, Key::Char('f'), Action::ToggleFill),
         (OPTION, Key::Char('r'), Action::ToggleSongLoopRow),
+        (EDIT, Key::Char('t'), Action::ScaleSpeed),
         (EDIT, Key::Up, nudge(true, true)),
         (EDIT, Key::Down, nudge(false, true)),
         (EDIT, Key::Right, nudge(true, false)),

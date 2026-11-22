@@ -11,6 +11,18 @@ const RIGHT: Action = Action::Move(Direction::Right);
 const TAB: Action = Action::FocusNext;
 const SELECT: Action = Action::StartSelection;
 
+fn scale_speed(app: &mut App, high: u8, low: u8) {
+    apply(
+        app,
+        &[
+            Action::ScaleSpeed,
+            Action::HexDigit(high),
+            Action::HexDigit(low),
+            Action::Confirm,
+        ],
+    );
+}
+
 fn change_speed(app: &mut App, high: u8, low: u8) {
     apply(
         app,
@@ -53,7 +65,7 @@ fn two_rows() -> Project {
 fn the_typed_speed_goes_to_the_phrase_on_show_and_the_others_scale_with_it() {
     let mut app = App::with_project(two_rows());
 
-    change_speed(&mut app, 0x2, 0x0);
+    scale_speed(&mut app, 0x2, 0x0);
 
     assert_eq!(speed(&app, 0), 32);
     assert_eq!(speed(&app, 1), 20);
@@ -67,22 +79,57 @@ fn nothing_changes_until_enter() {
 
     apply(
         &mut app,
-        &[
-            Action::ChangeSpeed,
-            Action::HexDigit(2),
-            Action::HexDigit(0),
-        ],
+        &[Action::ScaleSpeed, Action::HexDigit(2), Action::HexDigit(0)],
     );
 
     assert!(app.project() == &before);
-    assert!(status_line(&app).contains("NEW SPEED"));
+    assert!(status_line(&app).contains("PHRASE 00 SPEED"));
+}
+
+#[test]
+fn the_question_names_the_whole_song_when_nothing_is_selected() {
+    let mut app = App::with_project(two_rows());
+
+    app.apply(Action::ScaleSpeed);
+
+    assert!(
+        status_line(&app).contains("SCALES 3 PHRASES: WHOLE SONG"),
+        "{}",
+        status_line(&app)
+    );
+}
+
+#[test]
+fn the_question_names_the_selection_when_one_is_in_scope() {
+    let mut app = App::with_project(two_rows());
+
+    apply(&mut app, &[TAB, SELECT, Action::ScaleSpeed]);
+
+    assert!(
+        status_line(&app).contains("SCALES 1 PHRASE: SELECTION"),
+        "{}",
+        status_line(&app)
+    );
+}
+
+#[test]
+fn the_question_names_the_whole_song_for_a_selection_of_steps() {
+    let mut app = App::with_project(two_rows());
+
+    apply(&mut app, &[TAB, TAB, SELECT, DOWN, Action::ScaleSpeed]);
+
+    assert!(
+        status_line(&app).contains("WHOLE SONG"),
+        "{}",
+        status_line(&app)
+    );
 }
 
 #[test]
 fn the_question_shows_what_has_been_typed() {
     let mut app = App::with_project(two_rows());
 
-    apply(&mut app, &[Action::ChangeSpeed, Action::HexDigit(0xA)]);
+    apply(&mut app, &[Action::ScaleSpeed, Action::HexDigit(0xA)]);
 
     assert!(status_line(&app).contains("A_"), "{}", status_line(&app));
 }
@@ -94,7 +141,7 @@ fn speeds_round_to_the_nearest_whole_speed() {
     set_speed(&mut project, 2, 7);
     let mut app = App::with_project(project);
 
-    change_speed(&mut app, 0x1, 0x8);
+    scale_speed(&mut app, 0x1, 0x8);
 
     assert_eq!(speed(&app, 0), 24);
     assert_eq!(speed(&app, 1), 8);
@@ -106,13 +153,13 @@ fn speeds_stop_at_1_and_255() {
     let mut project = two_rows();
     set_speed(&mut project, 1, 200);
     let mut app = App::with_project(project);
-    change_speed(&mut app, 0x4, 0x0);
+    scale_speed(&mut app, 0x4, 0x0);
     assert_eq!(speed(&app, 1), 255, "200 x 4 stops at 255");
 
     let mut project = two_rows();
     set_speed(&mut project, 1, 3);
     let mut app = App::with_project(project);
-    change_speed(&mut app, 0x0, 0x1);
+    scale_speed(&mut app, 0x0, 0x1);
     assert_eq!(speed(&app, 0), 1);
     assert_eq!(speed(&app, 1), 1, "3 / 16 stops at 1");
 }
@@ -125,7 +172,7 @@ fn loose_phrases_and_chains_off_the_song_are_left_alone() {
     set_speed(&mut project, 8, 30);
     let mut app = App::with_project(project);
 
-    change_speed(&mut app, 0x2, 0x0);
+    scale_speed(&mut app, 0x2, 0x0);
 
     assert_eq!(speed(&app, 9), 30);
     assert_eq!(speed(&app, 8), 30);
@@ -137,7 +184,7 @@ fn a_phrase_used_twice_scales_once() {
     put_entry(&mut project, 1, 1, 1);
     let mut app = App::with_project(project);
 
-    change_speed(&mut app, 0x2, 0x0);
+    scale_speed(&mut app, 0x2, 0x0);
 
     assert_eq!(speed(&app, 1), 20);
 }
@@ -152,7 +199,7 @@ fn a_song_selection_scales_only_the_phrases_of_its_chains() {
 
     apply(&mut app, &[SELECT, RIGHT]);
     app.apply(Action::Move(Direction::Left));
-    change_speed(&mut app, 0x2, 0x0);
+    scale_speed(&mut app, 0x2, 0x0);
 
     assert_eq!(speed(&app, 0), 32);
     assert_eq!(speed(&app, 1), 20);
@@ -165,7 +212,7 @@ fn a_chain_selection_scales_only_the_phrases_of_its_entries() {
     let mut app = App::with_project(two_rows());
 
     apply(&mut app, &[TAB, SELECT]);
-    change_speed(&mut app, 0x2, 0x0);
+    scale_speed(&mut app, 0x2, 0x0);
 
     assert_eq!(speed(&app, 0), 32);
     assert_eq!(speed(&app, 1), 10);
@@ -177,7 +224,7 @@ fn a_selection_of_steps_leaves_the_whole_song_in_scope() {
     let mut app = App::with_project(two_rows());
 
     apply(&mut app, &[TAB, TAB, SELECT, DOWN]);
-    change_speed(&mut app, 0x2, 0x0);
+    scale_speed(&mut app, 0x2, 0x0);
 
     assert_eq!(speed(&app, 2), 40);
 }
@@ -186,7 +233,7 @@ fn a_selection_of_steps_leaves_the_whole_song_in_scope() {
 fn the_report_counts_the_phrases_that_changed() {
     let mut app = App::with_project(two_rows());
 
-    change_speed(&mut app, 0x2, 0x0);
+    scale_speed(&mut app, 0x2, 0x0);
 
     let status = status_line(&app);
     assert!(status.contains("3 PHRASES CHANGED"), "{status}");
@@ -202,7 +249,7 @@ fn a_phrase_that_keeps_its_speed_has_not_changed() {
     set_speed(&mut project, 2, 255);
     let mut app = App::with_project(project);
 
-    change_speed(&mut app, 0x2, 0x0);
+    scale_speed(&mut app, 0x2, 0x0);
 
     assert!(status_line(&app).contains("1 PHRASE CHANGED"));
 }
@@ -214,7 +261,7 @@ fn the_report_counts_rounded_and_stopped_speeds_as_inexact() {
     set_speed(&mut project, 2, 200);
     let mut app = App::with_project(project);
 
-    change_speed(&mut app, 0x1, 0x8);
+    scale_speed(&mut app, 0x1, 0x8);
 
     assert!(status_line(&app).contains("2 INEXACT"));
 }
@@ -225,7 +272,7 @@ fn the_report_counts_a_phrase_another_chain_plays_as_used_elsewhere() {
     put_entry(&mut project, 7, 0, 1);
     let mut app = App::with_project(project);
 
-    change_speed(&mut app, 0x2, 0x0);
+    scale_speed(&mut app, 0x2, 0x0);
 
     assert!(status_line(&app).contains("1 USED ELSEWHERE"));
 }
@@ -237,7 +284,7 @@ fn a_chain_also_placed_outside_a_song_selection_counts_as_used_elsewhere() {
     let mut app = App::with_project(project);
 
     apply(&mut app, &[SELECT]);
-    change_speed(&mut app, 0x2, 0x0);
+    scale_speed(&mut app, 0x2, 0x0);
 
     assert!(status_line(&app).contains("2 USED ELSEWHERE"));
 }
@@ -249,7 +296,7 @@ fn a_chain_selected_in_every_place_it_is_placed_is_not_used_elsewhere() {
     let mut app = App::with_project(project);
 
     apply(&mut app, &[SELECT, DOWN]);
-    change_speed(&mut app, 0x2, 0x0);
+    scale_speed(&mut app, 0x2, 0x0);
 
     assert!(status_line(&app).contains("0 USED ELSEWHERE"));
 }
@@ -261,7 +308,7 @@ fn an_entry_outside_a_chain_selection_counts_as_used_elsewhere() {
     let mut app = App::with_project(project);
 
     apply(&mut app, &[TAB, SELECT]);
-    change_speed(&mut app, 0x2, 0x0);
+    scale_speed(&mut app, 0x2, 0x0);
 
     assert!(status_line(&app).contains("1 USED ELSEWHERE"));
 }
@@ -273,7 +320,7 @@ fn the_report_counts_phrases_that_crossed_speed_8_in_either_direction() {
     set_speed(&mut project, 2, 4);
     let mut app = App::with_project(project);
 
-    change_speed(&mut app, 0x3, 0x0);
+    scale_speed(&mut app, 0x3, 0x0);
     assert!(status_line(&app).contains("2 CROSSED SPEED 8"));
 
     let mut project = two_rows();
@@ -281,7 +328,7 @@ fn the_report_counts_phrases_that_crossed_speed_8_in_either_direction() {
     set_speed(&mut project, 2, 8);
     let mut app = App::with_project(project);
 
-    change_speed(&mut app, 0x0, 0x8);
+    scale_speed(&mut app, 0x0, 0x8);
     assert!(status_line(&app).contains("2 CROSSED SPEED 8"));
 }
 
@@ -291,7 +338,7 @@ fn a_report_with_something_to_notice_stays_until_esc() {
     set_speed(&mut project, 1, 5);
     let mut app = App::with_project(project);
 
-    change_speed(&mut app, 0x1, 0x8);
+    scale_speed(&mut app, 0x1, 0x8);
     assert!(status_line(&app).starts_with("! "));
 
     app.apply(Action::Cancel);
@@ -302,7 +349,7 @@ fn a_report_with_something_to_notice_stays_until_esc() {
 fn no_phrase_on_show_means_no_speed_to_start_from() {
     let mut app = App::new();
 
-    app.apply(Action::ChangeSpeed);
+    app.apply(Action::ScaleSpeed);
 
     assert!(status_line(&app).contains("NO PHRASE HERE"));
     assert_eq!(app.key_context(), KeyContext::ReferenceValue);
@@ -317,7 +364,7 @@ fn esc_changes_nothing_and_ends_the_selection() {
         &mut app,
         &[
             SELECT,
-            Action::ChangeSpeed,
+            Action::ScaleSpeed,
             Action::HexDigit(2),
             Action::Cancel,
         ],
@@ -325,7 +372,7 @@ fn esc_changes_nothing_and_ends_the_selection() {
 
     assert!(app.project() == &before);
     assert!(!status_line(&app).contains("NEW SPEED"));
-    change_speed(&mut app, 0x2, 0x0);
+    scale_speed(&mut app, 0x2, 0x0);
     assert_eq!(speed(&app, 2), 40, "the whole Song is in scope again");
 }
 
@@ -334,7 +381,7 @@ fn enter_with_nothing_typed_keeps_asking() {
     let mut app = App::with_project(two_rows());
     let before = app.project().clone();
 
-    apply(&mut app, &[Action::ChangeSpeed, Action::Confirm]);
+    apply(&mut app, &[Action::ScaleSpeed, Action::Confirm]);
 
     assert!(app.project() == &before);
     assert!(status_line(&app).contains("SPEED MUST BE 01-FF"));
@@ -345,7 +392,7 @@ fn speed_zero_is_refused() {
     let mut app = App::with_project(two_rows());
     let before = app.project().clone();
 
-    change_speed(&mut app, 0x0, 0x0);
+    scale_speed(&mut app, 0x0, 0x0);
 
     assert!(app.project() == &before);
     assert!(status_line(&app).contains("SPEED MUST BE 01-FF"));
@@ -357,7 +404,7 @@ fn one_digit_is_a_whole_speed() {
 
     apply(
         &mut app,
-        &[Action::ChangeSpeed, Action::HexDigit(8), Action::Confirm],
+        &[Action::ScaleSpeed, Action::HexDigit(8), Action::Confirm],
     );
 
     assert_eq!(speed(&app, 0), 8);
@@ -370,7 +417,7 @@ fn a_third_digit_is_ignored_and_backspace_takes_one_back() {
     apply(
         &mut app,
         &[
-            Action::ChangeSpeed,
+            Action::ScaleSpeed,
             Action::HexDigit(1),
             Action::HexDigit(2),
             Action::HexDigit(3),
@@ -387,10 +434,10 @@ fn a_third_digit_is_ignored_and_backspace_takes_one_back() {
 fn other_keys_wait_for_the_answer() {
     let mut app = App::with_project(two_rows());
 
-    apply(&mut app, &[Action::ChangeSpeed, Action::Clone, DOWN]);
+    apply(&mut app, &[Action::ScaleSpeed, Action::Clone, DOWN]);
 
     assert_eq!(app.project().song_cell(0, 0), Some(ChainId::new(0)));
-    assert!(status_line(&app).contains("NEW SPEED"));
+    assert!(status_line(&app).contains("PHRASE 00 SPEED"));
 }
 
 #[test]
@@ -398,7 +445,7 @@ fn change_speed_is_one_undo_step() {
     let mut app = App::with_project(two_rows());
     let before = app.project().clone();
 
-    change_speed(&mut app, 0x2, 0x0);
+    scale_speed(&mut app, 0x2, 0x0);
     let after = app.project().clone();
     assert!(after != before);
 
@@ -442,11 +489,70 @@ fn the_player_hears_a_change_made_during_playback() {
     app.apply(Action::PlayFocusedPane);
     app.take_audio_requests();
 
-    change_speed(&mut app, 0x2, 0x0);
+    scale_speed(&mut app, 0x2, 0x0);
 
     let requests = app.take_audio_requests();
     let heard = requests.iter().any(|request| {
         matches!(request, AudioRequest::UpdateProject(project) if **project == *app.project())
     });
     assert!(heard);
+}
+
+#[test]
+fn change_speed_sets_the_typed_speed_on_every_phrase_of_the_song() {
+    let mut app = App::with_project(two_rows());
+
+    change_speed(&mut app, 0x2, 0x0);
+
+    assert_eq!(speed(&app, 0), 32);
+    assert_eq!(speed(&app, 1), 32);
+    assert_eq!(speed(&app, 2), 32);
+}
+
+#[test]
+fn change_speed_sets_only_the_phrases_of_a_chain_selection() {
+    let mut app = App::with_project(two_rows());
+
+    apply(&mut app, &[TAB, SELECT]);
+    change_speed(&mut app, 0x2, 0x0);
+
+    assert_eq!(speed(&app, 0), 32);
+    assert_eq!(speed(&app, 1), 10);
+    assert_eq!(speed(&app, 2), 20);
+}
+
+#[test]
+fn the_change_speed_question_says_it_sets_and_names_its_scope() {
+    let mut app = App::with_project(two_rows());
+
+    app.apply(Action::ChangeSpeed);
+
+    assert!(
+        status_line(&app).contains("PHRASE 00 SPEED (NOW 10): __  SETS 3 PHRASES: WHOLE SONG"),
+        "{}",
+        status_line(&app)
+    );
+}
+
+#[test]
+fn the_change_speed_report_counts_changes_without_inexact_ones() {
+    let mut app = App::with_project(two_rows());
+
+    change_speed(&mut app, 0x1, 0x0);
+
+    let status = status_line(&app);
+    assert!(status.contains("2 PHRASES CHANGED"), "{status}");
+    assert!(!status.contains("INEXACT"), "{status}");
+    assert!(status.contains("0 CROSSED SPEED 8"), "{status}");
+}
+
+#[test]
+fn change_speed_is_one_undo_step_too() {
+    let mut app = App::with_project(two_rows());
+    let before = app.project().clone();
+
+    change_speed(&mut app, 0x2, 0x0);
+    app.apply(Action::Undo);
+
+    assert!(app.project() == &before);
 }
