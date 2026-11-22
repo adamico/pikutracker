@@ -653,7 +653,7 @@ fn phrases_starting_on(project: &Project, pitch: u8) -> Vec<Phrase> {
 }
 
 #[test]
-fn every_other_sfx_becomes_a_loose_unclaimed_phrase_without_its_loop() {
+fn every_other_sfx_becomes_a_loose_unclaimed_phrase_with_its_loop() {
     let mut looping = TestSfx::with_pitches(5, &[40, 41, 42, 43]);
     looping.loop_start = 1;
     looping.loop_end = 3;
@@ -675,15 +675,19 @@ fn every_other_sfx_becomes_a_loose_unclaimed_phrase_without_its_loop() {
     let [kept] = phrases_starting_on(&project, 40)[..] else {
         panic!("SFX 01 is not kept once");
     };
-    assert_eq!((kept.length(), kept.speed()), (32, 5));
+    assert_eq!(
+        (kept.loop_start(), kept.loop_end(), kept.speed()),
+        (1, 3, 5)
+    );
     assert_eq!(kept.step(3).pitch(), 43);
     let [kept] = phrases_starting_on(&project, 45)[..] else {
         panic!("SFX 03 is not kept once");
     };
     assert_eq!((kept.length(), kept.speed()), (2, 7));
+    assert_eq!(kept.step(2).pitch(), 47);
     assert_eq!(
         warnings,
-        ["SFX 01 03 KEPT AS LOOSE PHRASES OUTSIDE THE CLAIM, WITHOUT THEIR LOOPS."]
+        ["SFX 01 03 KEPT AS LOOSE PHRASES OUTSIDE THE CLAIM."]
     );
 }
 

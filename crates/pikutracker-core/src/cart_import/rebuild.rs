@@ -11,7 +11,6 @@ const DETUNE_DIVISOR: u8 = 8;
 const REVERB_DIVISOR: u8 = 24;
 const DAMPEN_DIVISOR: u8 = 72;
 const FILTER_LEVELS: u8 = 3;
-const STEPS_TO_HEAR_EVERY_LOOP_NOTE: usize = 512;
 
 pub(super) struct RebuiltEntry {
     pub(super) phrase: Phrase,
@@ -22,7 +21,6 @@ pub(super) struct RebuiltEntry {
 pub(super) struct RebuiltChannel {
     pub(super) entry: Option<RebuiltEntry>,
     pub(super) lost_step: bool,
-    pub(super) unroll_needed: Option<usize>,
     pub(super) early_ticks: u32,
 }
 
@@ -145,28 +143,21 @@ pub(super) fn stored_length(sfx: Sfx<'_>) -> usize {
     (notes_when_setting_length(sfx) as usize).min(SFX_NOTES)
 }
 
-fn entry_of(sfx: Sfx<'_>, notes: impl Iterator<Item = Option<usize>>, loops: bool) -> RebuiltEntry {
+fn entry_of(sfx: Sfx<'_>, notes: &[Option<usize>]) -> RebuiltEntry {
     let mut phrase = Phrase::default();
     let mut instruments = BTreeSet::new();
-    let mut length = 0;
-    let notes: Vec<Option<usize>> = notes.collect();
-    for (index, played) in notes.iter().copied().enumerate() {
-        length = index + 1;
-        let Some(played) = played else { continue };
+    for (index, played) in notes.iter().enumerate() {
+        let Some(played) = *played else { continue };
         let note = sfx.note(played);
         *phrase.step_mut(index) = step_of(note);
         if note.custom && note.volume > 0 {
             instruments.insert(note.instrument);
         }
     }
-    if loops {
-        phrase.set_loop(0, length as i32);
-    } else {
-        phrase.set_length(length as i32);
-    }
+    phrase.set_length(notes.len() as i32);
     phrase.set_speed(speed_of(sfx) as i32);
     *phrase.filters_mut() = filters_of(sfx);
-    let arpeggio_changed = carry_arpeggio_pitches(sfx, &notes, &mut phrase);
+    let arpeggio_changed = carry_arpeggio_pitches(sfx, notes, &mut phrase);
     RebuiltEntry {
         phrase,
         instruments,
@@ -174,61 +165,75 @@ fn entry_of(sfx: Sfx<'_>, notes: impl Iterator<Item = Option<usize>>, loops: boo
     }
 }
 
+fn every_note() -> Vec<Option<usize>> {
+    (0..SFX_NOTES).map(Some).collect()
+}
+
 pub(super) fn loose_phrase(sfx: Sfx<'_>) -> Option<(Phrase, BTreeSet<u8>)> {
-    let length = stored_length(sfx);
-    let entry = entry_of(sfx, (0..length).map(Some), false);
+    let entry = if has_bit_7(sfx) {
+        let notes: Vec<Option<usize>> = (0..stored_length(sfx)).map(Some).collect();
+        entry_of(sfx, &notes)
+    } else {
+        let mut entry = entry_of(sfx, &every_note());
+        entry
+            .phrase
+            .set_loop(i32::from(sfx.loop_start()), i32::from(sfx.loop_end()));
+        entry
+    };
     (!entry.phrase.is_silent()).then_some((entry.phrase, entry.instruments))
 }
 
-fn loop_over(
-    sfx: Sfx<'_>,
-    start: usize,
-    end: usize,
-    unroll_needed: Option<usize>,
-) -> RebuiltChannel {
-    RebuiltChannel {
-        entry: Some(entry_of(sfx, (start..end.min(SFX_NOTES)).map(Some), true)),
-        lost_step: false,
-        unroll_needed,
-        early_ticks: 0,
+/// The Phrase that plays a looping SFX from note `first` on, looping as the SFX does.
+fn loop_from(sfx: Sfx<'_>, first: usize, start: usize, end: usize) -> RebuiltEntry {
+    if first == 0 {
+        let mut entry = entry_of(sfx, &every_note());
+        entry.phrase.set_loop(start as i32, end as i32);
+        return entry;
     }
+    if first < start {
+        let notes: Vec<Option<usize>> = (first..SFX_NOTES).map(Some).collect();
+        let mut entry = entry_of(sfx, &notes);
+        entry
+            .phrase
+            .set_loop((start - first) as i32, (end - first) as i32);
+        return entry;
+    }
+    let body = end - start;
+    let offset = (first - start) % body;
+    let notes: Vec<Option<usize>> = (0..body)
+        .map(|index| Some(start + (offset + index) % body))
+        .collect();
+    let mut entry = entry_of(sfx, &notes);
+    entry.phrase.set_loop(0, body as i32);
+    entry
 }
 
-fn silent_from(sfx: Sfx<'_>, playback: Playback, first: usize, past: usize) -> bool {
-    (first..past.min(first + STEPS_TO_HEAR_EVERY_LOOP_NOTE))
-        .filter_map(|step| playback.note_at(step))
-        .all(|note| sfx.note(note).volume == 0)
-}
-
-fn rebuild_channel(sfx: Sfx<'_>, from: u32, to: u32, may_loop: bool) -> RebuiltChannel {
+fn rebuild_channel(sfx: Sfx<'_>, from: u32, to: u32, sets_length: bool) -> RebuiltChannel {
     let playback = Playback::of(sfx);
-    if let Playback::Loop { start: 0, end } = playback
-        && may_loop
-        && end <= SFX_NOTES
-    {
-        return loop_over(sfx, 0, end, None);
-    }
     let speed = speed_of(sfx);
     let first = from.div_ceil(speed) as usize;
     let early_ticks = first as u32 * speed - from;
-    let past = (to / speed) as usize;
-    let needed = past.saturating_sub(first);
-    let fits = needed <= MAX_STEPS;
     if let Playback::Loop { start, end } = playback
-        && !fits
-        && !silent_from(sfx, playback, first + MAX_STEPS, past)
+        && !sets_length
+        && end <= SFX_NOTES
     {
         return RebuiltChannel {
+            entry: Some(loop_from(sfx, first, start, end)),
+            lost_step: false,
             early_ticks,
-            ..loop_over(sfx, start, end, Some(needed))
         };
     }
+    let past = (to / speed) as usize;
+    let needed = past.saturating_sub(first);
     let steps = needed.min(MAX_STEPS);
-    let notes = (first..first + steps).map(|step| playback.note_at(step));
+    let notes: Vec<Option<usize>> = (first..first + steps)
+        .map(|step| playback.note_at(step))
+        .collect();
     RebuiltChannel {
-        entry: (steps > 0).then(|| entry_of(sfx, notes, false)),
-        lost_step: fits && !to.is_multiple_of(speed) && playback.note_at(past).is_some(),
-        unroll_needed: None,
+        entry: (steps > 0).then(|| entry_of(sfx, &notes)),
+        lost_step: needed <= MAX_STEPS
+            && !to.is_multiple_of(speed)
+            && playback.note_at(past).is_some(),
         early_ticks,
     }
 }
@@ -266,8 +271,7 @@ pub(super) fn rebuild_pattern(cart: &Cart, pattern: Pattern) -> RebuiltPattern {
             [0, 1, 2, 3].map(|channel| {
                 let sets_length = channel == timing_channel;
                 sfx[channel].map(|sfx| {
-                    let may_loop = rows == 1 && !sets_length;
-                    let mut rebuilt = rebuild_channel(sfx, from, to, may_loop);
+                    let mut rebuilt = rebuild_channel(sfx, from, to, sets_length);
                     let finished = rebuilt
                         .entry
                         .as_ref()

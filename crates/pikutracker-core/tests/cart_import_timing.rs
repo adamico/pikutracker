@@ -97,42 +97,39 @@ fn a_channel_too_slow_for_one_whole_step_becomes_an_empty_entry_with_a_warning()
 }
 
 #[test]
-fn a_loop_over_the_whole_sfx_becomes_a_phrase_loop_and_drops_the_notes_after_it() {
+fn a_loop_over_the_whole_sfx_becomes_a_phrase_loop_and_keeps_the_notes_after_it() {
     let cart = one_pattern(vec![counting(8), looping(counting(8), 0, 4)]);
 
     let (project, warnings) = imported(&cart);
 
     assert_eq!(warnings, Vec::<String>::new());
-    assert!(phrase(&project, 1, 0).loops());
+    assert_eq!(phrase(&project, 1, 0).phrase_loop(), Some(0..4));
     assert_eq!(pitches(phrase(&project, 1, 0)), audible(10..14));
-    assert!(phrase(&project, 1, 0).step(4).is_silent());
+    assert_eq!(phrase(&project, 1, 0).step(4).pitch(), 14);
     assert_eq!(project.chain_row_ticks(0, 0), 256);
 }
 
 #[test]
-fn a_lead_in_loop_is_unrolled() {
+fn a_lead_in_loop_becomes_a_phrase_loop_after_its_lead_in() {
     let cart = one_pattern(vec![with_len(counting(8), 10), looping(counting(8), 2, 4)]);
 
     let (project, warnings) = imported(&cart);
 
     assert_eq!(warnings, Vec::<String>::new());
-    assert!(!phrase(&project, 1, 0).loops());
-    let expected = [10, 11, 12, 13, 12, 13, 12, 13, 12, 13].map(Some);
-    assert_eq!(pitches(phrase(&project, 1, 0)), expected);
+    assert_eq!(phrase(&project, 1, 0).phrase_loop(), Some(2..4));
+    assert_eq!(pitches(phrase(&project, 1, 0)), audible(10..14));
+    assert_eq!(project.chain_row_ticks(0, 0), 80);
 }
 
 #[test]
-fn an_unroll_over_32_steps_becomes_a_phrase_loop_over_the_loop_body_with_a_warning() {
+fn a_lead_in_loop_that_plays_past_32_steps_keeps_its_lead_in_without_a_warning() {
     let cart = one_pattern(vec![counting(16), looping(counting(8), 2, 6)]);
 
     let (project, warnings) = imported(&cart);
 
-    assert!(phrase(&project, 1, 0).loops());
-    assert_eq!(pitches(phrase(&project, 1, 0)), audible(12..16));
-    assert_eq!(
-        warnings,
-        ["SFX 01 LEAD-IN NEEDS 64 STEPS UNROLLED: KEPT AS A PHRASE LOOP OVER THE LOOP BODY ONLY."]
-    );
+    assert_eq!(warnings, Vec::<String>::new());
+    assert_eq!(phrase(&project, 1, 0).phrase_loop(), Some(2..6));
+    assert_eq!(pitches(phrase(&project, 1, 0)), audible(10..16));
 }
 
 #[test]
@@ -283,11 +280,9 @@ fn len_above_32_splits_the_pattern_into_chain_rows_of_one_song_row() {
     assert_eq!(pitches(phrase(&project, 0, 1)), [None; 8]);
     assert_eq!(pitches(phrase(&project, 1, 0)), audible(10..42));
     assert_eq!(project.chain_row_entry(0, 1, 1), None);
-    assert!(!phrase(&project, 2, 0).loops());
-    assert!(!phrase(&project, 2, 1).loops());
-    assert_eq!(phrase(&project, 2, 0).length(), 32);
-    let unrolled = [10, 11, 12, 13, 10, 11, 12, 13].map(Some);
-    assert_eq!(pitches(phrase(&project, 2, 1)), unrolled);
+    assert_eq!(phrase(&project, 2, 0).phrase_loop(), Some(0..4));
+    assert_eq!(phrase(&project, 2, 1).phrase_loop(), Some(0..4));
+    assert_eq!(pitches(phrase(&project, 2, 1)), audible(10..14));
     assert_eq!(
         warnings,
         [
@@ -310,16 +305,28 @@ fn len_64_lasts_exactly_two_chain_rows() {
 
 #[test]
 fn a_step_straddling_a_split_is_dropped_with_a_warning() {
-    let cart = one_pattern(vec![with_len(counting(3), 40), looping(counting(5), 0, 4)]);
+    let cart = one_pattern(vec![with_len(counting(3), 40), counting(5)]);
 
     let (project, warnings) = imported(&cart);
 
     assert_eq!(phrase(&project, 1, 0).length(), 19);
-    assert_eq!(pitches(phrase(&project, 1, 1)), [10, 11, 12, 13].map(Some));
+    assert_eq!(pitches(phrase(&project, 1, 1)), audible(30..34));
     assert_eq!(
         warnings[0],
         "PATTERN 00 SPLITS INSIDE A STEP: T2 PHRASE 02 LOST ITS LAST STEP."
     );
+}
+
+#[test]
+fn a_loop_across_a_split_starts_the_next_chain_row_where_the_cart_is() {
+    let cart = one_pattern(vec![with_len(counting(3), 40), looping(counting(5), 1, 4)]);
+
+    let (project, warnings) = imported(&cart);
+
+    assert_eq!(phrase(&project, 1, 0).phrase_loop(), Some(1..4));
+    assert_eq!(phrase(&project, 1, 1).phrase_loop(), Some(0..3));
+    assert_eq!(pitches(phrase(&project, 1, 1)), [12, 13, 11].map(Some));
+    assert!(!warnings.iter().any(|w| w.contains("LOST")), "{warnings:?}");
 }
 
 #[test]
@@ -365,7 +372,7 @@ fn a_song_with_more_phrases_than_a_project_holds_warns_and_still_imports() {
             looping(TestSfx::with_pitches(1, &notes), 0, 7)
         })
         .collect();
-    sfx.extend((0..4).map(|len| with_len(counting(1), 97 + len)));
+    sfx.extend([1, 2, 3, 5].map(|speed| with_len(counting(speed), 97)));
     let patterns = (0..64)
         .map(|at: u8| {
             let loop_at = |offset: u8| Some((at + offset) % 60);
@@ -408,16 +415,13 @@ fn an_arpeggio_reading_notes_past_len_imports_with_the_same_sound() {
 }
 
 #[test]
-fn an_unrolled_loop_that_moves_an_arpeggio_group_warns() {
+fn a_copied_loop_keeps_its_arpeggio_groups() {
     let looped = with_fast_arpeggio(looping(counting(8), 2, 5), 2..5);
     let cart = one_pattern(vec![with_len(counting(8), 10), looped]);
 
     let (_, warnings) = imported(&cart);
 
-    assert_eq!(
-        warnings,
-        ["PATTERN 00 T2 STEP 04 PLAYS A DIFFERENT ARPEGGIO AFTER IMPORT."]
-    );
+    assert_eq!(warnings, Vec::<String>::new());
 }
 
 #[test]

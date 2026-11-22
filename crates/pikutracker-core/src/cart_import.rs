@@ -206,9 +206,9 @@ impl LooseSfx {
         }
         if !kept.is_empty() {
             let text = if kept.len() == 1 {
-                "A LOOSE PHRASE OUTSIDE THE CLAIM, WITHOUT ITS LOOP"
+                "A LOOSE PHRASE OUTSIDE THE CLAIM"
             } else {
-                "LOOSE PHRASES OUTSIDE THE CLAIM, WITHOUT THEIR LOOPS"
+                "LOOSE PHRASES OUTSIDE THE CLAIM"
             };
             warnings.push(ImportWarning::general(format!(
                 "SFX {} KEPT AS {text}.",
@@ -333,7 +333,7 @@ impl<'a> SongBuilder<'a> {
             if let Some(played) = pattern.channel(track) {
                 self.played.insert(played);
                 self.warn_about_sfx(played, row, track);
-                chain = self.chain_of(slot, played, row, track, &rebuilt);
+                chain = self.chain_of(slot, row, track, &rebuilt);
             }
             let chain = self.shared.chain(self.project, chain);
             self.project.set_song_cell(row, track, Some(chain));
@@ -368,7 +368,6 @@ impl<'a> SongBuilder<'a> {
     fn chain_of(
         &mut self,
         slot: u8,
-        played: u8,
         song_row: usize,
         track: usize,
         rebuilt: &RebuiltPattern,
@@ -413,15 +412,6 @@ impl<'a> SongBuilder<'a> {
                         pattern_name(slot),
                         track_name(track),
                         counted(channel.early_ticks as usize, "TICK")
-                    ),
-                ));
-            }
-            if let Some(needed) = channel.unroll_needed {
-                self.warnings.push(ImportWarning::at(
-                    place,
-                    format!(
-                        "SFX {played:02X} LEAD-IN NEEDS {needed} STEPS UNROLLED: KEPT AS A PHRASE LOOP \
-                         OVER THE LOOP BODY ONLY."
                     ),
                 ));
             }

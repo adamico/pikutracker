@@ -758,3 +758,57 @@ fn the_overwrite_question_names_only_slots_the_claim_still_holds() {
         "PATTERN 01 CHANGED IN GAME.P8  ENTER OVERWRITE  ESC CANCEL"
     );
 }
+
+fn looping_sfx(pitches: &[u8], loop_start: u8, loop_end: u8) -> TestSfx {
+    let mut sfx = TestSfx::with_pitches(8, pitches);
+    sfx.editor_and_filters = 1;
+    sfx.loop_start = loop_start;
+    sfx.loop_end = loop_end;
+    sfx
+}
+
+fn loops_cart() -> TestCart {
+    let mut only = TestPattern::playing([Some(0), Some(1), Some(2), None]);
+    only.stop = true;
+    TestCart {
+        sfx: vec![
+            looping_sfx(&(10..26).collect::<Vec<u8>>(), 16, 0),
+            looping_sfx(&[30, 31, 32, 33, 34, 35], 2, 6),
+            looping_sfx(&[40, 41, 42, 43], 0, 4),
+            looping_sfx(&[50, 51, 52], 1, 3),
+        ],
+        patterns: vec![only],
+    }
+}
+
+fn loop_pair(project: &Project, track: usize) -> (u8, u8) {
+    let entry = project.chain_row_entry(0, track, 0).unwrap();
+    let phrase = project.phrase(entry.phrase());
+    (phrase.loop_start(), phrase.loop_end())
+}
+
+#[test]
+fn sfx_loops_import_as_phrase_loops_and_export_back_byte_for_byte() {
+    let original = loops_cart().p8();
+    let mut app = imported(original.clone());
+
+    let project = app.project();
+    assert_eq!(loop_pair(project, 0), (16, 0));
+    assert_eq!(loop_pair(project, 1), (2, 6));
+    assert_eq!(loop_pair(project, 2), (0, 4));
+    let loose = (0..=255)
+        .map(|id| project.phrase(PhraseId::new(id)))
+        .find(|phrase| phrase.step(0).pitch() == 50 && !phrase.is_silent())
+        .unwrap();
+    assert_eq!((loose.loop_start(), loose.loop_end()), (1, 3));
+
+    let written = export_ok(&mut app, original.clone());
+
+    let (before, after) = (
+        Cart::read(&original).unwrap(),
+        Cart::read(&written).unwrap(),
+    );
+    for slot in 0..4 {
+        assert_eq!(after.sfx_bytes(slot), before.sfx_bytes(slot), "SFX {slot}");
+    }
+}
