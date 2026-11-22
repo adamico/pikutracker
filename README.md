@@ -45,6 +45,76 @@ The workflow and the optional M8-style keys come from the Dirtywave M8; its [ope
 
 When nothing else is shown, the status line at the bottom lists the main keys: Ctrl+N new, Ctrl+O open, Ctrl+S save, Ctrl+I import, Ctrl+E export, Space play. Ctrl+S saves the Project as one `.ptrk` file. Ctrl+E Exports it into a Cart.
 
+## Default shortcuts
+
+These are the keys of the default PcTracker preset. The M8-style column applies only when you switch presets under [Settings](#settings). "X+R" means hold X, then press R. Keys marked "same" are the same in both presets.
+
+### Project
+
+| Action | PcTracker | M8-style |
+| --- | --- | --- |
+| New Project | Ctrl+N | same |
+| Open Project | Ctrl+O | same |
+| Save | Ctrl+S | same |
+| Save as | Ctrl+Shift+S | same |
+| Import a Cart or MIDI file | Ctrl+I | same |
+| Export into a Cart | Ctrl+E | same |
+| Quit | Ctrl+Q | same |
+
+### Moving around
+
+| Action | PcTracker | M8-style |
+| --- | --- | --- |
+| Move the cursor | Arrows | same |
+| Next / previous pane | Tab / Shift+Tab | same, or Shift+Arrows |
+| Jump 16 Song rows, or to the next filled Chain or Phrase | Alt+Arrows | X+Arrows |
+| Open the instrument under the cursor (Phrase pane) | Enter | same |
+| Cancel | Esc | same |
+
+### Editing
+
+| Action | PcTracker | M8-style |
+| --- | --- | --- |
+| Enter a note (Phrase pane, note column) | Z–M lower octave, Q–U upper octave | Q–P |
+| Octave down / up | [ / ] | same |
+| Type a value | 0–9, A–F | same |
+| Change the value by 1 | Shift+Up / Shift+Down | Z+Right / Z+Left |
+| Change the value by a larger step (an octave for notes) | Ctrl+Up / Ctrl+Down | Z+Up / Z+Down |
+| Clear | Delete | same |
+| Insert row | Insert | same |
+| Delete row | Ctrl+Delete | same |
+| Undo / redo | Ctrl+Z / Ctrl+Y | same |
+| Start a selection | Ctrl+B | X+Shift |
+| Copy | Ctrl+C | X (while selecting) |
+| Cut | Ctrl+X | Z+X |
+| Paste | Ctrl+V | Z+Shift |
+| New unused Chain or Phrase under the cursor | Ctrl+Shift+N | Double-tap Z |
+| Clone the Chain or Phrase under the cursor | Ctrl+D | Z (while selecting) |
+| Clone Chains together with their Phrases | Ctrl+Shift+D | same |
+| Toggle Fill on a Chain entry | Ctrl+F | X+F |
+| Set or clear the Song loop row | Ctrl+R | X+R |
+| Set one Speed on every Phrase in the selection, or else the Song | Ctrl+Shift+T | same |
+| Scale Speeds by a ratio, keeping Phrases in time | Alt+T | Z+T |
+| Purge unused Chains and Phrases | Ctrl+Shift+P | same |
+
+### Playback
+
+| Action | PcTracker | M8-style |
+| --- | --- | --- |
+| Play / stop the focused pane | Space | same |
+| Play the Song from the cursor | Shift+Space | same |
+| Mute Track 1–8 | F1–F8 | same |
+| Solo Track 1–8 | Shift+F1–F8 | same |
+| Clear mutes and solos | F9 | same |
+| Toggle Follow | F10 | same |
+
+### Views
+
+| Action | PcTracker | M8-style |
+| --- | --- | --- |
+| Show / hide the Cart | Ctrl+T | X+T |
+| Show / hide the log | Ctrl+L | X+L |
+
 ## Settings
 
 No settings file is needed. To use the M8-style key preset or rebind keys, copy `config.example.ron` to `~/.config/pikutracker/config.ron` (or `$XDG_CONFIG_HOME`) and edit the copy. The file explains each option.
