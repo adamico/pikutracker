@@ -93,7 +93,8 @@ These are the keys of the default PcTracker preset. The M8-style column applies 
 | Clone Chains together with their Phrases | Ctrl+Shift+D | same |
 | Toggle Fill on a Chain entry | Ctrl+F | X+F |
 | Set or clear the Song loop row | Ctrl+R | X+R |
-| Change Phrase speed | Ctrl+Shift+T | same |
+| Set one Speed on every Phrase in the selection, or else the Song | Ctrl+Shift+T | same |
+| Scale Speeds by a ratio, keeping Phrases in time | Alt+T | Z+T |
 | Purge unused Chains and Phrases | Ctrl+Shift+P | same |
 
 ### Playback
