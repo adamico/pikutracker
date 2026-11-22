@@ -1,12 +1,10 @@
 use super::font::{GLYPH_HEIGHT, GLYPH_WIDTH, glyph};
-use super::grid::{Cell, GRID_COLUMNS, GRID_ROWS, Grid};
+use super::grid::{CELL_HEIGHT, CELL_WIDTH, Cell, GRID_COLUMNS, GRID_ROWS, Grid};
 use super::palette::Colour;
 
 pub const LOGICAL_WIDTH: u32 = 640;
 pub const LOGICAL_HEIGHT: u32 = 360;
 
-const CELL_WIDTH: usize = 6;
-const CELL_HEIGHT: usize = 8;
 const WIDTH: usize = LOGICAL_WIDTH as usize;
 const HEIGHT: usize = LOGICAL_HEIGHT as usize;
 const SEPARATOR: char = '│';
@@ -42,6 +40,13 @@ impl Frame {
         for y in 0..CELL_HEIGHT {
             for x in 0..CELL_WIDTH {
                 self.set_pixel(left + x, top + y, cell.style.bg);
+            }
+        }
+        if let Some(bar) = cell.bar {
+            for y in 0..CELL_HEIGHT {
+                for x in 0..usize::from(bar.pixels).min(CELL_WIDTH) {
+                    self.set_pixel(left + x, top + y, bar.colour);
+                }
             }
         }
 

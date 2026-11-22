@@ -864,7 +864,7 @@ impl App {
             focus == Some(Focus::Song),
             project,
             &self.track_mix,
-            chain_row.map(|(row, _)| row),
+            self.playhead.as_ref(),
         );
         self.chain.draw(
             &mut grid,

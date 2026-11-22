@@ -1,5 +1,6 @@
 use pikutracker_core::app::{Action, App, Direction};
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project, Step};
+use pikutracker_core::screen::font::{GLYPH_HEIGHT, GLYPH_WIDTH, glyph};
 use pikutracker_core::screen::frame::{Frame, LOGICAL_HEIGHT, LOGICAL_WIDTH};
 use pikutracker_core::screen::grid::{GRID_COLUMNS, GRID_ROWS, Grid, Style};
 use pikutracker_core::screen::palette::Colour;
@@ -105,6 +106,31 @@ fn a_background_fills_the_whole_cell() {
     assert_eq!(pixel(&frame, 5, 7), Colour::Red.rgba());
     assert_eq!(pixel(&frame, 6, 7), Colour::Black.rgba());
     assert_eq!(pixel(&frame, 5, 8), Colour::Black.rgba());
+}
+
+#[test]
+fn a_progress_bar_fills_pixels_from_the_left_under_the_character() {
+    let mut grid = Grid::new();
+    grid.put(0, 0, "00", Style::fg(Colour::White));
+    grid.put_bar(0, 0, 2, (3, 4), Colour::DarkGreen);
+    let frame = Frame::from_grid(&grid);
+
+    let ink = glyph('0');
+    for x in 0..12 {
+        for y in 0..8 {
+            let inked = x % 6 < GLYPH_WIDTH
+                && y < GLYPH_HEIGHT
+                && ink[y] & (1 << (GLYPH_WIDTH - 1 - x % 6)) != 0;
+            let expected = if inked {
+                Colour::White
+            } else if x < 9 {
+                Colour::DarkGreen
+            } else {
+                Colour::Black
+            };
+            assert_eq!(pixel(&frame, x, y), expected.rgba(), "pixel {x},{y}");
+        }
+    }
 }
 
 #[test]

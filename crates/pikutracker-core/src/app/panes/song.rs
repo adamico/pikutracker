@@ -5,13 +5,15 @@ use super::{
 use crate::app::Direction;
 use crate::app::layout::Area;
 use crate::app::selection::{CellPosition, CellRange};
-use crate::player::TrackMix;
+use crate::player::{Playhead, TrackMix};
 use crate::project::{ChainId, Project, SONG_ROWS, TRACKS};
 use crate::screen::grid::{Grid, Style};
 use crate::screen::palette::Colour;
 
 const SOLOED: Style = Style::fg(Colour::Yellow);
 const EXPORT_CHANNEL_NUMBER: Style = Style::fg(Colour::Green);
+const PLAYING_BAR: Colour = Colour::DarkGreen;
+const WAITING_BAR: Colour = Colour::DarkGrey;
 
 const HEADER_ROWS: usize = 2;
 const FIRST_TRACK_COLUMN: usize = 4;
@@ -188,8 +190,11 @@ impl SongPane {
         focused: bool,
         project: &Project,
         track_mix: &TrackMix,
-        playing_row: Option<usize>,
+        playhead: Option<&Playhead>,
     ) {
+        let playing_row = playhead
+            .and_then(|playhead| playhead.chain_row)
+            .map(|(row, _)| row);
         let loop_row = project
             .song_loop_row()
             .map_or_else(|| "--".to_owned(), |row| format!("{row:02X}"));
@@ -229,6 +234,30 @@ impl SongPane {
                 let style = if chain.is_some() { VALUE } else { EMPTY };
                 draw_styled_value(grid, column, row, &id_text(chain), is_cursor, style);
             }
+            if let Some(playhead) = playhead.filter(|_| playing_row == Some(song_row)) {
+                draw_progress_bars(grid, area.column, row, project, playhead);
+            }
         }
+    }
+}
+
+/// Lays a bar over each Track's Chain number showing how far it is through
+/// its Phrase: Steps played out of the Phrase's length, or full and dimmed
+/// once it has ended and waits for the Chain row to end.
+fn draw_progress_bars(
+    grid: &mut Grid,
+    area_column: usize,
+    row: usize,
+    project: &Project,
+    playhead: &Playhead,
+) {
+    for track in 0..TRACKS {
+        let column = area_column + FIRST_TRACK_COLUMN + track * TRACK_WIDTH;
+        let (progress, colour) = match playhead.tracks[track] {
+            Some((phrase, step)) => ((step + 1, project.phrase(phrase).length()), PLAYING_BAR),
+            None if playhead.waiting[track] => ((1, 1), WAITING_BAR),
+            None => continue,
+        };
+        grid.put_bar(column, row, 2, progress, colour);
     }
 }
