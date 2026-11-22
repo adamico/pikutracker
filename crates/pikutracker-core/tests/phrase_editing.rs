@@ -1,6 +1,7 @@
 use pikutracker_core::app::{Action, App, Direction, KeyContext};
 use pikutracker_core::keymap::{Key, KeyPress, Keymap, Modifiers};
 use pikutracker_core::project::{Phrase, Step};
+use pikutracker_core::screen::palette::Colour;
 
 const FIRST_STEP_LINE: usize = 5;
 const UP: Action = Action::Move(Direction::Up);
@@ -58,7 +59,7 @@ fn a_new_phrase_shows_empty_steps() {
 
     assert_eq!(step_line(&app, 0), "00[...].. . .");
     assert_eq!(step_line(&app, 15), "0F ... .. . .");
-    assert_eq!(step_line(&app, 16), "");
+    assert_eq!(step_line(&app, 31), "1F ... .. . .");
 }
 
 #[test]
@@ -81,10 +82,10 @@ fn entering_a_note_moves_the_cursor_down_one_step() {
 }
 
 #[test]
-fn the_cursor_stays_on_the_last_step_after_entering_a_note_there() {
-    let app = phrase_app(&[&[DOWN; 15][..], &[C]].concat());
+fn the_cursor_stays_on_step_31_after_entering_a_note_there() {
+    let app = phrase_app(&[&[DOWN; 31][..], &[C]].concat());
 
-    assert_eq!(step_line(&app, 15), "0F[C-2]02 5 0");
+    assert_eq!(step_line(&app, 31), "1F[C-2]02 5 0");
 }
 
 #[test]
@@ -372,4 +373,86 @@ fn the_pc_tracker_brackets_change_the_octave_and_modified_arrows_nudge() {
             coarse: true
         })
     );
+}
+
+const PHRASE_COLUMN: usize = 63;
+const PITCH_OFFSET: usize = 3;
+const LEN_8: [Action; 6] = [UP, UP, Action::HexDigit(0), Action::HexDigit(8), DOWN, DOWN];
+
+fn pitch_colour(app: &App, index: usize) -> Colour {
+    app.grid()
+        .cell(PHRASE_COLUMN + PITCH_OFFSET, FIRST_STEP_LINE + index)
+        .style
+        .fg
+}
+
+fn label_colour(app: &App, index: usize) -> Colour {
+    app.grid()
+        .cell(PHRASE_COLUMN, FIRST_STEP_LINE + index)
+        .style
+        .fg
+}
+
+#[test]
+fn steps_past_len_are_shown_dimmed_with_their_notes() {
+    let app = phrase_app(&[&[DOWN; 10][..], &[C], &[UP; 11], &LEN_8].concat());
+
+    assert_eq!(phrase(&app).length(), 8);
+    assert_eq!(step_line(&app, 10), "0A C-2 02 5 0");
+    assert_eq!(step_line(&app, 31), "1F ... .. . .");
+    assert_eq!(pitch_colour(&app, 10), Colour::DarkGrey);
+    assert_eq!(label_colour(&app, 10), Colour::DarkGrey);
+    assert_eq!(label_colour(&app, 7), Colour::Lavender);
+}
+
+#[test]
+fn lengthening_shows_the_steps_in_the_normal_style_with_no_data_change() {
+    let shortened = phrase_app(&[&[DOWN; 10][..], &[C], &[UP; 11], &LEN_8].concat());
+    let app = phrase_app(
+        &[
+            &[DOWN; 10][..],
+            &[C],
+            &[UP; 13],
+            &LEN_8,
+            &[UP, UP, Action::HexDigit(1), Action::HexDigit(0)],
+        ]
+        .concat(),
+    );
+
+    assert_eq!(phrase(&app).length(), 16);
+    assert_eq!(phrase(&app).step(10), phrase(&shortened).step(10));
+    assert_eq!(step_line(&app, 10), "0A C-2 02 5 0");
+    assert_eq!(pitch_colour(&app, 10), Colour::White);
+    assert_eq!(label_colour(&app, 10), Colour::Lavender);
+}
+
+#[test]
+fn the_cursor_moves_past_len_and_stops_at_step_31() {
+    let app = phrase_app(&[&LEN_8[..], &[DOWN; 40]].concat());
+
+    assert_eq!(step_line(&app, 31), "1F[...].. . .");
+}
+
+#[test]
+fn a_step_past_len_can_be_edited_and_still_does_not_play() {
+    let app = phrase_app(
+        &[
+            &LEN_8[..],
+            &[DOWN; 20],
+            &[C, UP, RIGHT, Action::HexDigit(3)],
+        ]
+        .concat(),
+    );
+
+    assert_eq!(phrase(&app).length(), 8);
+    assert_eq!(step(&app, 20).pitch(), 24);
+    assert_eq!(step(&app, 20).instrument(), 3);
+    assert_eq!(step_line(&app, 20), "14 C-2[03]5 0");
+}
+
+#[test]
+fn entering_a_note_on_the_last_step_within_len_moves_into_the_dimmed_steps() {
+    let app = phrase_app(&[&LEN_8[..], &[DOWN; 7], &[C]].concat());
+
+    assert_eq!(step_line(&app, 8), "08[...].. . .");
 }

@@ -260,20 +260,19 @@ fn a_silent_step_pasted_over_a_note_silences_it() {
 }
 
 #[test]
-fn a_phrase_paste_stops_at_len_and_never_changes_it() {
+fn a_phrase_paste_reaches_past_len_stops_at_step_31_and_never_changes_len() {
     let mut app = App::with_project(phrase_music());
     apply(&mut app, &[TAB, TAB, SELECT]);
     apply(&mut app, &moves(DOWN, 3));
     app.apply(Action::Copy);
-    apply(&mut app, &moves(DOWN, 3));
+    apply(&mut app, &moves(DOWN, 27));
 
     app.apply(Action::Paste);
 
     let phrase = app.project().phrase(PhraseId::new(0));
     assert_eq!(phrase.length(), 8);
-    assert_eq!(phrase.step(6).pitch(), 24);
-    assert_eq!(phrase.step(7).pitch(), 25);
-    assert_eq!(phrase.step(8), Step::default());
+    assert_eq!(phrase.step(30).pitch(), 24);
+    assert_eq!(phrase.step(31).pitch(), 25);
     assert_eq!(status_line(&app), "! PASTE LOST 2 ROWS");
 }
 

@@ -177,12 +177,12 @@ fn the_cursor_stops_at_the_edges_of_every_pane() {
     let app = app_after(
         &[
             &[Action::FocusNext, Action::FocusNext][..],
-            &[Action::Move(Direction::Down); 30],
+            &[Action::Move(Direction::Down); 40],
             &[Action::Move(Direction::Right); 6],
         ]
         .concat(),
     );
-    assert_eq!(phrase_text(&app, 20), "0F ... .. .[.]");
+    assert_eq!(phrase_text(&app, 36), "1F ... .. .[.]");
 
     let app = app_after(
         &[

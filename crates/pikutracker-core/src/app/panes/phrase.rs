@@ -1,6 +1,6 @@
 use super::{
-    EMPTY, HEADING, SELECTED, VALUE, draw_out_of_range_flag, draw_row_label, draw_styled_value,
-    draw_title, id_text, stepped,
+    DIMMED, EMPTY, HEADING, SELECTED, VALUE, draw_out_of_range_flag, draw_row_label,
+    draw_styled_value, draw_title, id_text, stepped,
 };
 use crate::app::layout::Area;
 use crate::app::selection::{CellPosition, CellRange};
@@ -135,10 +135,6 @@ impl PhrasePane {
         self.header_row = None;
     }
 
-    pub fn keep_inside(&mut self, phrase: &Phrase) {
-        self.step = self.step.min(phrase.length() - 1);
-    }
-
     pub fn key_context(&self) -> KeyContext {
         if self.step_cell() == Some(StepCell::Pitch) {
             KeyContext::PhrasePitch
@@ -147,14 +143,14 @@ impl PhrasePane {
         }
     }
 
-    pub fn move_cursor(&mut self, direction: Direction, phrase: &Phrase) {
+    pub fn move_cursor(&mut self, direction: Direction) {
         let (columns, rows) = direction.column_and_row_delta();
         match self.header_row {
             Some(row) => self.move_in_header(row, columns, rows),
             None if rows < 0 && self.step == 0 => self.enter_header(),
             None => {
                 self.column = stepped(self.column, columns, STEP_CELLS.len());
-                self.step = stepped(self.step, rows, phrase.length());
+                self.step = stepped(self.step, rows, MAX_STEPS);
             }
         }
     }
@@ -196,7 +192,7 @@ impl PhrasePane {
         step.set_pitch(pitch);
         step.set_instrument(i32::from(self.instrument));
         step.set_volume(i32::from(self.volume));
-        self.step = stepped(self.step, 1, phrase.length());
+        self.step = stepped(self.step, 1, MAX_STEPS);
     }
 
     pub fn instrument_under_cursor(&self, phrase: &Phrase) -> Option<u8> {
@@ -279,10 +275,7 @@ impl PhrasePane {
         }
         match self.header_cell() {
             Some(HeaderCell::Speed) => phrase.set_speed(value),
-            Some(HeaderCell::Length) => {
-                phrase.set_length(value);
-                self.step = self.step.min(phrase.length() - 1);
-            }
+            Some(HeaderCell::Length) => phrase.set_length(value),
             Some(HeaderCell::Noiz) => phrase.filters_mut().set_noiz(value > 0),
             Some(HeaderCell::Buzz) => phrase.filters_mut().set_buzz(value > 0),
             Some(HeaderCell::Detune) => phrase.filters_mut().set_detune(value),
@@ -348,7 +341,7 @@ impl PhrasePane {
         columns: &RangeInclusive<usize>,
         rows: &[Step],
     ) -> usize {
-        let fitting = rows.len().min(phrase.length().saturating_sub(self.step));
+        let fitting = rows.len().min(MAX_STEPS.saturating_sub(self.step));
         for (index, source) in (self.step..).zip(&rows[..fitting]) {
             let step = phrase.step_mut(index);
             *step = pasted_step(*step, *source, columns);
@@ -388,15 +381,22 @@ impl PhrasePane {
         self.draw_header(grid, area, focused, phrase);
         grid.put(area.column, HEADER_ROWS - 1, "   NOT IN V F", HEADING);
 
-        for index in 0..phrase.length().min(MAX_STEPS) {
+        for index in 0..MAX_STEPS {
             let row = HEADER_ROWS + index;
             let label = format!("{index:02X}");
-            draw_row_label(grid, area.column, row, &label, playing_step == Some(index));
+            let plays = index < phrase.length();
+            if plays {
+                draw_row_label(grid, area.column, row, &label, playing_step == Some(index));
+            } else {
+                grid.put(area.column, row, &label, DIMMED);
+            }
             let on_this_step = focused && self.header_row.is_none() && index == self.step;
             let texts = step_texts(phrase.step(index));
             for (cell, ((_, offset, _), text)) in STEP_CELLS.iter().zip(&texts).enumerate() {
                 let is_cursor = on_this_step && cell == self.column;
-                let style = if phrase.step(index).is_silent() {
+                let style = if !plays {
+                    DIMMED
+                } else if phrase.step(index).is_silent() {
                     EMPTY
                 } else {
                     VALUE

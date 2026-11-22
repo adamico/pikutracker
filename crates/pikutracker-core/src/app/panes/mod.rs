@@ -16,6 +16,7 @@ const TITLE: Style = Style::fg(Colour::Blue);
 const FOCUSED_TITLE: Style = Style::fg(Colour::Yellow);
 const HEADING: Style = Style::fg(Colour::Lavender);
 const EMPTY: Style = Style::fg(Colour::DarkGrey);
+const DIMMED: Style = Style::fg(Colour::DarkGrey);
 const VALUE: Style = Style::fg(Colour::White);
 const CURSOR: Style = Style {
     fg: Colour::Black,

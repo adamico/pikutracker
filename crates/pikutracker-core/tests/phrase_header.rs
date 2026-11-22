@@ -129,7 +129,7 @@ fn len_runs_from_1_to_32_and_sets_the_visible_steps() {
     let app = phrase_app(&[UP, UP, Action::HexDigit(0), Action::HexDigit(4)]);
     assert_eq!(phrase(&app).length(), 4);
     assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 3), "03 ... .. . .");
-    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 4), "");
+    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 4), "04 ... .. . .");
 
     let app = phrase_app(&[UP, UP, Action::HexDigit(0), Action::HexDigit(0)]);
     assert_eq!(phrase(&app).length(), 1);
@@ -140,7 +140,7 @@ fn len_runs_from_1_to_32_and_sets_the_visible_steps() {
 }
 
 #[test]
-fn shortening_len_keeps_the_cursor_inside_the_phrase() {
+fn after_shortening_len_the_cursor_still_reaches_the_steps_past_it() {
     let app = phrase_app(
         &[
             &[DOWN; 10][..],
@@ -151,7 +151,7 @@ fn shortening_len_keeps_the_cursor_inside_the_phrase() {
         .concat(),
     );
 
-    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 1), "01[...].. . .");
+    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 7), "07[...].. . .");
 }
 
 #[test]

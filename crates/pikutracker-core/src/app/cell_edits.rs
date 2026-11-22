@@ -125,10 +125,7 @@ impl App {
         match self.focus {
             Focus::Song => self.song.move_cursor(direction),
             Focus::Chain => self.chain.move_cursor(direction),
-            Focus::Phrase => {
-                let shown = self.shown_phrase();
-                self.phrase.move_cursor(direction, &shown);
-            }
+            Focus::Phrase => self.phrase.move_cursor(direction),
             Focus::RightSlot => {}
         }
     }
