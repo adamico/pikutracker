@@ -34,18 +34,17 @@ fn write(project: &mut Project, id: u8, steps: usize) -> PhraseId {
     id
 }
 
-/// Song row 0 plays a 2-Step Phrase, a 4-Step Phrase, a 2-Step Phrase on
-/// Fill, and a Chain whose first entry is empty. Song row 1 keeps going.
+/// Song row 0 plays a 2-Step Phrase, a 4-Step Phrase, a 2-Step Phrase
+/// with a Phrase loop over all of it, and a Chain whose first entry is empty. Song row 1 keeps going.
 fn song() -> Project {
     let mut project = Project::new();
     let short = write(&mut project, 1, 2);
     let long = write(&mut project, 2, 4);
     let looping = write(&mut project, 3, 2);
+    project.phrase_mut(looping).set_loop(0, 2);
     *project.chain_mut(ChainId::new(0)).entry_mut(0) = Some(ChainEntry::new(short));
     *project.chain_mut(ChainId::new(1)).entry_mut(0) = Some(ChainEntry::new(long));
-    let mut fill = ChainEntry::new(looping);
-    fill.set_fill(true);
-    *project.chain_mut(ChainId::new(2)).entry_mut(0) = Some(fill);
+    *project.chain_mut(ChainId::new(2)).entry_mut(0) = Some(ChainEntry::new(looping));
     *project.chain_mut(ChainId::new(3)).entry_mut(1) = Some(ChainEntry::new(short));
     for track in 0..4 {
         project.set_song_cell(0, track, Some(ChainId::new(track as u8)));
@@ -122,7 +121,7 @@ fn a_track_whose_phrase_has_ended_keeps_a_full_dimmed_bar_while_it_waits() {
 }
 
 #[test]
-fn a_bar_on_fill_starts_again_on_each_pass() {
+fn a_looping_phrase_bar_starts_again_on_each_pass() {
     let (mut app, mut player) = played(&[PLAY_SONG], 1);
     assert_eq!(bar(&app, 0, LOOPING), playing(2, 2));
 
