@@ -2,6 +2,8 @@ use super::palette::Colour;
 
 pub const GRID_COLUMNS: usize = 106;
 pub const GRID_ROWS: usize = 45;
+pub const CELL_WIDTH: usize = 6;
+pub const CELL_HEIGHT: usize = 8;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Style {
@@ -22,6 +24,15 @@ impl Style {
 pub struct Cell {
     pub ch: char,
     pub style: Style,
+    pub bar: Option<ProgressBar>,
+}
+
+/// A background strip filling a cell's leftmost pixels, drawn under its
+/// character so the character stays readable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProgressBar {
+    pub colour: Colour,
+    pub pixels: u8,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -34,6 +45,7 @@ impl Grid {
         let blank = Cell {
             ch: ' ',
             style: Style::fg(Colour::LightGrey),
+            bar: None,
         };
         Self {
             cells: vec![blank; GRID_COLUMNS * GRID_ROWS],
@@ -50,7 +62,11 @@ impl Grid {
             return;
         }
         for (x, ch) in (column..GRID_COLUMNS).zip(text.chars()) {
-            self.cells[row * GRID_COLUMNS + x] = Cell { ch, style };
+            self.cells[row * GRID_COLUMNS + x] = Cell {
+                ch,
+                style,
+                bar: None,
+            };
         }
     }
 
@@ -60,6 +76,29 @@ impl Grid {
         }
         for x in column..(column + width).min(GRID_COLUMNS) {
             self.cells[row * GRID_COLUMNS + x].style = style;
+        }
+    }
+
+    /// Lays a bar over `width` cells, filling `filled` out of `of` of their
+    /// pixels from the left, and leaves their characters and styles alone.
+    pub fn put_bar(
+        &mut self,
+        column: usize,
+        row: usize,
+        width: usize,
+        (filled, of): (usize, usize),
+        colour: Colour,
+    ) {
+        if row >= GRID_ROWS || of == 0 {
+            return;
+        }
+        let pixels = width * CELL_WIDTH * filled.min(of) / of;
+        for (index, x) in (column..(column + width).min(GRID_COLUMNS)).enumerate() {
+            let in_cell = pixels.saturating_sub(index * CELL_WIDTH).min(CELL_WIDTH);
+            self.cells[row * GRID_COLUMNS + x].bar = (in_cell > 0).then_some(ProgressBar {
+                colour,
+                pixels: in_cell as u8,
+            });
         }
     }
 

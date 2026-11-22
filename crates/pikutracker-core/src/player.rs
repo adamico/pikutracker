@@ -143,6 +143,8 @@ impl TrackMix {
 pub struct Playhead {
     pub chain_row: Option<(usize, usize)>,
     pub tracks: [Option<(PhraseId, usize)>; TRACKS],
+    /// Tracks whose Phrase has ended and that wait for the Chain row to end.
+    pub waiting: [bool; TRACKS],
 }
 
 impl Playhead {
@@ -289,17 +291,26 @@ impl Playback {
 
     fn playhead(&self) -> Playhead {
         let mut tracks = [None; TRACKS];
-        for (track, place) in tracks.iter_mut().enumerate() {
+        let mut waiting = [false; TRACKS];
+        for track in (0..TRACKS).filter(|&track| self.sounds(track)) {
             let lane = self.lanes[track];
-            if lane.state == LaneState::Playing && self.sounds(track) {
-                *place = self.entry(track).map(|entry| (entry.phrase(), lane.step));
+            match lane.state {
+                LaneState::Playing => {
+                    tracks[track] = self.entry(track).map(|entry| (entry.phrase(), lane.step));
+                }
+                LaneState::Finished => waiting[track] = true,
+                LaneState::Idle => {}
             }
         }
         let chain_row = match self.route {
             Route::Phrase { .. } => None,
             _ => Some((self.row, self.k)),
         };
-        Playhead { chain_row, tracks }
+        Playhead {
+            chain_row,
+            tracks,
+            waiting,
+        }
     }
 
     fn chain_row_is_over(&self) -> bool {
