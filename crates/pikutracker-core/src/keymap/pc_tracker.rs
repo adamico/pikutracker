@@ -3,6 +3,7 @@ use super::key::Key;
 use super::shared::{
     self, ALT, CTRL, CTRL_SHIFT, SHIFT, anywhere, common_presses, in_context, nudge,
 };
+use super::trigger::{Scope, Trigger};
 use crate::app::{Action, Direction, KeyContext};
 
 const LOWER_OCTAVE_KEYS: &str = "zsxdcvgbhnjm";
@@ -41,7 +42,13 @@ pub(super) fn bindings() -> Vec<Binding> {
         (Key::Char('r'), Action::ResetMidiRow),
     ]
     .map(|(key, action)| in_context(KeyContext::MidiImport, key, action));
+    let selecting = [(Key::Up, true), (Key::Down, false)].map(|(key, up)| Binding {
+        scope: Scope::Selecting,
+        trigger: Trigger::Press(key, ALT),
+        action: Action::MoveRows { up },
+    });
     anywhere(common_presses().into_iter().chain(own))
+        .chain(selecting)
         .chain(shared::piano(piano))
         .chain(shared::typed_characters())
         .chain(midi_import)

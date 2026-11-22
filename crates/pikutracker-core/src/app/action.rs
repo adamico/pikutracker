@@ -61,6 +61,7 @@ pub enum Action {
     ToggleFill,
     ToggleSongLoopRow,
     Nudge { up: bool, coarse: bool },
+    MoveRows { up: bool },
     Confirm,
     Cancel,
     TypeChar(char),

@@ -1,6 +1,6 @@
 use super::messages::Report;
 use super::selection::{CellPosition, CellRange};
-use super::{App, Chain, ChainPane, Focus, NO_CHAIN_HERE, NO_PHRASE_HERE};
+use super::{App, Chain, ChainPane, Direction, Focus, NO_CHAIN_HERE, NO_PHRASE_HERE};
 use crate::project::{ChainEntry, ChainId, Step};
 use crate::screen::grid::Grid;
 use std::ops::RangeInclusive;
@@ -91,6 +91,43 @@ impl App {
             }
             Focus::Phrase => {
                 self.edit_phrase(|pane, phrase| pane.nudge_cells(phrase, cells, up, coarse));
+            }
+            Focus::RightSlot => {}
+        }
+    }
+
+    pub(super) fn move_rows(&mut self, up: bool) {
+        let Some(cells) = self.selected_cells() else {
+            return;
+        };
+        let moved = match self.focus {
+            Focus::Song => self
+                .project
+                .move_song_cells(cells.rows(), cells.columns(), up),
+            Focus::Chain => self
+                .chain_under_cursor()
+                .is_some_and(|id| self.project.chain_mut(id).move_entries(cells.rows(), up)),
+            Focus::Phrase => self
+                .phrase_under_cursor()
+                .is_some_and(|id| self.project.phrase_mut(id).move_steps(cells.rows(), up)),
+            Focus::RightSlot => false,
+        };
+        if moved {
+            self.move_selection_with_rows(up);
+        }
+    }
+
+    fn move_selection_with_rows(&mut self, up: bool) {
+        let direction = if up { Direction::Up } else { Direction::Down };
+        if let Some(start) = self.selection_start.as_mut() {
+            start.row = if up { start.row - 1 } else { start.row + 1 };
+        }
+        match self.focus {
+            Focus::Song => self.song.move_cursor(direction),
+            Focus::Chain => self.chain.move_cursor(direction),
+            Focus::Phrase => {
+                let shown = self.shown_phrase();
+                self.phrase.move_cursor(direction, &shown);
             }
             Focus::RightSlot => {}
         }

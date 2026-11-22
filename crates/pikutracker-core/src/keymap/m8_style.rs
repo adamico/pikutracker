@@ -45,6 +45,8 @@ pub(super) fn bindings() -> Vec<Binding> {
         trigger: Trigger::Press(key, NONE),
         action,
     });
+    let moving_rows = [(Key::Up, true), (Key::Down, false)]
+        .map(|(key, up)| chord(Scope::Selecting, OPTION, key, Action::MoveRows { up }));
     let in_midi_import = Scope::Context(KeyContext::MidiImport);
     let midi_import = [
         in_context(KeyContext::MidiImport, Key::Space, Action::ToggleVoice),
@@ -73,6 +75,7 @@ pub(super) fn bindings() -> Vec<Binding> {
         .chain(chords)
         .chain([double_tap])
         .chain(selecting)
+        .chain(moving_rows)
         .chain(shared::piano(PIANO_KEYS.chars()))
         .chain(shared::typed_characters())
         .chain(midi_import)

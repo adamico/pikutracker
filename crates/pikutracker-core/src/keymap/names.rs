@@ -81,6 +81,7 @@ pub fn named_actions() -> Vec<(String, Action)> {
                     Action::Nudge { up, coarse: true },
                 ),
                 (format!("MidiDrumNote{name}"), Action::MidiDrumNote { up }),
+                (format!("MoveRows{name}"), Action::MoveRows { up }),
             ]
         });
     units.chain(moves).chain(tracks).chain(nudges).collect()

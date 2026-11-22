@@ -1,6 +1,17 @@
 use super::{
     CHAIN_ENTRIES, Chain, ChainId, ID_COUNT, Phrase, PhraseId, Project, SONG_ROWS, Step, TRACKS,
 };
+use std::ops::RangeInclusive;
+
+fn move_run<T>(items: &mut [T], run: RangeInclusive<usize>, up: bool) -> bool {
+    let (first, last) = (*run.start(), *run.end());
+    match up {
+        true if first > 0 && last < items.len() => items[first - 1..=last].rotate_left(1),
+        false if last + 1 < items.len() => items[first..=last + 1].rotate_right(1),
+        _ => return false,
+    }
+    true
+}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct UnusedItems {
@@ -23,6 +34,10 @@ impl Phrase {
         }
     }
 
+    pub fn move_steps(&mut self, steps: RangeInclusive<usize>, up: bool) -> bool {
+        move_run(&mut self.steps[..self.length], steps, up)
+    }
+
     pub fn delete_step(&mut self, index: usize) {
         if index < self.length {
             self.steps[index..self.length].rotate_left(1);
@@ -35,6 +50,10 @@ impl Chain {
     pub fn insert_entry(&mut self, index: usize) {
         self.entries[index..].rotate_right(1);
         self.entries[index] = None;
+    }
+
+    pub fn move_entries(&mut self, entries: RangeInclusive<usize>, up: bool) -> bool {
+        move_run(&mut self.entries, entries, up)
     }
 
     pub fn delete_entry(&mut self, index: usize) {
@@ -99,6 +118,24 @@ impl Project {
                 loop_row
             }
         });
+    }
+
+    pub fn move_song_cells(
+        &mut self,
+        rows: RangeInclusive<usize>,
+        tracks: RangeInclusive<usize>,
+        up: bool,
+    ) -> bool {
+        for track in tracks {
+            let mut cells: Vec<Option<ChainId>> = self.song.iter().map(|row| row[track]).collect();
+            if !move_run(&mut cells, rows.clone(), up) {
+                return false;
+            }
+            for (row, cell) in self.song.iter_mut().zip(cells) {
+                row[track] = cell;
+            }
+        }
+        true
     }
 
     pub fn delete_song_row(&mut self, row: usize) {

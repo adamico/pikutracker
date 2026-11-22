@@ -83,6 +83,7 @@ These are the keys of the default PcTracker preset. The M8-style column applies 
 | Clear | Delete | same |
 | Insert row | Insert | same |
 | Delete row | Ctrl+Delete | same |
+| Move the selected rows up / down | Alt+Up / Alt+Down (while selecting) | X+Up / X+Down (while selecting) |
 | Undo / redo | Ctrl+Z / Ctrl+Y | same |
 | Start a selection | Ctrl+B | X+Shift |
 | Copy | Ctrl+C | X (while selecting) |

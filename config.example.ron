@@ -54,6 +54,8 @@
         // "Redo": "Ctrl+Y",
         // "InsertRow": "Insert",
         // "DeleteRow": "Ctrl+Delete",
+        // "MoveRowsUp": "Alt+Up",
+        // "MoveRowsDown": "Alt+Down",
         // "ChangeSpeed": "Ctrl+Shift+T",
         // "ScaleSpeed": "Alt+T",
         // "PurgeUnused": "Ctrl+Shift+P",

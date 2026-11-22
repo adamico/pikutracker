@@ -513,6 +513,7 @@ impl App {
             }
             Action::HexDigit(digit) => self.type_digit(digit),
             Action::Nudge { up, coarse } => self.nudge(up, coarse),
+            Action::MoveRows { up } => self.move_rows(up),
             _ => {}
         }
         if let Some((index, before)) = before_edit {
