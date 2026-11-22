@@ -1,6 +1,6 @@
 use pikutracker_core::app::{Action, App, Direction};
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project, Step};
-use pikutracker_core::screen::font::{GLYPH_HEIGHT, GLYPH_WIDTH, glyph};
+use pikutracker_core::screen::font::{GLYPH_WIDTH, glyph};
 use pikutracker_core::screen::frame::{Frame, LOGICAL_HEIGHT, LOGICAL_WIDTH};
 use pikutracker_core::screen::grid::{GRID_COLUMNS, GRID_ROWS, Grid, Style};
 use pikutracker_core::screen::palette::Colour;
@@ -118,9 +118,8 @@ fn a_progress_bar_fills_pixels_from_the_left_under_the_character() {
     let ink = glyph('0');
     for x in 0..12 {
         for y in 0..8 {
-            let inked = x % 6 < GLYPH_WIDTH
-                && y < GLYPH_HEIGHT
-                && ink[y] & (1 << (GLYPH_WIDTH - 1 - x % 6)) != 0;
+            let row_bits = ink.get(y).copied().unwrap_or(0);
+            let inked = x % 6 < GLYPH_WIDTH && row_bits & (1 << (GLYPH_WIDTH - 1 - x % 6)) != 0;
             let expected = if inked {
                 Colour::White
             } else if x < 9 {
