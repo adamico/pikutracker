@@ -16,6 +16,7 @@ pub(super) struct SpeedEntry {
     shown_speed: u8,
     phrases: Vec<PhraseId>,
     used_elsewhere: usize,
+    in_selection: bool,
     digits: Vec<u8>,
     refused: bool,
     text: String,
@@ -26,12 +27,14 @@ impl SpeedEntry {
         shown: PhraseId,
         shown_speed: u8,
         (phrases, used_elsewhere): (Vec<PhraseId>, usize),
+        in_selection: bool,
     ) -> Self {
         let mut entry = Self {
             shown,
             shown_speed,
             phrases,
             used_elsewhere,
+            in_selection,
             digits: Vec::new(),
             refused: false,
             text: String::new(),
@@ -51,10 +54,16 @@ impl SpeedEntry {
             .map(|digit| format!("{digit:X}"))
             .collect();
         self.text = format!(
-            "{}NEW SPEED FOR PHRASE {:02X} (NOW {:02X}): {typed:_<width$}  ENTER APPLY  ESC CANCEL",
+            "{}PHRASE {:02X} SPEED (NOW {:02X}): {typed:_<width$}  SCALES {}: {}  ENTER APPLY  ESC CANCEL",
             if self.refused { BAD_SPEED } else { "" },
             self.shown.number(),
             self.shown_speed,
+            counted(self.phrases.len(), "PHRASE"),
+            if self.in_selection {
+                "SELECTION"
+            } else {
+                "WHOLE SONG"
+            },
             width = SPEED_HEX_DIGITS,
         );
     }
@@ -120,14 +129,15 @@ impl App {
             return;
         };
         let shown_speed = self.project.phrase(shown).speed();
-        self.speed_entry = Some(SpeedEntry::new(shown, shown_speed, self.speed_scope()));
+        let (scope, in_selection) = self.speed_scope();
+        self.speed_entry = Some(SpeedEntry::new(shown, shown_speed, scope, in_selection));
     }
 
-    fn speed_scope(&self) -> (Vec<PhraseId>, usize) {
+    fn speed_scope(&self) -> ((Vec<PhraseId>, usize), bool) {
         match (self.focus, self.selected_cells()) {
-            (Focus::Song, Some(cells)) => self.song_scope(cells),
-            (Focus::Chain, Some(cells)) => self.chain_scope(cells),
-            _ => self.song_scope(whole_song()),
+            (Focus::Song, Some(cells)) => (self.song_scope(cells), true),
+            (Focus::Chain, Some(cells)) => (self.chain_scope(cells), true),
+            _ => (self.song_scope(whole_song()), false),
         }
     }
 

@@ -75,7 +75,46 @@ fn nothing_changes_until_enter() {
     );
 
     assert!(app.project() == &before);
-    assert!(status_line(&app).contains("NEW SPEED"));
+    assert!(status_line(&app).contains("PHRASE 00 SPEED"));
+}
+
+#[test]
+fn the_question_names_the_whole_song_when_nothing_is_selected() {
+    let mut app = App::with_project(two_rows());
+
+    app.apply(Action::ChangeSpeed);
+
+    assert!(
+        status_line(&app).contains("SCALES 3 PHRASES: WHOLE SONG"),
+        "{}",
+        status_line(&app)
+    );
+}
+
+#[test]
+fn the_question_names_the_selection_when_one_is_in_scope() {
+    let mut app = App::with_project(two_rows());
+
+    apply(&mut app, &[TAB, SELECT, Action::ChangeSpeed]);
+
+    assert!(
+        status_line(&app).contains("SCALES 1 PHRASE: SELECTION"),
+        "{}",
+        status_line(&app)
+    );
+}
+
+#[test]
+fn the_question_names_the_whole_song_for_a_selection_of_steps() {
+    let mut app = App::with_project(two_rows());
+
+    apply(&mut app, &[TAB, TAB, SELECT, DOWN, Action::ChangeSpeed]);
+
+    assert!(
+        status_line(&app).contains("WHOLE SONG"),
+        "{}",
+        status_line(&app)
+    );
 }
 
 #[test]
@@ -390,7 +429,7 @@ fn other_keys_wait_for_the_answer() {
     apply(&mut app, &[Action::ChangeSpeed, Action::Clone, DOWN]);
 
     assert_eq!(app.project().song_cell(0, 0), Some(ChainId::new(0)));
-    assert!(status_line(&app).contains("NEW SPEED"));
+    assert!(status_line(&app).contains("PHRASE 00 SPEED"));
 }
 
 #[test]
