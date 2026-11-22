@@ -27,20 +27,20 @@ One of the Song's 8 vertical lanes, played by one voice. Export picks 4 of them 
 _Avoid_: Channel (that is PICO-8's word)
 
 **Chain**:
-An ordered list of entries, each either a Phrase (with an optional transpose and an optional Fill) or empty. An empty entry leaves its Track silent for that Chain row.
+An ordered list of entries, each either a Phrase (with an optional transpose) or empty. An empty entry leaves its Track silent for that Chain row.
 _Avoid_: Block, sequence
 
 **Chain row**:
-The k-th entry of every Track's Chain within one Song row. They play together, and the Chain row lasts as long as its longest Phrase not marked Fill. Exported as one Pattern.
+The k-th entry of every Track's Chain within one Song row. They play together, and the Chain row lasts as long as its longest Phrase without a Phrase loop. If every Phrase in it loops, the longest plays once through and sets the length. Exported as one Pattern.
 _Avoid_: Position, bar
 
-**Fill**:
-A mark on a Chain entry: repeat its Phrase until the Chain row ends.
-_Avoid_: Loop (Phrases have no loop points)
-
 **Phrase**:
-A run of 1 to 32 Steps (16 by default); the unit where notes are written.
+32 Steps, of which the first 1 to 32 play (its length, 16 by default); the unit where notes are written. Steps past the length keep their notes and are shown, but don't play.
 _Avoid_: Pattern (that is PICO-8's word), SFX
+
+**Phrase loop**:
+The Steps from a chosen Step to the end of a Phrase's length, repeated until the Chain row ends. Steps before it play once as a lead-in.
+_Avoid_: Fill, loop start (that is PICO-8's flag), loop point
 
 **Loose Phrase**:
 A Phrase that holds something but that no Chain uses. Cart Import keeps a Cart's other SFX as loose Phrases, outside the Claim.

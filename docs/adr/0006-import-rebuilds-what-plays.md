@@ -1,4 +1,5 @@
 # Cart Import rebuilds what plays, not the stored SFX
+_Partly superseded by [ADR 0022](0022-phrases-loop-as-sfx-do.md): Cart Import copies SFX loops into Phrase loops instead of unrolling them or using Fill._
 
 Cart Import works out how long PICO-8 plays each Pattern, in Ticks and by PICO-8's own rules, and turns each channel into a Phrase holding the Steps that channel plays in that time. An SFX does not map one-to-one to a Phrase. We chose this over copying each SFX into a Phrase because PICO-8's Pattern timing (the left-most non-looping channel ends the Pattern) differs from the Project's (the longest Phrase not marked Fill ends the Chain row, per ADR 0005). Copied SFX would make an imported Cart play differently in the tracker and after Export.
 

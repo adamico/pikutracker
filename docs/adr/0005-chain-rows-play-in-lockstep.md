@@ -1,4 +1,5 @@
 # Chain rows play in lockstep, one Pattern each
+_Partly superseded by [ADR 0022](0022-phrases-loop-as-sfx-do.md): the loop moved from Fill on the Chain entry to the Phrase loop._
 
 Within a Song row, the k-th entry of every Track's Chain plays together as a **Chain row**, and Export compiles each Chain row into exactly one Pattern. A Chain entry can be marked **Fill**, which repeats its Phrase until the Chain row ends and compiles to a looping SFX. A Chain row lasts as long as its longest Phrase that is not marked Fill. This is PICO-8's own song structure: a flat list of Patterns, each holding 4 SFX that play together, where a looping SFX repeats until the Pattern ends. We chose it over M8-style free-running Chains, which Export would have to split into SFX wherever any Track's Phrase starts or ends. Free-running uses more SFX in ways that are hard to predict, can't Export cuts that land mid-Step or mid-arpeggio-group, and doesn't round-trip through Cart Import. The cost: Chains in parallel Tracks don't run independently. A [16, 16] Chain beside a [32] Chain lasts 48 Steps, not 32.
 
