@@ -31,7 +31,7 @@ use crate::project::{Chain, ChainEntry, ChainId, Phrase, PhraseId, Project, Step
 use crate::screen::grid::Grid;
 use crate::settings::AppState;
 use cell_edits::Clipboard;
-use change_speed::SpeedEntry;
+use change_speed::{SpeedChange, SpeedEntry};
 use files::{Question, Waiting};
 use focus::Focus;
 use history::{CursorPlace, History, Merge};
@@ -483,7 +483,8 @@ impl App {
             Action::InsertRow => self.insert_row(),
             Action::DeleteRow => self.delete_row(),
             Action::PurgeUnused => self.ask_to_purge(),
-            Action::ChangeSpeed => self.ask_for_speed(),
+            Action::ChangeSpeed => self.ask_for_speed(SpeedChange::Set),
+            Action::ScaleSpeed => self.ask_for_speed(SpeedChange::Scale),
             Action::Confirm => self.confirm(),
             Action::Cancel => self.cancel(),
             Action::Move(direction) => self.move_cursor(direction),

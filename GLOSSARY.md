@@ -74,6 +74,13 @@ _Avoid_: Sample, wavetable
 How many Ticks each Step of a Phrase lasts (1–255). Each Phrase has its own Speed; the tempo in BPM is only a readout of it.
 _Avoid_: Tempo, BPM (when meaning the stored value)
 
+**Change Speed**:
+The command that gives every Phrase in its scope the same typed Speed. Its scope is the selected Song rows or Chain entries, or else the whole Song.
+
+**Scale Speed**:
+The command that multiplies the Speed of every Phrase in its scope by the typed Speed over the Speed of the Phrase on show, so Phrases at different Speeds keep their timing against each other. It has the same scope as Change Speed.
+_Avoid_: Set Speed
+
 **Tick**:
 PICO-8's unit of sound time, about 1/120 of a second.
 _Avoid_: Frame

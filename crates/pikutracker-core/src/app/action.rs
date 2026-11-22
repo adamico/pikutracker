@@ -42,6 +42,7 @@ pub enum Action {
     InsertRow,
     DeleteRow,
     ChangeSpeed,
+    ScaleSpeed,
     PurgeUnused,
     ToggleCart,
     SuggestClaim,

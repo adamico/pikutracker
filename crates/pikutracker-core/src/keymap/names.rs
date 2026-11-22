@@ -1,7 +1,7 @@
 use crate::app::{Action, Direction};
 use crate::project::TRACKS;
 
-const UNIT_ACTIONS: [Action; 43] = [
+const UNIT_ACTIONS: [Action; 44] = [
     Action::FocusNext,
     Action::FocusPrevious,
     Action::NewProject,
@@ -23,6 +23,7 @@ const UNIT_ACTIONS: [Action; 43] = [
     Action::InsertRow,
     Action::DeleteRow,
     Action::ChangeSpeed,
+    Action::ScaleSpeed,
     Action::PurgeUnused,
     Action::ToggleCart,
     Action::SuggestClaim,
