@@ -314,3 +314,14 @@ fn without_a_selection_x_up_and_down_still_jump_in_the_m8_style_preset() {
     );
     assert!(app.grid().text_dump().contains("10 [--]"));
 }
+
+#[test]
+fn moving_song_rows_leaves_the_song_loop_row_where_it_is() {
+    let mut project = song();
+    project.set_song_loop_row(Some(1));
+    let mut app = App::with_project(project);
+
+    apply(&mut app, &[DOWN, SELECT, ROWS_DOWN]);
+
+    assert_eq!(app.project().song_loop_row(), Some(1));
+}
