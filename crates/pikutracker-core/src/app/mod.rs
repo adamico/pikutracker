@@ -322,8 +322,6 @@ impl App {
         if let Some(step) = step {
             self.phrase.follow(step);
         }
-        let shown = self.shown_phrase();
-        self.phrase.keep_inside(&shown);
     }
 
     fn toggle_follow(&mut self) {
@@ -522,8 +520,6 @@ impl App {
     }
 
     fn settle_after_edit(&mut self) {
-        let shown = self.shown_phrase();
-        self.phrase.keep_inside(&shown);
         self.send_edits_to_the_player();
     }
 
@@ -815,10 +811,7 @@ impl App {
             Focus::Song => self.song.move_cursor(direction),
             Focus::Chain => self.chain.move_cursor(direction),
             Focus::Phrase if self.selection_would_reach_phrase_header(direction) => {}
-            Focus::Phrase => {
-                let phrase = self.shown_phrase();
-                self.phrase.move_cursor(direction, &phrase);
-            }
+            Focus::Phrase => self.phrase.move_cursor(direction),
             Focus::RightSlot if self.log_open => self.log.move_cursor(direction),
             Focus::RightSlot => self.overview.move_cursor(direction),
         }

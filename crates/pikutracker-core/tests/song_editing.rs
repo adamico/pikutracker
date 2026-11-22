@@ -296,7 +296,7 @@ fn two_entries_sharing_a_phrase_show_the_same_notes() {
 }
 
 #[test]
-fn the_phrase_cursor_stays_inside_a_shorter_phrase_it_follows_to() {
+fn the_phrase_cursor_keeps_its_step_past_the_length_of_a_shorter_phrase_it_follows_to() {
     let mut app = chain_app();
     apply(&mut app, &id(1));
     app.apply(DOWN);
@@ -317,7 +317,7 @@ fn the_phrase_cursor_stays_inside_a_shorter_phrase_it_follows_to() {
     apply(&mut app, &[DOWN; 15]);
     apply(&mut app, &[BACK, DOWN, TAB]);
 
-    assert_eq!(phrase_text(&app, 6), "01[...].. . .");
+    assert_eq!(phrase_text(&app, 20), "0F[...].. . .");
 }
 
 #[test]

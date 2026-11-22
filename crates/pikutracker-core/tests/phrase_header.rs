@@ -166,7 +166,7 @@ fn with_end_00_the_start_is_the_length_and_nothing_loops() {
     assert_eq!(phrase(&app).length(), 4);
     assert_eq!(phrase(&app).phrase_loop(), None);
     assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 3), "03 ... .. . .");
-    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 4), "");
+    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 4), "04 ... .. . .");
 
     let app = with_loop(1, 0);
     assert_eq!(phrase(&app).length(), 1);
@@ -232,18 +232,19 @@ fn each_loop_edit_is_one_undo_step() {
 }
 
 #[test]
-fn shortening_the_phrase_keeps_the_cursor_inside_it() {
+fn after_shortening_len_the_cursor_still_reaches_the_steps_past_it() {
     let app = phrase_app(
         &[
             &[DOWN; 10][..],
-            &[UP; 13],
-            &[RIGHT, Action::HexDigit(0), Action::HexDigit(2), LEFT],
-            &[DOWN; 9],
+            &[UP; 10],
+            &typed(&LOOP_START, 0x02),
+            &[LEFT],
+            &[DOWN; 10],
         ]
         .concat(),
     );
 
-    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 1), "01[...].. . .");
+    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 7), "07[...].. . .");
 }
 
 #[test]
@@ -254,6 +255,23 @@ fn shortening_and_lengthening_the_phrase_keeps_the_steps_past_the_end() {
             &[Action::PianoKey(0)],
             &[UP; 13],
             &[RIGHT, Action::HexDigit(0), Action::HexDigit(4)],
+            &[Action::HexDigit(1), Action::HexDigit(0)],
+        ]
+        .concat(),
+    );
+
+    assert_eq!(phrase(&app).length(), 16);
+    assert_eq!(phrase(&app).step(8).volume(), 5);
+}
+
+#[test]
+fn shortening_and_lengthening_keeps_the_steps_past_the_end() {
+    let app = phrase_app(
+        &[
+            &[DOWN; 8][..],
+            &[Action::PianoKey(0)],
+            &[UP; 9],
+            &typed(&LOOP_START, 0x04),
             &[Action::HexDigit(1), Action::HexDigit(0)],
         ]
         .concat(),
