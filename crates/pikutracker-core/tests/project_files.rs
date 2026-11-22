@@ -429,7 +429,7 @@ fn each_project_opens_at_the_top_of_the_song_with_the_song_pane_focused() {
         dump.lines().nth(2).unwrap()[..28].trim_end(),
         "00 [--]-- -- -- -- -- -- --"
     );
-    assert!(dump.lines().nth(2).unwrap().contains("0 -- --- ----"));
+    assert!(dump.lines().nth(2).unwrap().contains("0 -- ---  "));
 }
 
 #[test]

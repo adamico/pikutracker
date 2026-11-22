@@ -33,9 +33,11 @@ fn phrase_app() -> App {
             UP,
             Action::HexDigit(0),
             Action::HexDigit(8),
-            DOWN,
+            RIGHT,
             Action::HexDigit(0),
             Action::HexDigit(4),
+            LEFT,
+            DOWN,
             DOWN,
             DOWN,
         ],
@@ -209,8 +211,12 @@ fn a_phrase_silent_inside_len_counts_as_empty() {
             UP,
             UP,
             UP,
+            UP,
+            RIGHT,
             Action::HexDigit(1),
             Action::HexDigit(0),
+            LEFT,
+            DOWN,
             DOWN,
             DOWN,
         ],
@@ -219,9 +225,9 @@ fn a_phrase_silent_inside_len_counts_as_empty() {
     apply(
         &mut app,
         &[
-            &[UP; 11][..],
-            &[Action::HexDigit(0), Action::HexDigit(4)],
-            &[DOWN, DOWN],
+            &[UP; 12][..],
+            &[RIGHT, Action::HexDigit(0), Action::HexDigit(4), LEFT],
+            &[DOWN, DOWN, DOWN],
         ]
         .concat(),
     );

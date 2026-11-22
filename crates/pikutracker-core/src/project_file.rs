@@ -142,13 +142,13 @@ struct EntryDocument {
     index: u8,
     phrase: u8,
     transpose: i8,
-    fill: bool,
 }
 
 #[derive(Serialize, Deserialize)]
 struct PhraseDocument {
     id: u8,
-    length: u8,
+    loop_start: u8,
+    loop_end: u8,
     speed: u8,
     noiz: bool,
     buzz: bool,
@@ -379,7 +379,6 @@ impl ChainDocument {
                     index: index as u8,
                     phrase: entry.phrase().number(),
                     transpose: entry.transpose(),
-                    fill: entry.fill(),
                 })
             })
             .collect();
@@ -392,7 +391,6 @@ impl ChainDocument {
             require(index < CHAIN_ENTRIES, "CHAIN ENTRY IS OUT OF RANGE")?;
             let mut read = ChainEntry::new(PhraseId::new(entry.phrase));
             read.set_transpose(i32::from(entry.transpose));
-            read.set_fill(entry.fill);
             *project.chain_mut(ChainId::new(self.id)).entry_mut(index) = Some(read);
         }
         Ok(())
@@ -408,7 +406,8 @@ impl PhraseDocument {
             .map_or(0, |index| index + 1);
         Self {
             id,
-            length: phrase.length() as u8,
+            loop_start: phrase.loop_start(),
+            loop_end: phrase.loop_end(),
             speed: phrase.speed(),
             noiz: filters.noiz(),
             buzz: filters.buzz(),
@@ -422,16 +421,17 @@ impl PhraseDocument {
     }
 
     fn read_into(self, project: &mut Project) -> Result<(), String> {
+        let in_range = |value: u8| usize::from(value) <= MAX_STEPS;
         require(
-            (1..=MAX_STEPS).contains(&usize::from(self.length)),
-            "PHRASE LENGTH IS OUT OF RANGE",
+            in_range(self.loop_start) && in_range(self.loop_end),
+            "PHRASE LOOP IS OUT OF RANGE",
         )?;
         require(self.speed >= 1, "PHRASE SPEED IS 0")?;
         require(self.steps.len() <= MAX_STEPS, "PHRASE HAS TOO MANY STEPS")?;
         let filters = read_filters(self.noiz, self.buzz, self.detune, self.reverb, self.dampen)?;
 
         let phrase = project.phrase_mut(PhraseId::new(self.id));
-        phrase.set_length(i32::from(self.length));
+        phrase.set_loop(i32::from(self.loop_start), i32::from(self.loop_end));
         phrase.set_speed(i32::from(self.speed));
         *phrase.filters_mut() = filters;
         for (index, token) in self.steps.iter().enumerate() {

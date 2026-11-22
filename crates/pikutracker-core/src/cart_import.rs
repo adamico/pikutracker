@@ -420,7 +420,7 @@ impl<'a> SongBuilder<'a> {
                 self.warnings.push(ImportWarning::at(
                     place,
                     format!(
-                        "SFX {played:02X} LEAD-IN NEEDS {needed} STEPS UNROLLED: KEPT AS FILL \
+                        "SFX {played:02X} LEAD-IN NEEDS {needed} STEPS UNROLLED: KEPT AS A PHRASE LOOP \
                          OVER THE LOOP BODY ONLY."
                     ),
                 ));
@@ -441,9 +441,7 @@ impl<'a> SongBuilder<'a> {
             self.out_of_phrases = true;
             return None;
         };
-        let mut placed = ChainEntry::new(id);
-        placed.set_fill(entry.fill);
-        *chain.entry_mut(k) = Some(placed);
+        *chain.entry_mut(k) = Some(ChainEntry::new(id));
         Some((id, entry.phrase.length()))
     }
 

@@ -5,6 +5,7 @@ pub(crate) use change::ProjectChange;
 pub use usage::UnusedItems;
 
 use std::collections::BTreeMap;
+use std::ops::Range;
 
 pub const MAX_STEPS: usize = 32;
 pub const TRACKS: usize = 8;
@@ -170,7 +171,8 @@ impl Filters {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Phrase {
     steps: [Step; MAX_STEPS],
-    length: usize,
+    loop_start: u8,
+    loop_end: u8,
     speed: u8,
     filters: Filters,
 }
@@ -179,7 +181,8 @@ impl Default for Phrase {
     fn default() -> Self {
         Self {
             steps: [Step::default(); MAX_STEPS],
-            length: DEFAULT_LENGTH,
+            loop_start: DEFAULT_LENGTH as u8,
+            loop_end: 0,
             speed: DEFAULT_SPEED,
             filters: Filters::default(),
         }
@@ -195,12 +198,55 @@ impl Phrase {
         &mut self.steps[index]
     }
 
+    /// The number of Steps that play, read from the loop pair as PICO-8 reads an SFX's.
     pub const fn length(&self) -> usize {
-        self.length
+        let (start, end) = (self.loop_start as usize, self.loop_end as usize);
+        if end == 0 && start > 0 {
+            start
+        } else if start < end {
+            end
+        } else {
+            MAX_STEPS
+        }
     }
 
+    /// The Steps of the Phrase loop, when the Phrase has one.
+    pub const fn phrase_loop(&self) -> Option<Range<usize>> {
+        let (start, end) = (self.loop_start as usize, self.loop_end as usize);
+        if start < end { Some(start..end) } else { None }
+    }
+
+    pub const fn loops(&self) -> bool {
+        self.phrase_loop().is_some()
+    }
+
+    pub const fn loop_start(&self) -> u8 {
+        self.loop_start
+    }
+
+    pub const fn loop_end(&self) -> u8 {
+        self.loop_end
+    }
+
+    pub fn set_loop_start(&mut self, start: i32) {
+        self.loop_start = start.clamp(0, MAX_STEPS as i32) as u8;
+    }
+
+    pub fn set_loop_end(&mut self, end: i32) {
+        self.loop_end = end.clamp(0, MAX_STEPS as i32) as u8;
+    }
+
+    pub fn set_loop(&mut self, start: i32, end: i32) {
+        self.set_loop_start(start);
+        self.set_loop_end(end);
+    }
+
+    /// Plays the first `length` Steps without a Phrase loop, as `LOOP 00 00` when all 32 play.
     pub fn set_length(&mut self, length: i32) {
-        self.length = length.clamp(1, MAX_STEPS as i32) as usize;
+        match length.clamp(1, MAX_STEPS as i32) {
+            full if full == MAX_STEPS as i32 => self.set_loop(0, 0),
+            length => self.set_loop(length, 0),
+        }
     }
 
     pub const fn speed(&self) -> u8 {
@@ -224,14 +270,14 @@ impl Phrase {
     }
 
     pub fn ticks(&self) -> u32 {
-        self.length as u32 * u32::from(self.speed)
+        self.length() as u32 * u32::from(self.speed)
     }
 
     pub fn step_is_out_of_range(&self, index: usize, transpose: i8) -> bool {
         let step = self.steps[index];
         let pitch = i32::from(step.pitch) + i32::from(transpose);
         let heard =
-            (index < self.length && !step.is_silent()) || self.steps_read_by_arpeggios()[index];
+            (index < self.length() && !step.is_silent()) || self.steps_read_by_arpeggios()[index];
         heard && !(0..=MAX_PITCH).contains(&pitch)
     }
 
@@ -241,7 +287,7 @@ impl Phrase {
 
     pub fn steps_read_by_arpeggios(&self) -> [bool; MAX_STEPS] {
         let mut read = [false; MAX_STEPS];
-        for index in (0..self.length).filter(|&index| self.steps[index].plays_arpeggio()) {
+        for index in (0..self.length()).filter(|&index| self.steps[index].plays_arpeggio()) {
             let group = arpeggio_group_start(index);
             read[group..group + ARPEGGIO_GROUP].fill(true);
         }
@@ -253,7 +299,7 @@ impl Phrase {
     }
 
     pub fn is_silent(&self) -> bool {
-        self.steps[..self.length]
+        self.steps[..self.length()]
             .iter()
             .all(|step| step.is_silent())
     }
@@ -289,7 +335,6 @@ impl ChainId {
 pub struct ChainEntry {
     phrase: PhraseId,
     transpose: i8,
-    fill: bool,
 }
 
 impl ChainEntry {
@@ -297,7 +342,6 @@ impl ChainEntry {
         Self {
             phrase,
             transpose: 0,
-            fill: false,
         }
     }
 
@@ -309,20 +353,12 @@ impl ChainEntry {
         self.transpose
     }
 
-    pub const fn fill(self) -> bool {
-        self.fill
-    }
-
     pub fn set_phrase(&mut self, phrase: PhraseId) {
         self.phrase = phrase;
     }
 
     pub fn set_transpose(&mut self, semitones: i32) {
         self.transpose = semitones.clamp(MIN_TRANSPOSE, MAX_TRANSPOSE) as i8;
-    }
-
-    pub fn set_fill(&mut self, fill: bool) {
-        self.fill = fill;
     }
 }
 
@@ -492,19 +528,23 @@ impl Project {
 
     pub fn chain_row_ticks(&self, row: usize, chain_row: usize) -> u32 {
         let mut longest = 0;
-        let mut longest_fill = 0;
+        let mut longest_looping = 0;
         for track in 0..TRACKS {
             if let Some(entry) = self.chain_row_entry(row, track, chain_row) {
-                let ticks = self.phrase(entry.phrase()).ticks();
-                let slot = if entry.fill() {
-                    &mut longest_fill
+                let phrase = self.phrase(entry.phrase());
+                let slot = if phrase.loops() {
+                    &mut longest_looping
                 } else {
                     &mut longest
                 };
-                *slot = ticks.max(*slot);
+                *slot = phrase.ticks().max(*slot);
             }
         }
-        if longest > 0 { longest } else { longest_fill }
+        if longest > 0 {
+            longest
+        } else {
+            longest_looping
+        }
     }
 
     pub fn song_row_is_empty(&self, row: usize) -> bool {

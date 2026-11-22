@@ -43,7 +43,6 @@ fn chain_music() -> Project {
     project.set_song_cell(0, 0, Some(chain));
     let mut first = ChainEntry::new(PhraseId::new(5));
     first.set_transpose(3);
-    first.set_fill(true);
     *project.chain_mut(chain).entry_mut(0) = Some(first);
     *project.chain_mut(chain).entry_mut(1) = Some(ChainEntry::new(PhraseId::new(6)));
     project
@@ -180,7 +179,7 @@ fn a_song_paste_past_the_last_track_counts_every_clipped_row() {
 }
 
 #[test]
-fn chain_entries_paste_with_their_transpose_and_fill() {
+fn chain_entries_paste_with_their_transpose() {
     let mut app = App::with_project(chain_music());
     apply(&mut app, &[TAB, SELECT, RIGHT, RIGHT, Action::Copy]);
     apply(&mut app, &moves(DOWN, 4));
@@ -201,7 +200,6 @@ fn a_partial_chain_copy_lands_in_its_own_columns() {
     let pasted = entry(&app, 1).unwrap();
     assert_eq!(pasted.transpose(), 3);
     assert_eq!(pasted.phrase(), PhraseId::new(6));
-    assert!(!pasted.fill());
 }
 
 #[test]

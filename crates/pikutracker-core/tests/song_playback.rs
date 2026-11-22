@@ -54,10 +54,11 @@ fn plain(phrase: PhraseId) -> Option<ChainEntry> {
     Some(ChainEntry::new(phrase))
 }
 
-fn filled(phrase: PhraseId) -> Option<ChainEntry> {
-    let mut entry = ChainEntry::new(phrase);
-    entry.set_fill(true);
-    Some(entry)
+fn looping_from(project: &mut Project, phrase: PhraseId, start: i32) -> PhraseId {
+    let phrase_ref = project.phrase_mut(phrase);
+    let end = phrase_ref.length() as i32;
+    phrase_ref.set_loop(start, end);
+    phrase
 }
 
 fn transposed(phrase: PhraseId, semitones: i32) -> Option<ChainEntry> {
@@ -180,12 +181,13 @@ fn a_short_phrase_rests_until_the_chain_row_ends() {
 }
 
 #[test]
-fn fill_repeats_a_phrase_until_the_chain_row_ends() {
+fn a_phrase_loop_repeats_until_the_chain_row_ends() {
     let mut project = Project::new();
     let riff = write(&mut project, 1, &[A2, A3]);
+    let riff = looping_from(&mut project, riff, 0);
     let next = write(&mut project, 2, &[A1, A1]);
     let long_silence = write(&mut project, 3, &[REST; 5]);
-    place(&mut project, 0, 0, 0, &[filled(riff), plain(next)]);
+    place(&mut project, 0, 0, 0, &[plain(riff), plain(next)]);
     place(&mut project, 0, 1, 1, &[plain(long_silence)]);
 
     let samples = hear(project, &[SPACE], 7);
@@ -194,17 +196,37 @@ fn fill_repeats_a_phrase_until_the_chain_row_ends() {
 }
 
 #[test]
-fn an_all_fill_chain_row_plays_its_longest_entry_once() {
+fn the_steps_before_a_phrase_loop_play_once_as_a_lead_in() {
+    let mut project = Project::new();
+    let riff = write(&mut project, 1, &[A1, A2, A3]);
+    let riff = looping_from(&mut project, riff, 1);
+    let next = write(&mut project, 2, &[A4, A4]);
+    let long_silence = write(&mut project, 3, &[REST; 6]);
+    place(&mut project, 0, 0, 0, &[plain(riff), plain(next)]);
+    place(&mut project, 0, 1, 1, &[plain(long_silence)]);
+
+    let samples = hear(project, &[SPACE], 8);
+
+    assert_steps(
+        &samples,
+        &[220.0, 440.0, 880.0, 440.0, 880.0, 440.0, 1760.0, 1760.0],
+    );
+}
+
+#[test]
+fn an_all_looping_chain_row_plays_its_longest_phrase_once_through() {
     let mut project = Project::new();
     let short = write(&mut project, 1, &[REST, REST]);
-    let long = write(&mut project, 2, &[A2, A2, A3, A3]);
-    let next = write(&mut project, 3, &[A1, A1]);
-    place(&mut project, 0, 0, 0, &[filled(short)]);
-    place(&mut project, 0, 1, 1, &[filled(long), plain(next)]);
+    let short = looping_from(&mut project, short, 0);
+    let long = write(&mut project, 2, &[A1, A2, A3, A3]);
+    let long = looping_from(&mut project, long, 2);
+    let next = write(&mut project, 3, &[A4, A4]);
+    place(&mut project, 0, 0, 0, &[plain(short)]);
+    place(&mut project, 0, 1, 1, &[plain(long), plain(next)]);
 
     let samples = hear(project, &[SPACE], 6);
 
-    assert_steps(&samples, &[440.0, 440.0, 880.0, 880.0, 220.0, 220.0]);
+    assert_steps(&samples, &[220.0, 440.0, 880.0, 880.0, 1760.0, 1760.0]);
 }
 
 #[test]
@@ -420,11 +442,12 @@ fn the_chain_plays_from_the_cursors_entry_and_loops_to_the_first() {
 }
 
 #[test]
-fn fill_repeats_in_the_chain_pane_as_it_does_in_the_song() {
+fn a_phrase_loop_repeats_in_the_chain_pane_as_it_does_in_the_song() {
     let mut project = Project::new();
     let riff = write(&mut project, 1, &[A2, A3]);
+    let riff = looping_from(&mut project, riff, 0);
     let stretch = write(&mut project, 2, &[REST; 4]);
-    place(&mut project, 0, 0, 0, &[filled(riff)]);
+    place(&mut project, 0, 0, 0, &[plain(riff)]);
     place(&mut project, 0, 1, 1, &[plain(stretch)]);
 
     let samples = hear(project, &[TAB, SPACE], 4);
@@ -443,6 +466,18 @@ fn space_in_the_phrase_pane_plays_the_phrase_alone_with_its_transpose() {
     let samples = hear(project, &[TAB, TAB, SPACE], 4);
 
     assert_steps(&samples, &[880.0, 440.0, 880.0, 440.0]);
+}
+
+#[test]
+fn a_phrase_played_alone_repeats_its_phrase_loop_after_the_lead_in() {
+    let mut project = Project::new();
+    let riff = write(&mut project, 1, &[A1, A2, A3]);
+    let riff = looping_from(&mut project, riff, 1);
+    place(&mut project, 0, 0, 0, &[plain(riff)]);
+
+    let samples = hear(project, &[TAB, TAB, SPACE], 6);
+
+    assert_steps(&samples, &[220.0, 440.0, 880.0, 440.0, 880.0, 440.0]);
 }
 
 #[test]

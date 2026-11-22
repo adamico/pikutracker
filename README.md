@@ -31,6 +31,7 @@ The screen shows three panes side by side. From left to right:
 - **Chain**: a list of up to 16 Phrases, played in order. The same Phrase can appear more than once, and each entry can transpose it.
   - **Chain row**: entry K of every Track's Chain in the same Song row. They start together and become one PICO-8 Pattern. The table under the Chain pane lists them.
 - **Phrase**: 1 to 32 Steps (16 by default) with its own speed. This is where you write notes. A Phrase becomes roughly one PICO-8 SFX; when a Chain transposes it, the transposed copy is exported as its own SFX.
+  - **Phrase loop**: set with the LOOP start and end beside the speed, read exactly as PICO-8 reads an SFX's. With end 00, the start is the length and nothing loops. With start below end, Steps start to end − 1 repeat until the Chain row ends, after the Steps before them play once. Any other pair plays all 32 Steps. A `<` beside the row label marks where the loop starts.
   - **Step**: one row of a Phrase: a note, its instrument, volume and effect. It is the same as one note of a PICO-8 SFX.
 
 In the screenshot, Song row 00 plays Chain 00 on Track 1 and Chain 02 on Track 2. Chain 00 plays Phrase 00 twice, then Phrase 01. The cursor is on that Phrase 01, so the Phrase pane shows its 8 Steps.
@@ -92,7 +93,6 @@ These are the keys of the default PcTracker preset. The M8-style column applies 
 | New unused Chain or Phrase under the cursor | Ctrl+Shift+N | Double-tap Z |
 | Clone the Chain or Phrase under the cursor | Ctrl+D | Z (while selecting) |
 | Clone Chains together with their Phrases | Ctrl+Shift+D | same |
-| Toggle Fill on a Chain entry | Ctrl+F | X+F |
 | Set or clear the Song loop row | Ctrl+R | X+R |
 | Set one Speed on every Phrase in the selection, or else the Song | Ctrl+Shift+T | same |
 | Scale Speeds by a ratio, keeping Phrases in time | Alt+T | Z+T |

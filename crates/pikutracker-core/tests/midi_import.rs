@@ -130,14 +130,15 @@ fn a_file_with_no_tempo_plays_at_120_bpm() {
 }
 
 #[test]
-fn the_project_has_only_built_in_instruments_no_fill_no_claim_and_no_target_cart() {
+fn the_project_has_only_built_in_instruments_no_phrase_loop_no_claim_and_no_target_cart() {
     let song = Song::new().note(0, TICKS_PER_STEP, 1, MIDDLE_C, 127);
 
     let project = project(&song);
 
     assert_eq!(project.custom_instruments().count(), 0);
     assert_eq!(project.target_cart(), None);
-    assert!(!project.chain_row_entry(0, 0, 0).unwrap().fill());
+    let phrase = project.chain_row_entry(0, 0, 0).unwrap().phrase();
+    assert!(!project.phrase(phrase).loops());
 }
 
 #[test]

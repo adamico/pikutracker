@@ -28,7 +28,7 @@
     // Other names include Up, Down, Left, Right, Tab, Space, Enter, Esc, Backspace,
     // Insert, Delete and F1 to F12. Further actions include MoveUp, FocusNext, Confirm,
     // Cancel, Clear, JumpUp (Alt+Up), Mute1 to Mute8, Solo1 to Solo8, NudgeUp,
-    // NudgeDownCoarse, OctaveUp, ToggleFill and ToggleSongLoopRow.
+    // NudgeDownCoarse, OctaveUp and ToggleSongLoopRow.
     //
     // Remove the // in front of a line to use it, then change the key. The keys shown
     // are the PcTracker preset's.

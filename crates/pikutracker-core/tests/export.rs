@@ -386,35 +386,42 @@ fn a_cart_that_cannot_be_read_fails_the_export() {
 }
 
 #[test]
-fn a_fill_entry_loops_from_0_to_its_phrases_length() {
+fn a_phrase_loop_is_written_as_the_sfx_loop_byte_for_byte() {
     let mut project = one_row_project();
     write_phrase(&mut project, 1, 32, 20);
     place(&mut project, 0, 1, 1, 1);
     project.set_export_track(1, Some(2));
-    let chain = project.chain_mut(ChainId::new(0));
-    chain.entry_mut(0).as_mut().unwrap().set_fill(true);
+    project.phrase_mut(PhraseId::new(0)).set_loop(4, 12);
 
     let cart = exported_cart(&project, &claim(&[8, 9], (0, 0)));
 
-    assert_eq!(cart.sfx_bytes(8)[66..], [0, 16]);
+    assert_eq!(cart.sfx_bytes(8)[66..], [4, 12]);
     assert_eq!(cart.sfx_bytes(9)[66..], [0, 0]);
 }
 
 #[test]
-fn in_an_all_fill_chain_row_the_longest_entry_plays_once_with_len() {
+fn a_pair_that_plays_all_32_steps_is_written_as_entered() {
+    let mut project = one_row_project();
+    project.phrase_mut(PhraseId::new(0)).set_loop(12, 4);
+
+    let cart = exported_cart(&project, &claim(&[8], (0, 0)));
+
+    assert_eq!(cart.sfx_bytes(8)[66..], [12, 4]);
+}
+
+#[test]
+fn in_an_all_looping_chain_row_the_longest_phrase_plays_once_through_with_len() {
     let mut project = one_row_project();
     write_phrase(&mut project, 1, 8, 20);
     place(&mut project, 0, 1, 1, 1);
     project.set_export_track(1, Some(2));
-    for chain in [0, 1] {
-        let chain = project.chain_mut(ChainId::new(chain));
-        chain.entry_mut(0).as_mut().unwrap().set_fill(true);
-    }
+    project.phrase_mut(PhraseId::new(0)).set_loop(4, 16);
+    project.phrase_mut(PhraseId::new(1)).set_loop(2, 8);
 
     let cart = exported_cart(&project, &claim(&[8, 9], (0, 0)));
 
     assert_eq!(cart.sfx_bytes(8)[66..], [16, 0]);
-    assert_eq!(cart.sfx_bytes(9)[66..], [0, 8]);
+    assert_eq!(cart.sfx_bytes(9)[66..], [2, 8]);
 }
 
 #[test]

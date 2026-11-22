@@ -28,20 +28,23 @@ impl UnusedItems {
 
 impl Phrase {
     pub fn insert_step(&mut self, index: usize) {
-        if index < self.length {
-            self.steps[index..self.length].rotate_right(1);
+        let length = self.length();
+        if index < length {
+            self.steps[index..length].rotate_right(1);
             self.steps[index] = Step::default();
         }
     }
 
     pub fn move_steps(&mut self, steps: RangeInclusive<usize>, up: bool) -> bool {
-        move_run(&mut self.steps[..self.length], steps, up)
+        let length = self.length();
+        move_run(&mut self.steps[..length], steps, up)
     }
 
     pub fn delete_step(&mut self, index: usize) {
-        if index < self.length {
-            self.steps[index..self.length].rotate_left(1);
-            self.steps[self.length - 1] = Step::default();
+        let length = self.length();
+        if index < length {
+            self.steps[index..length].rotate_left(1);
+            self.steps[length - 1] = Step::default();
         }
     }
 }

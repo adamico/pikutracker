@@ -58,7 +58,6 @@ pub enum Action {
     OctaveUp,
     OctaveDown,
     Clear,
-    ToggleFill,
     ToggleSongLoopRow,
     Nudge { up: bool, coarse: bool },
     MoveRows { up: bool },

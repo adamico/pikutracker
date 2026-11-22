@@ -40,7 +40,6 @@
                     index: 0,
                     phrase: 0,
                     transpose: 0,
-                    fill: false,
                 ),
             ],
         ),
@@ -51,7 +50,6 @@
                     index: 0,
                     phrase: 1,
                     transpose: 0,
-                    fill: false,
                 ),
             ],
         ),
@@ -59,7 +57,8 @@
     phrases: [
         (
             id: 0,
-            length: 32,
+            loop_start: 0,
+            loop_end: 0,
             speed: 16,
             noiz: false,
             buzz: false,
@@ -103,7 +102,8 @@
         ),
         (
             id: 1,
-            length: 32,
+            loop_start: 0,
+            loop_end: 0,
             speed: 16,
             noiz: false,
             buzz: false,

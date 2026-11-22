@@ -126,5 +126,5 @@ fn key_presses_drive_the_headless_app_through_the_preset() {
         .skip(29)
         .take(13)
         .collect();
-    assert_eq!(chain_entry_one, "1[--]--- ----");
+    assert_eq!(chain_entry_one, "1[--]---     ");
 }

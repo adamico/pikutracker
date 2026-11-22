@@ -208,7 +208,7 @@ fn a_phrase_shortened_past_the_playhead_ends_its_entry() {
 
     apply(
         &mut app,
-        &[UP, UP, Action::HexDigit(0), Action::HexDigit(1)],
+        &[UP, UP, UP, RIGHT, Action::HexDigit(0), Action::HexDigit(1)],
     );
     let rest = render(&mut app, &mut player, 2);
     samples.extend(rest);
@@ -283,18 +283,13 @@ fn a_chain_with_every_entry_cleared_keeps_playing_until_it_has_notes_again() {
 }
 
 #[test]
-fn a_fill_phrase_shortened_past_the_playhead_starts_again() {
+fn a_looping_phrase_shortened_past_the_playhead_starts_its_loop_again() {
     let mut project = Project::new();
     let riff = write(&mut project, 1, &[A2, A2, A3, A3]);
+    project.phrase_mut(riff).set_loop(0, 4);
     let stretch = write(&mut project, 2, &[REST; 8]);
     place(&mut project, 0, 0, 0, riff);
     place(&mut project, 0, 1, 1, stretch);
-    project
-        .chain_mut(ChainId::new(0))
-        .entry_mut(0)
-        .as_mut()
-        .unwrap()
-        .set_fill(true);
     let mut app = playing_in_phrase_pane(project);
     let mut player = Player::new();
     let mut samples = render(&mut app, &mut player, 2);
@@ -302,7 +297,15 @@ fn a_fill_phrase_shortened_past_the_playhead_starts_again() {
 
     apply(
         &mut app,
-        &[UP, UP, Action::HexDigit(0), Action::HexDigit(2)],
+        &[
+            UP,
+            UP,
+            UP,
+            RIGHT,
+            RIGHT,
+            Action::HexDigit(0),
+            Action::HexDigit(2),
+        ],
     );
     samples.extend(render(&mut app, &mut player, 3));
 

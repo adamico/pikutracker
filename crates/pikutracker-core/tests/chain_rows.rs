@@ -21,10 +21,12 @@ fn place(project: &mut Project, row: usize, track: usize, chain: u8, entries: &[
     project.set_song_cell(row, track, Some(id));
 }
 
-fn filled(phrase: PhraseId) -> ChainEntry {
-    let mut entry = ChainEntry::new(phrase);
-    entry.set_fill(true);
-    entry
+fn looping(project: &mut Project, id: u8, start: i32, end: i32, speed: i32) -> PhraseId {
+    let id = PhraseId::new(id);
+    let phrase = project.phrase_mut(id);
+    phrase.set_loop(start, end);
+    phrase.set_speed(speed);
+    id
 }
 
 fn transposed(phrase: PhraseId, semitones: i32) -> ChainEntry {
@@ -61,17 +63,17 @@ fn step_text(app: &App, step: usize) -> String {
 }
 
 #[test]
-fn the_strip_shows_the_kth_entry_of_every_track_and_marks_fill() {
+fn the_strip_shows_the_kth_entry_of_every_track() {
     let mut project = Project::new();
     let short = phrase(&mut project, 5, 4, 8);
     let long = phrase(&mut project, 6, 8, 8);
-    place(&mut project, 0, 0, 0, &[filled(short)]);
+    place(&mut project, 0, 0, 0, &[ChainEntry::new(short)]);
     place(&mut project, 0, 1, 1, &[ChainEntry::new(long)]);
     place(&mut project, 0, 7, 2, &[ChainEntry::new(short)]);
 
     let app = App::with_project(project);
 
-    assert_eq!(strip_text(&app, 0), "0 05F06 -- -- -- -- -- 05    64");
+    assert_eq!(strip_text(&app, 0), "0 05 06 -- -- -- -- -- 05    64");
     assert_eq!(strip_text(&app, 1), "1 -- -- -- -- -- -- -- --     -");
 }
 
@@ -89,25 +91,36 @@ fn the_strip_shows_the_song_row_under_the_cursor() {
 }
 
 #[test]
-fn a_chain_row_lasts_as_long_as_its_longest_phrase_not_marked_fill() {
+fn a_chain_row_lasts_as_long_as_its_longest_phrase_without_a_phrase_loop() {
     let mut project = Project::new();
-    let long_fill = phrase(&mut project, 1, 32, 16);
+    let long_loop = looping(&mut project, 1, 0, 32, 16);
     let short = phrase(&mut project, 2, 4, 8);
-    place(&mut project, 0, 0, 0, &[filled(long_fill)]);
+    place(&mut project, 0, 0, 0, &[ChainEntry::new(long_loop)]);
     place(&mut project, 0, 1, 1, &[ChainEntry::new(short)]);
 
     assert_eq!(project.chain_row_ticks(0, 0), 32);
 }
 
 #[test]
-fn an_all_fill_chain_row_lasts_as_long_as_its_longest_entry() {
+fn an_all_looping_chain_row_lasts_as_long_as_its_longest_phrase_played_once_through() {
     let mut project = Project::new();
-    let shorter = phrase(&mut project, 1, 4, 8);
-    let longer = phrase(&mut project, 2, 8, 8);
-    place(&mut project, 0, 0, 0, &[filled(shorter)]);
-    place(&mut project, 0, 1, 1, &[filled(longer)]);
+    let shorter = looping(&mut project, 1, 0, 4, 8);
+    let longer = looping(&mut project, 2, 6, 8, 8);
+    place(&mut project, 0, 0, 0, &[ChainEntry::new(shorter)]);
+    place(&mut project, 0, 1, 1, &[ChainEntry::new(longer)]);
 
     assert_eq!(project.chain_row_ticks(0, 0), 64);
+}
+
+#[test]
+fn a_looping_phrase_with_a_lead_in_never_sets_the_length() {
+    let mut project = Project::new();
+    let lead_in_and_loop = looping(&mut project, 1, 4, 32, 8);
+    let short = phrase(&mut project, 2, 4, 8);
+    place(&mut project, 0, 0, 0, &[ChainEntry::new(lead_in_and_loop)]);
+    place(&mut project, 0, 1, 1, &[ChainEntry::new(short)]);
+
+    assert_eq!(project.chain_row_ticks(0, 0), 32);
 }
 
 #[test]
@@ -154,7 +167,7 @@ fn a_step_transposed_above_63_is_flagged_in_the_phrase_and_chain_panes() {
     let app = transposed_app(40, 5);
 
     assert_eq!(step_text(&app, 0), "00 C-2 00 5 0 !");
-    assert_eq!(chain_text(&app, 0), "0 01 +28 ---- !");
+    assert_eq!(chain_text(&app, 0), "0 01 +28      !");
 }
 
 #[test]
@@ -162,14 +175,14 @@ fn a_step_transposed_below_0_is_flagged() {
     let app = transposed_app(-25, 5);
 
     assert_eq!(step_text(&app, 0), "00 C-2 00 5 0 !");
-    assert_eq!(chain_text(&app, 0), "0 01 -19 ---- !");
+    assert_eq!(chain_text(&app, 0), "0 01 -19      !");
 }
 
 #[test]
 fn the_edges_of_the_pitch_range_are_not_flagged() {
     assert_eq!(step_text(&transposed_app(39, 5), 0), "00 C-2 00 5 0");
     assert_eq!(step_text(&transposed_app(-24, 5), 0), "00 C-2 00 5 0");
-    assert_eq!(chain_text(&transposed_app(39, 5), 0), "0 01 +27 ----");
+    assert_eq!(chain_text(&transposed_app(39, 5), 0), "0 01 +27");
 }
 
 #[test]
@@ -177,7 +190,7 @@ fn a_silent_step_is_not_flagged() {
     let app = transposed_app(40, 0);
 
     assert_eq!(step_text(&app, 0), "00 ... .. . .");
-    assert_eq!(chain_text(&app, 0), "0 01 +28 ----");
+    assert_eq!(chain_text(&app, 0), "0 01 +28");
 }
 
 #[test]
@@ -191,7 +204,7 @@ fn a_step_past_len_is_not_flagged() {
 
     let app = App::with_project(project);
 
-    assert_eq!(chain_text(&app, 0), "0 01 +0C ----");
+    assert_eq!(chain_text(&app, 0), "0 01 +0C");
 }
 
 fn arpeggio_reading_a_silent_d_sharp_5(length: i32) -> App {
@@ -209,12 +222,12 @@ fn a_silent_step_an_arpeggio_reads_is_flagged_like_export_rejects_it() {
 
     assert_eq!(step_text(&app, 0), "00 C-2 00 5 6");
     assert_eq!(step_text(&app, 1), "01 ... .. . . !");
-    assert_eq!(chain_text(&app, 0), "0 01 +01 ---- !");
+    assert_eq!(chain_text(&app, 0), "0 01 +01      !");
 }
 
 #[test]
 fn a_step_past_len_an_arpeggio_reads_flags_the_chain_entry() {
     let app = arpeggio_reading_a_silent_d_sharp_5(1);
 
-    assert_eq!(chain_text(&app, 0), "0 01 +01 ---- !");
+    assert_eq!(chain_text(&app, 0), "0 01 +01      !");
 }

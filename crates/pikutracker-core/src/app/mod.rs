@@ -229,7 +229,7 @@ impl App {
         }
         match self.focus {
             Focus::Song => KeyContext::ReferenceValue,
-            Focus::Chain if self.chain.takes_digits() => KeyContext::ReferenceValue,
+            Focus::Chain => KeyContext::ReferenceValue,
             Focus::Phrase => self.phrase.key_context(),
             Focus::RightSlot if !self.log_open => KeyContext::ReferenceValue,
             _ => KeyContext::Navigation,
@@ -506,7 +506,6 @@ impl App {
             Action::OctaveUp => self.phrase.change_octave(1),
             Action::OctaveDown => self.phrase.change_octave(-1),
             Action::ToggleSongLoopRow => self.song.toggle_loop_row(&mut self.project),
-            Action::ToggleFill if self.focus == Focus::Chain => self.toggle_fill(),
             Action::Clear => self.clear_cells(),
             Action::PianoKey(key) if self.focus == Focus::Phrase => {
                 self.edit_phrase(|pane, phrase| pane.enter_note(phrase, key));
@@ -669,14 +668,6 @@ impl App {
             Focus::Phrase => self.edit_phrase(|pane, phrase| pane.nudge(phrase, up, coarse)),
             Focus::RightSlot => {}
         }
-    }
-
-    fn toggle_fill(&mut self) {
-        if self.chain_under_cursor().is_some() && self.entry_under_cursor().is_none() {
-            self.remark = Some(NO_PHRASE_HERE);
-            return;
-        }
-        self.edit_chain(|pane, chain| pane.toggle_fill(chain));
     }
 
     fn edit_chain(&mut self, edit: impl FnOnce(&mut ChainPane, &mut Chain)) {

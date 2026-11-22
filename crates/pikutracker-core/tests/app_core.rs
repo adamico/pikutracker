@@ -113,10 +113,10 @@ fn the_song_pane_scrolls_to_keep_the_cursor_visible() {
 fn tab_cycles_focus_through_song_chain_phrase_and_the_right_hand_view() {
     let app = app_after(&[Action::FocusNext]);
     assert_eq!(song_text(&app, 2), "00  -- -- -- -- -- -- -- --");
-    assert_eq!(chain_text(&app, 2), "0[--]--- ----");
+    assert_eq!(chain_text(&app, 2), "0[--]---");
 
     let app = app_after(&[Action::FocusNext; 2]);
-    assert_eq!(chain_text(&app, 2), "0 -- --- ----");
+    assert_eq!(chain_text(&app, 2), "0 -- ---");
     assert_eq!(phrase_text(&app, 5), "00[...].. . .");
 
     let app = app_after(&[Action::FocusNext; 3]);
@@ -143,7 +143,7 @@ fn arrows_move_the_cursor_inside_the_focused_pane_only() {
         Action::Move(Direction::Right),
     ]);
 
-    assert_eq!(chain_text(&app, 3), "1 --[---]----");
+    assert_eq!(chain_text(&app, 3), "1 --[---]");
     assert_eq!(song_text(&app, 2), "00  -- -- -- -- -- -- -- --");
 
     let app = app_after(&[
@@ -172,7 +172,7 @@ fn the_cursor_stops_at_the_edges_of_every_pane() {
         ]
         .concat(),
     );
-    assert_eq!(chain_text(&app, 17), "F -- ---[----]");
+    assert_eq!(chain_text(&app, 17), "F --[---]");
 
     let app = app_after(
         &[

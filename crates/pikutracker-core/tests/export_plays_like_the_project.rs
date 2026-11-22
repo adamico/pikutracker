@@ -35,10 +35,10 @@ fn plays(phrase: u8) -> Option<ChainEntry> {
     Some(ChainEntry::new(PhraseId::new(phrase)))
 }
 
-fn fills(phrase: u8) -> Option<ChainEntry> {
-    let mut entry = ChainEntry::new(PhraseId::new(phrase));
-    entry.set_fill(true);
-    Some(entry)
+fn loop_from(project: &mut Project, phrase: u8, start: i32) {
+    let phrase = project.phrase_mut(PhraseId::new(phrase));
+    let end = phrase.length() as i32;
+    phrase.set_loop(start, end);
 }
 
 fn transposed(phrase: u8, semitones: i32) -> Option<ChainEntry> {
@@ -134,18 +134,21 @@ fn every_kind_of_chain_row_plays_the_same_after_export() {
     write_phrase(&mut project, 6, 16, 8, &[4]);
     write_phrase(&mut project, 7, 4, 8, &[2]);
     write_phrase(&mut project, 8, 32, 5, &[0, SFX_INSTRUMENT]);
-    let shorter_left_of_longest_then_fill_then_shorter =
-        [plays(0), plays(1), fills(2), plays(3), None];
-    let every_entry_fill = [fills(4), fills(5), None, None, None];
+    let shorter_left_of_longest_then_looping_then_shorter =
+        [plays(0), plays(1), plays(2), plays(3), None];
+    let every_phrase_looping = [plays(4), plays(5), None, None, None];
     let timed_by_unexported_t5_with_shorter_left_of_free_channel =
-        [plays(7), None, fills(2), None, plays(6)];
+        [plays(7), None, plays(2), None, plays(6)];
     let no_exported_entries = [None, None, None, None, plays(4)];
+    loop_from(&mut project, 2, 1);
+    loop_from(&mut project, 4, 0);
+    loop_from(&mut project, 5, 2);
     place_song_row(
         &mut project,
         0,
         &[
-            shorter_left_of_longest_then_fill_then_shorter,
-            every_entry_fill,
+            shorter_left_of_longest_then_looping_then_shorter,
+            every_phrase_looping,
             timed_by_unexported_t5_with_shorter_left_of_free_channel,
             no_exported_entries,
         ],
@@ -183,12 +186,13 @@ fn phrase_filters_play_the_same_after_export() {
     filters.set_noiz(true);
     filters.set_buzz(true);
     filters.set_detune(2);
+    loop_from(&mut project, 2, 0);
     place_song_row(
         &mut project,
         0,
         &[
-            [plays(0), plays(1), fills(2), plays(3), None],
-            [plays(3), plays(0), plays(1), fills(2), None],
+            [plays(0), plays(1), plays(2), plays(3), None],
+            [plays(3), plays(0), plays(1), plays(2), None],
         ],
     );
 
@@ -217,16 +221,17 @@ fn a_shorter_32_step_phrase_left_of_a_longer_one_plays_the_same_after_export() {
 }
 
 #[test]
-fn a_fill_longer_than_its_chain_row_is_cut_the_same_after_export() {
+fn a_phrase_loop_longer_than_its_chain_row_is_cut_the_same_after_export() {
     let mut project = instrumented_project();
     write_phrase(&mut project, 0, 32, 8, &[0, 5]);
     write_phrase(&mut project, 1, 8, 6, &[2]);
+    loop_from(&mut project, 0, 4);
     place_song_row(
         &mut project,
         0,
         &[
-            [fills(0), plays(1), None, None, None],
-            [plays(1), fills(0), None, None, None],
+            [plays(0), plays(1), None, None, None],
+            [plays(1), plays(0), None, None, None],
         ],
     );
 
@@ -234,14 +239,16 @@ fn a_fill_longer_than_its_chain_row_is_cut_the_same_after_export() {
 }
 
 #[test]
-fn an_all_fill_chain_row_timed_by_an_unexported_track_plays_the_same_after_export() {
+fn an_all_looping_chain_row_timed_by_an_unexported_track_plays_the_same_after_export() {
     let mut project = instrumented_project();
     write_phrase(&mut project, 0, 8, 6, &[0, 3]);
     write_phrase(&mut project, 1, 16, 8, &[1]);
+    loop_from(&mut project, 0, 0);
+    loop_from(&mut project, 1, 3);
     place_song_row(
         &mut project,
         0,
-        &[[fills(0), fills(0), None, None, fills(1)]],
+        &[[plays(0), plays(0), None, None, plays(1)]],
     );
 
     assert_exports_sample_for_sample(&project, 128);
@@ -253,13 +260,14 @@ fn a_looping_song_plays_the_same_after_export() {
     write_phrase(&mut project, 0, 8, 6, &[0, SFX_INSTRUMENT]);
     write_phrase(&mut project, 1, 16, 6, &[2, 4]);
     write_phrase(&mut project, 2, 4, 6, &[WAVEFORM_INSTRUMENT]);
+    loop_from(&mut project, 2, 0);
     place_song_row(&mut project, 0, &[[plays(1), None, None, None, None]]);
     place_song_row(
         &mut project,
         1,
         &[
             [plays(0), plays(1), None, None, None],
-            [fills(2), plays(0), None, None, None],
+            [plays(2), plays(0), None, None, None],
         ],
     );
     project.set_song_loop_row(Some(1));

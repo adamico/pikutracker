@@ -1,6 +1,6 @@
 use super::{
-    EMPTY, FILL, HEADING, SELECTED, VALUE, draw_out_of_range_flag, draw_row_label,
-    draw_styled_value, draw_title, id_text, nudged_id, stepped, typed_value,
+    EMPTY, HEADING, SELECTED, VALUE, draw_out_of_range_flag, draw_row_label, draw_styled_value,
+    draw_title, id_text, nudged_id, stepped, typed_value,
 };
 use crate::app::Direction;
 use crate::app::layout::Area;
@@ -22,13 +22,11 @@ const STRIP_TICKS_COLUMN: usize = 27;
 enum EntryCell {
     Phrase,
     Transpose,
-    Fill,
 }
 
-const ENTRY_CELLS: [(EntryCell, usize, &str); 3] = [
+const ENTRY_CELLS: [(EntryCell, usize, &str); 2] = [
     (EntryCell::Phrase, 2, "--"),
     (EntryCell::Transpose, 5, "---"),
-    (EntryCell::Fill, 9, "----"),
 ];
 
 #[derive(Clone, Copy, Debug)]
@@ -85,10 +83,6 @@ impl ChainPane {
 
     pub fn edits_empty_entries(&self) -> bool {
         self.cell() == EntryCell::Phrase
-    }
-
-    pub fn takes_digits(&self) -> bool {
-        self.cell() != EntryCell::Fill
     }
 
     pub fn finish_typing(&mut self) {
@@ -175,12 +169,6 @@ impl ChainPane {
         }
     }
 
-    pub fn toggle_fill(&mut self, chain: &mut Chain) {
-        if let Some(entry) = chain.entry_mut(self.entry) {
-            entry.set_fill(!entry.fill());
-        }
-    }
-
     pub fn follow(&mut self, entry: usize) {
         if self.entry != entry {
             self.entry = entry;
@@ -205,7 +193,7 @@ impl ChainPane {
         let number = id_text(id.map(ChainId::number));
         let title = format!("CHAIN {number}  T{} ROW {song_row:02X}", track + 1);
         draw_title(grid, area.column, 0, &title, focused);
-        grid.put(area.column, 1, "K PH TSP FILL", HEADING);
+        grid.put(area.column, 1, "K PH TSP", HEADING);
 
         for index in 0..CHAIN_ENTRIES {
             let row = HEADER_ROWS + index;
@@ -245,7 +233,6 @@ fn nudge_cell(slot: &mut Option<ChainEntry>, cell: EntryCell, up: bool, coarse: 
             let delta = if up { amount } else { -amount };
             entry.set_transpose(i32::from(entry.transpose()) + delta);
         }
-        (EntryCell::Fill, Some(entry)) => entry.set_fill(!entry.fill()),
         _ => {}
     }
 }
@@ -254,7 +241,6 @@ fn clear_cell(slot: &mut Option<ChainEntry>, cell: EntryCell) {
     match (cell, slot.as_mut()) {
         (EntryCell::Phrase, _) => *slot = None,
         (EntryCell::Transpose, Some(entry)) => entry.set_transpose(0),
-        (EntryCell::Fill, Some(entry)) => entry.set_fill(false),
         _ => {}
     }
 }
@@ -282,9 +268,6 @@ fn paste_entry(
     if copied(EntryCell::Transpose) {
         target.set_transpose(source.map_or(0, |source| i32::from(source.transpose())));
     }
-    if copied(EntryCell::Fill) {
-        target.set_fill(source.is_some_and(ChainEntry::fill));
-    }
 }
 
 fn set_phrase(slot: &mut Option<ChainEntry>, phrase: PhraseId) {
@@ -302,8 +285,6 @@ fn cell_text(cell: EntryCell, entry: ChainEntry) -> (String, Style) {
             let sign = if transpose < 0 { '-' } else { '+' };
             (format!("{sign}{:02X}", transpose.abs()), VALUE)
         }
-        EntryCell::Fill if entry.fill() => ("FILL".to_owned(), FILL),
-        EntryCell::Fill => ("----".to_owned(), EMPTY),
     }
 }
 
@@ -352,10 +333,5 @@ fn draw_strip_entry(grid: &mut Grid, column: usize, row: usize, entry: Option<Ch
         return;
     };
     let number = format!("{:02X}", entry.phrase().number());
-    if entry.fill() {
-        grid.put(column, row, &number, FILL);
-        grid.put(column + number.len(), row, "F", FILL);
-    } else {
-        grid.put(column, row, &number, VALUE);
-    }
+    grid.put(column, row, &number, VALUE);
 }

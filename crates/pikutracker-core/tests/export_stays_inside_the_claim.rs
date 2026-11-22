@@ -112,7 +112,11 @@ fn random_project(rng: &mut Rng) -> (Project, Needs) {
                 }
                 let mut entry = ChainEntry::new(id);
                 entry.set_transpose(rng.between(0, 24) as i32 - 12);
-                entry.set_fill(rng.chance(25));
+                if rng.chance(25) {
+                    let phrase = project.phrase_mut(id);
+                    let end = phrase.length();
+                    phrase.set_loop(rng.below(end) as i32, end as i32);
+                }
                 *chain.entry_mut(k) = Some(entry);
             }
             let id = ChainId::new(next_chain);

@@ -97,13 +97,13 @@ fn a_channel_too_slow_for_one_whole_step_becomes_an_empty_entry_with_a_warning()
 }
 
 #[test]
-fn a_loop_over_the_whole_sfx_becomes_fill_and_drops_the_notes_after_it() {
+fn a_loop_over_the_whole_sfx_becomes_a_phrase_loop_and_drops_the_notes_after_it() {
     let cart = one_pattern(vec![counting(8), looping(counting(8), 0, 4)]);
 
     let (project, warnings) = imported(&cart);
 
     assert_eq!(warnings, Vec::<String>::new());
-    assert!(entry(&project, 1, 0).fill());
+    assert!(phrase(&project, 1, 0).loops());
     assert_eq!(pitches(phrase(&project, 1, 0)), audible(10..14));
     assert!(phrase(&project, 1, 0).step(4).is_silent());
     assert_eq!(project.chain_row_ticks(0, 0), 256);
@@ -116,22 +116,22 @@ fn a_lead_in_loop_is_unrolled() {
     let (project, warnings) = imported(&cart);
 
     assert_eq!(warnings, Vec::<String>::new());
-    assert!(!entry(&project, 1, 0).fill());
+    assert!(!phrase(&project, 1, 0).loops());
     let expected = [10, 11, 12, 13, 12, 13, 12, 13, 12, 13].map(Some);
     assert_eq!(pitches(phrase(&project, 1, 0)), expected);
 }
 
 #[test]
-fn an_unroll_over_32_steps_becomes_fill_over_the_loop_body_with_a_warning() {
+fn an_unroll_over_32_steps_becomes_a_phrase_loop_over_the_loop_body_with_a_warning() {
     let cart = one_pattern(vec![counting(16), looping(counting(8), 2, 6)]);
 
     let (project, warnings) = imported(&cart);
 
-    assert!(entry(&project, 1, 0).fill());
+    assert!(phrase(&project, 1, 0).loops());
     assert_eq!(pitches(phrase(&project, 1, 0)), audible(12..16));
     assert_eq!(
         warnings,
-        ["SFX 01 LEAD-IN NEEDS 64 STEPS UNROLLED: KEPT AS FILL OVER THE LOOP BODY ONLY."]
+        ["SFX 01 LEAD-IN NEEDS 64 STEPS UNROLLED: KEPT AS A PHRASE LOOP OVER THE LOOP BODY ONLY."]
     );
 }
 
@@ -146,16 +146,16 @@ fn len_on_a_channel_that_does_not_set_the_length_does_not_stop_it() {
 }
 
 #[test]
-fn when_every_channel_loops_the_slowest_is_unrolled_to_32_steps_without_fill() {
+fn when_every_channel_loops_the_slowest_is_unrolled_to_32_steps_without_a_phrase_loop() {
     let cart = one_pattern(vec![looping(counting(4), 0, 8), looping(counting(8), 0, 8)]);
 
     let (project, warnings) = imported(&cart);
 
     assert_eq!(warnings, Vec::<String>::new());
     assert_eq!(project.chain_row_ticks(0, 0), 256);
-    assert!(entry(&project, 0, 0).fill());
+    assert!(phrase(&project, 0, 0).loops());
     assert_eq!(pitches(phrase(&project, 0, 0)), audible(10..18));
-    assert!(!entry(&project, 1, 0).fill());
+    assert!(!phrase(&project, 1, 0).loops());
     let unrolled: Vec<Option<u8>> = (0..32).map(|step| Some(10 + step % 8)).collect();
     assert_eq!(pitches(phrase(&project, 1, 0)), unrolled);
 }
@@ -201,7 +201,7 @@ fn a_bit_7_sfx_is_an_ordinary_phrase_that_never_sets_the_length() {
     let (project, warnings) = imported(&cart);
 
     assert_eq!(project.chain_row_ticks(0, 0), 128);
-    assert!(!entry(&project, 0, 0).fill());
+    assert!(!phrase(&project, 0, 0).loops());
     assert_eq!(pitches(phrase(&project, 0, 0)), audible(10..26));
     assert_eq!(warnings, [BIT_7_WARNING]);
 }
@@ -237,7 +237,7 @@ fn beside_channels_that_all_loop_the_length_follows_the_looping_channels_alone()
 
     assert_eq!(project.chain_row_ticks(0, 0), 256);
     assert_eq!(pitches(phrase(&project, 0, 0)), audible(10..26));
-    assert!(!entry(&project, 1, 0).fill());
+    assert!(!phrase(&project, 1, 0).loops());
     assert_eq!(phrase(&project, 1, 0).length(), 32);
     assert_eq!(warnings, [BIT_7_WARNING]);
 }
@@ -283,8 +283,8 @@ fn len_above_32_splits_the_pattern_into_chain_rows_of_one_song_row() {
     assert_eq!(pitches(phrase(&project, 0, 1)), [None; 8]);
     assert_eq!(pitches(phrase(&project, 1, 0)), audible(10..42));
     assert_eq!(project.chain_row_entry(0, 1, 1), None);
-    assert!(!entry(&project, 2, 0).fill());
-    assert!(!entry(&project, 2, 1).fill());
+    assert!(!phrase(&project, 2, 0).loops());
+    assert!(!phrase(&project, 2, 1).loops());
     assert_eq!(phrase(&project, 2, 0).length(), 32);
     let unrolled = [10, 11, 12, 13, 10, 11, 12, 13].map(Some);
     assert_eq!(pitches(phrase(&project, 2, 1)), unrolled);
@@ -444,6 +444,6 @@ fn a_loop_past_the_last_note_does_not_set_the_length_and_stays_silent_after_note
 
     assert_eq!(warnings, Vec::<String>::new());
     assert_eq!(project.chain_row_ticks(0, 0), 256);
-    assert!(!entry(&project, 0, 0).fill());
+    assert!(!phrase(&project, 0, 0).loops());
     assert_eq!(pitches(phrase(&project, 0, 0)), audible(10..42));
 }

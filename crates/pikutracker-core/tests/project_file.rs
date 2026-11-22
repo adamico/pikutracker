@@ -31,10 +31,9 @@ fn fixture_project() -> Project {
     project.set_song_cell(2, 7, Some(ChainId::new(0xFF)));
 
     *project.chain_mut(ChainId::new(0)).entry_mut(0) = Some(ChainEntry::new(PhraseId::new(0)));
-    let mut filled = ChainEntry::new(PhraseId::new(1));
-    filled.set_transpose(-12);
-    filled.set_fill(true);
-    *project.chain_mut(ChainId::new(0)).entry_mut(15) = Some(filled);
+    let mut lowered = ChainEntry::new(PhraseId::new(1));
+    lowered.set_transpose(-12);
+    *project.chain_mut(ChainId::new(0)).entry_mut(15) = Some(lowered);
     let mut raised = ChainEntry::new(PhraseId::new(0xFF));
     raised.set_transpose(127);
     *project.chain_mut(ChainId::new(1)).entry_mut(3) = Some(raised);
@@ -51,7 +50,7 @@ fn fixture_project() -> Project {
     *phrase.step_mut(3) = step(63, 0xFF, 7, 7);
 
     let phrase = project.phrase_mut(PhraseId::new(1));
-    phrase.set_length(32);
+    phrase.set_loop(4, 32);
     phrase.set_speed(255);
     phrase.filters_mut().set_buzz(true);
     phrase.filters_mut().set_dampen(2);
@@ -234,15 +233,15 @@ fn random_project(random: &mut SeededRandom) -> Project {
 
         let mut entry = ChainEntry::new(PhraseId::new(random.below(256)));
         entry.set_transpose(i32::from(random.below(256)) - 128);
-        entry.set_fill(random.flip());
         let index = usize::from(random.below(16));
         *project.chain_mut(chain).entry_mut(index) = Some(entry);
 
         let id = PhraseId::new(random.below(256));
-        let length = i32::from(random.below(32)) + 1;
+        let loop_start = i32::from(random.below(33));
+        let loop_end = i32::from(random.below(33));
         let speed = i32::from(random.below(255)) + 1;
         let phrase = project.phrase_mut(id);
-        phrase.set_length(length);
+        phrase.set_loop(loop_start, loop_end);
         phrase.set_speed(speed);
         phrase.filters_mut().set_noiz(random.flip());
         phrase.filters_mut().set_buzz(random.flip());
@@ -355,8 +354,8 @@ fn values_outside_their_limits_are_refused() {
         ("\"C#2 08 5 3\"", "\"H-2 08 5 3\""),
         ("\"C#2 08 5 3\"", "\"C#2 8 5 3\""),
         ("\"C#2 08 5 3\"", "\"C#2 08 5\""),
-        ("length: 3", "length: 0"),
-        ("length: 3", "length: 33"),
+        ("loop_start: 3", "loop_start: 33"),
+        ("loop_end: 0", "loop_end: 33"),
         ("speed: 8", "speed: 0"),
         (
             "detune: 1,\n            reverb: 2",

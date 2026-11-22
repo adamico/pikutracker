@@ -1,7 +1,7 @@
 use crate::app::{Action, Direction};
 use crate::project::TRACKS;
 
-const UNIT_ACTIONS: [Action; 44] = [
+const UNIT_ACTIONS: [Action; 43] = [
     Action::FocusNext,
     Action::FocusPrevious,
     Action::NewProject,
@@ -35,7 +35,6 @@ const UNIT_ACTIONS: [Action; 44] = [
     Action::OctaveUp,
     Action::OctaveDown,
     Action::Clear,
-    Action::ToggleFill,
     Action::ToggleSongLoopRow,
     Action::Confirm,
     Action::Cancel,

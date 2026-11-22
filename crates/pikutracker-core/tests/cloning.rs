@@ -56,12 +56,12 @@ fn cloning_a_chain_points_the_song_cell_at_a_new_copy_that_shares_its_phrases() 
 }
 
 #[test]
-fn cloning_a_phrase_copies_all_of_it_and_keeps_the_entrys_transpose_and_fill() {
+fn cloning_a_phrase_copies_all_of_it_with_its_loop_and_keeps_the_entrys_transpose() {
     let mut project = project_with_a_song();
-    let mut filled = ChainEntry::new(PhraseId::new(0));
-    filled.set_transpose(5);
-    filled.set_fill(true);
-    *project.chain_mut(ChainId::new(0)).entry_mut(0) = Some(filled);
+    project.phrase_mut(PhraseId::new(0)).set_loop(2, 8);
+    let mut transposed = ChainEntry::new(PhraseId::new(0));
+    transposed.set_transpose(5);
+    *project.chain_mut(ChainId::new(0)).entry_mut(0) = Some(transposed);
     let mut app = App::with_project(project);
 
     apply(&mut app, &[TAB, Action::Clone]);
@@ -69,7 +69,10 @@ fn cloning_a_phrase_copies_all_of_it_and_keeps_the_entrys_transpose_and_fill() {
     let cloned = entry(&app, 0, 0).unwrap();
     assert_eq!(cloned.phrase().number(), 2);
     assert_eq!(cloned.transpose(), 5);
-    assert!(cloned.fill());
+    assert_eq!(
+        app.project().phrase(PhraseId::new(2)).phrase_loop(),
+        Some(2..8)
+    );
     assert!(app.project().phrase(PhraseId::new(2)) == app.project().phrase(PhraseId::new(0)));
     assert_eq!(entry_phrase(&app, 0, 2), Some(0), "other entries stay");
 }
@@ -107,18 +110,17 @@ fn deep_clone_gives_the_new_chain_one_copy_of_each_distinct_phrase() {
 }
 
 #[test]
-fn deep_clone_keeps_each_entrys_transpose_and_fill() {
+fn deep_clone_keeps_each_entrys_transpose() {
     let mut project = project_with_a_song();
-    let mut filled = ChainEntry::new(PhraseId::new(1));
-    filled.set_transpose(-3);
-    filled.set_fill(true);
-    *project.chain_mut(ChainId::new(0)).entry_mut(1) = Some(filled);
+    let mut transposed = ChainEntry::new(PhraseId::new(1));
+    transposed.set_transpose(-3);
+    *project.chain_mut(ChainId::new(0)).entry_mut(1) = Some(transposed);
     let mut app = App::with_project(project);
 
     app.apply(Action::DeepClone);
 
     let copy = entry(&app, 1, 1).unwrap();
-    assert_eq!((copy.transpose(), copy.fill()), (-3, true));
+    assert_eq!(copy.transpose(), -3);
 }
 
 #[test]
@@ -284,19 +286,18 @@ fn new_unused_puts_a_new_phrase_at_the_projects_default_speed_on_the_chain_entry
 }
 
 #[test]
-fn new_unused_over_a_filled_entry_keeps_its_transpose_and_fill() {
+fn new_unused_over_a_transposed_entry_keeps_its_transpose() {
     let mut project = project_with_a_song();
-    let mut filled = ChainEntry::new(PhraseId::new(1));
-    filled.set_transpose(2);
-    filled.set_fill(true);
-    *project.chain_mut(ChainId::new(0)).entry_mut(0) = Some(filled);
+    let mut transposed = ChainEntry::new(PhraseId::new(1));
+    transposed.set_transpose(2);
+    *project.chain_mut(ChainId::new(0)).entry_mut(0) = Some(transposed);
     let mut app = App::with_project(project);
 
     apply(&mut app, &[TAB, Action::NewUnused]);
 
     let entry = entry(&app, 0, 0).unwrap();
     assert_eq!(entry.phrase().number(), 2);
-    assert_eq!((entry.transpose(), entry.fill()), (2, true));
+    assert_eq!(entry.transpose(), 2);
 }
 
 #[test]

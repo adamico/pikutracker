@@ -179,7 +179,7 @@ enum LaneState {
 #[derive(Clone, Copy, Debug, Default)]
 struct Lane {
     state: LaneState,
-    fill: bool,
+    loops: bool,
     played_through: bool,
     step: usize,
     samples_left: u64,
@@ -193,24 +193,28 @@ impl Lane {
         let phrase = project.phrase(entry.phrase());
         Self {
             state: LaneState::Playing,
-            fill: entry.fill(),
+            loops: phrase.loops(),
             played_through: false,
             step: from_step.min(phrase.length() - 1),
             samples_left: step_samples(phrase),
         }
     }
 
-    fn finish_step(&mut self, entry: Option<ChainEntry>, project: &Project) {
+    fn finish_step(&mut self, entry: Option<ChainEntry>, project: &Project, repeats: bool) {
         let Some(entry) = entry else {
             self.state = LaneState::Idle;
             return;
         };
         let phrase = project.phrase(entry.phrase());
-        self.fill = entry.fill();
+        self.loops = phrase.loops();
+        let repeat_from = phrase
+            .phrase_loop()
+            .map(|steps| steps.start)
+            .or(repeats.then_some(0));
         if self.step + 1 < phrase.length() {
             self.step += 1;
-        } else if entry.fill() {
-            self.step = 0;
+        } else if let Some(start) = repeat_from {
+            self.step = start;
             self.played_through = true;
         } else {
             self.state = LaneState::Finished;
@@ -264,7 +268,6 @@ impl Playback {
             Route::Phrase { phrase, transpose } => (track == 0).then(|| {
                 let mut entry = ChainEntry::new(phrase);
                 entry.set_transpose(i32::from(transpose));
-                entry.set_fill(true);
                 entry
             }),
             _ => self.project.chain_row_entry(self.row, track, self.k),
@@ -306,7 +309,7 @@ impl Playback {
         let mut plain = self
             .lanes
             .iter()
-            .filter(|lane| lane.state != LaneState::Idle && !lane.fill)
+            .filter(|lane| lane.state != LaneState::Idle && !lane.loops)
             .peekable();
         if plain.peek().is_some() {
             return plain.all(|lane| lane.state == LaneState::Finished);
@@ -551,7 +554,8 @@ impl Player {
             let lane = playback.lanes[track];
             if lane.state == LaneState::Playing && lane.samples_left == 0 {
                 let entry = playback.entry(track);
-                playback.lanes[track].finish_step(entry, &playback.project);
+                let repeats = matches!(playback.route, Route::Phrase { .. });
+                playback.lanes[track].finish_step(entry, &playback.project, repeats);
                 *moved = true;
             }
         }
@@ -612,7 +616,15 @@ impl Player {
 }
 
 fn entry_sound(phrase: &Phrase, entry: ChainEntry) -> Sound {
-    sound(phrase, entry.transpose(), 0, phrase.length() as u8)
+    match phrase.phrase_loop() {
+        Some(_) => sound(
+            phrase,
+            entry.transpose(),
+            phrase.loop_start(),
+            phrase.loop_end(),
+        ),
+        None => sound(phrase, entry.transpose(), 0, phrase.length() as u8),
+    }
 }
 
 fn sound(phrase: &Phrase, transpose: i8, loop_start: u8, loop_end: u8) -> Sound {

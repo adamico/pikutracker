@@ -1,6 +1,6 @@
 use super::{
-    EMPTY, HEADING, SELECTED, VALUE, draw_out_of_range_flag, draw_row_label, draw_styled_value,
-    draw_title, id_text, stepped,
+    EMPTY, HEADING, LOOP_MARK, SELECTED, VALUE, draw_out_of_range_flag, draw_row_label,
+    draw_styled_value, draw_title, id_text, stepped,
 };
 use crate::app::layout::Area;
 use crate::app::selection::{CellPosition, CellRange};
@@ -15,7 +15,8 @@ const FIRST_HEADER_ROW: usize = 1;
 
 const SEMITONES_PER_OCTAVE: i32 = 12;
 const COARSE_SPEED: i32 = 16;
-const COARSE_LENGTH: i32 = 4;
+const COARSE_LOOP: i32 = 4;
+const LOOP_MARK_COLUMN: usize = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum StepCell {
@@ -35,7 +36,8 @@ pub(super) const STEP_CELLS: [(StepCell, usize, &str); 4] = [
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum HeaderCell {
     Speed,
-    Length,
+    LoopStart,
+    LoopEnd,
     Noiz,
     Buzz,
     Detune,
@@ -44,12 +46,12 @@ enum HeaderCell {
 }
 
 const HEADER_CELLS: [&[(HeaderCell, usize)]; 3] = [
-    &[(HeaderCell::Speed, 4)],
     &[
-        (HeaderCell::Length, 4),
-        (HeaderCell::Noiz, 10),
-        (HeaderCell::Buzz, 15),
+        (HeaderCell::Speed, 4),
+        (HeaderCell::LoopStart, 12),
+        (HeaderCell::LoopEnd, 15),
     ],
+    &[(HeaderCell::Noiz, 12), (HeaderCell::Buzz, 17)],
     &[
         (HeaderCell::Detune, 3),
         (HeaderCell::Reverb, 8),
@@ -231,7 +233,7 @@ impl PhrasePane {
         let two_digits = matches!(self.step_cell(), Some(StepCell::Instrument))
             || matches!(
                 self.header_cell(),
-                Some(HeaderCell::Speed | HeaderCell::Length)
+                Some(HeaderCell::Speed | HeaderCell::LoopStart | HeaderCell::LoopEnd)
             );
         self.first_digit = two_digits.then_some(digit);
         let value = i32::from(if two_digits { typed } else { digit });
@@ -249,7 +251,7 @@ impl PhrasePane {
         match (self.step_cell(), self.header_cell()) {
             (Some(StepCell::Pitch), _) => SEMITONES_PER_OCTAVE,
             (_, Some(HeaderCell::Speed)) => COARSE_SPEED,
-            (_, Some(HeaderCell::Length)) => COARSE_LENGTH,
+            (_, Some(HeaderCell::LoopStart | HeaderCell::LoopEnd)) => COARSE_LOOP,
             _ => 1,
         }
     }
@@ -263,7 +265,8 @@ impl PhrasePane {
             (Some(StepCell::Volume), _) => i32::from(step.volume()),
             (Some(StepCell::Effect), _) => i32::from(step.effect()),
             (_, Some(HeaderCell::Speed)) => i32::from(phrase.speed()),
-            (_, Some(HeaderCell::Length)) => phrase.length() as i32,
+            (_, Some(HeaderCell::LoopStart)) => i32::from(phrase.loop_start()),
+            (_, Some(HeaderCell::LoopEnd)) => i32::from(phrase.loop_end()),
             (_, Some(HeaderCell::Noiz)) => i32::from(filters.noiz()),
             (_, Some(HeaderCell::Buzz)) => i32::from(filters.buzz()),
             (_, Some(HeaderCell::Detune)) => i32::from(filters.detune()),
@@ -279,9 +282,13 @@ impl PhrasePane {
         }
         match self.header_cell() {
             Some(HeaderCell::Speed) => phrase.set_speed(value),
-            Some(HeaderCell::Length) => {
-                phrase.set_length(value);
-                self.step = self.step.min(phrase.length() - 1);
+            Some(HeaderCell::LoopStart) => {
+                phrase.set_loop_start(value);
+                self.keep_inside(phrase);
+            }
+            Some(HeaderCell::LoopEnd) => {
+                phrase.set_loop_end(value);
+                self.keep_inside(phrase);
             }
             Some(HeaderCell::Noiz) => phrase.filters_mut().set_noiz(value > 0),
             Some(HeaderCell::Buzz) => phrase.filters_mut().set_buzz(value > 0),
@@ -387,11 +394,15 @@ impl PhrasePane {
         draw_title(grid, area.column, 0, &title, focused);
         self.draw_header(grid, area, focused, phrase);
         grid.put(area.column, HEADER_ROWS - 1, "   NOT IN V F", HEADING);
+        let loop_start = phrase.phrase_loop().map(|steps| steps.start);
 
         for index in 0..phrase.length().min(MAX_STEPS) {
             let row = HEADER_ROWS + index;
             let label = format!("{index:02X}");
             draw_row_label(grid, area.column, row, &label, playing_step == Some(index));
+            if loop_start == Some(index) {
+                grid.put(area.column + LOOP_MARK_COLUMN, row, "<", LOOP_MARK);
+            }
             let on_this_step = focused && self.header_row.is_none() && index == self.step;
             let texts = step_texts(phrase.step(index));
             for (cell, ((_, offset, _), text)) in STEP_CELLS.iter().zip(&texts).enumerate() {
@@ -412,8 +423,8 @@ impl PhrasePane {
     fn draw_header(&self, grid: &mut Grid, area: Area, focused: bool, phrase: &Phrase) {
         let filters = phrase.filters();
         let labels = [
-            format!("SPD    BPM {}", phrase.bpm()),
-            "LEN    NZ   BZ".to_owned(),
+            "SPD    LOOP".to_owned(),
+            format!("BPM {:<5}NZ   BZ", phrase.bpm()),
             "DT   RV   DP".to_owned(),
         ];
         for (row, label) in labels.iter().enumerate() {
@@ -424,7 +435,8 @@ impl PhrasePane {
             for (column, (cell, offset)) in cells.iter().enumerate() {
                 let text = match cell {
                     HeaderCell::Speed => format!("{:02X}", phrase.speed()),
-                    HeaderCell::Length => format!("{:02X}", phrase.length()),
+                    HeaderCell::LoopStart => format!("{:02X}", phrase.loop_start()),
+                    HeaderCell::LoopEnd => format!("{:02X}", phrase.loop_end()),
                     HeaderCell::Noiz => u8::from(filters.noiz()).to_string(),
                     HeaderCell::Buzz => u8::from(filters.buzz()).to_string(),
                     HeaderCell::Detune => filters.detune().to_string(),

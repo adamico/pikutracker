@@ -414,9 +414,10 @@ impl ExportedChainRow {
                 Some((track, entry))
             })
         };
-        let all_fill = entries().all(|(_, entry)| entry.fill());
+        let loops = |entry: ChainEntry| project.phrase(entry.phrase()).loops();
+        let all_loop = entries().all(|(_, entry)| loops(entry));
         let sets_length = |entry: ChainEntry| {
-            (all_fill || !entry.fill()) && project.phrase(entry.phrase()).ticks() == ticks
+            (all_loop || !loops(entry)) && project.phrase(entry.phrase()).ticks() == ticks
         };
         let entry_channel = channels
             .iter()
@@ -443,16 +444,17 @@ impl ExportedChainRow {
         let Some((_, entry)) = self.channels[channel] else {
             return Ending::Len;
         };
-        let length = project.phrase(entry.phrase()).length() as u8;
+        let phrase = project.phrase(entry.phrase());
+        let length = phrase.length() as u8;
         let length_channel = self.length.channel();
         let is_left_of_length =
             length_channel.is_some_and(|length_channel| channel < length_channel);
         if length_channel == Some(channel) {
             Ending::Len
-        } else if entry.fill() {
+        } else if phrase.loops() {
             Ending::Loop {
-                start: 0,
-                end: length,
+                start: phrase.loop_start(),
+                end: phrase.loop_end(),
             }
         } else if is_left_of_length {
             Ending::Loop {
@@ -546,6 +548,10 @@ fn bake_sfx(
     sfx[FILTERS_BYTE] = filters_byte(phrase.filters());
     sfx[SPEED_BYTE] = phrase.speed();
     match ending {
+        Ending::Len if !phrase.loops() => {
+            sfx[LOOP_START_BYTE] = phrase.loop_start();
+            sfx[LOOP_END_BYTE] = phrase.loop_end();
+        }
         Ending::Len if phrase.length() < FULL_LENGTH => {
             sfx[LOOP_START_BYTE] = phrase.length() as u8;
         }

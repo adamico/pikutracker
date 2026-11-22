@@ -154,7 +154,7 @@ fn edits_in_every_pane_are_undone_in_order() {
         &[
             Action::ToggleSongLoopRow,
             Action::FocusNext,
-            Action::ToggleFill,
+            NUDGE_UP,
             Action::FocusNext,
             Action::PianoKey(0),
             UP,

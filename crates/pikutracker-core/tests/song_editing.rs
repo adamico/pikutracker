@@ -135,15 +135,14 @@ fn delete_is_bound_to_clear() {
 }
 
 #[test]
-fn a_chain_entry_holds_a_phrase_with_no_transpose_or_fill_at_first() {
+fn a_chain_entry_holds_a_phrase_with_no_transpose_at_first() {
     let mut app = chain_app();
     apply(&mut app, &id(0x1F));
 
     let entry = app.project().chain(ChainId::new(3)).entry(0).unwrap();
     assert_eq!(entry.phrase(), PhraseId::new(0x1F));
     assert_eq!(entry.transpose(), 0);
-    assert!(!entry.fill());
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0[1F]+00 ----");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0[1F]+00");
 }
 
 #[test]
@@ -152,7 +151,7 @@ fn an_untouched_chain_entry_stays_empty() {
     apply(&mut app, &id(1));
 
     assert!(app.project().chain(ChainId::new(3)).entry(1).is_none());
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE + 1), "1 -- --- ----");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE + 1), "1 -- ---");
 }
 
 #[test]
@@ -163,7 +162,7 @@ fn the_transpose_column_nudges_by_semitones_and_octaves() {
 
     let entry = app.project().chain(ChainId::new(3)).entry(0).unwrap();
     assert_eq!(entry.transpose(), -10);
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0 01[-0A]----");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0 01[-0A]");
 }
 
 #[test]
@@ -189,67 +188,33 @@ fn a_transpose_stops_at_its_limits() {
 }
 
 #[test]
-fn toggle_fill_marks_and_unmarks_the_entry_under_the_cursor() {
-    let mut app = chain_app();
-    apply(&mut app, &id(1));
-
-    app.apply(Action::ToggleFill);
-    assert!(
-        app.project()
-            .chain(ChainId::new(3))
-            .entry(0)
-            .unwrap()
-            .fill()
-    );
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0[01]+00 FILL");
-
-    app.apply(Action::ToggleFill);
-    assert!(
-        !app.project()
-            .chain(ChainId::new(3))
-            .entry(0)
-            .unwrap()
-            .fill()
-    );
-}
-
-#[test]
-fn toggle_fill_on_an_empty_entry_says_there_is_no_phrase() {
-    let mut app = chain_app();
-
-    app.apply(Action::ToggleFill);
-
-    assert_eq!(status_line(&app), "NO PHRASE HERE");
-    assert!(app.project().chain(ChainId::new(3)).entry(0).is_none());
-}
-
-#[test]
 fn clear_on_the_phrase_column_empties_the_whole_entry() {
     let mut app = chain_app();
     apply(&mut app, &id(1));
-    apply(&mut app, &[Action::ToggleFill, Action::Clear]);
+    apply(&mut app, &[Action::Clear]);
 
     assert!(app.project().chain(ChainId::new(3)).entry(0).is_none());
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0[--]--- ----");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0[--]---");
 }
 
 #[test]
-fn clear_on_the_transpose_or_fill_column_resets_only_that_value() {
+fn clear_on_the_transpose_column_resets_only_the_transpose() {
     let mut app = chain_app();
     apply(&mut app, &id(1));
-    apply(
-        &mut app,
-        &[Action::ToggleFill, RIGHT, NUDGE_UP, Action::Clear],
-    );
+    apply(&mut app, &[RIGHT, NUDGE_UP, Action::Clear]);
 
     let entry = app.project().chain(ChainId::new(3)).entry(0).unwrap();
     assert_eq!(entry.transpose(), 0);
-    assert!(entry.fill());
-
-    apply(&mut app, &[RIGHT, Action::Clear]);
-    let entry = app.project().chain(ChainId::new(3)).entry(0).unwrap();
-    assert!(!entry.fill());
     assert_eq!(entry.phrase(), PhraseId::new(1));
+}
+
+#[test]
+fn the_chain_pane_has_no_fill_column() {
+    let mut app = chain_app();
+    apply(&mut app, &id(1));
+    apply(&mut app, &[RIGHT, RIGHT, RIGHT]);
+
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0 01[+00]");
 }
 
 #[test]
@@ -257,7 +222,7 @@ fn editing_a_chain_entry_with_no_chain_under_the_cursor_says_so() {
     let app = app_after(&[&[TAB][..], &id(1)].concat());
 
     assert_eq!(status_line(&app), "NO CHAIN HERE");
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0[--]--- ----");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0[--]---");
 }
 
 #[test]
@@ -274,11 +239,11 @@ fn the_chain_pane_follows_the_song_cursor() {
     apply(&mut app, &id(7));
     apply(&mut app, &[BACK, DOWN]);
     assert_eq!(chain_text(&app, 0), "CHAIN --  T1 ROW 01");
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0 -- --- ----");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0 -- ---");
 
     app.apply(UP);
     assert_eq!(chain_text(&app, 0), "CHAIN 03  T1 ROW 00");
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0 07 +00 ----");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0 07 +00");
 }
 
 #[test]
@@ -338,9 +303,17 @@ fn the_phrase_cursor_stays_inside_a_shorter_phrase_it_follows_to() {
     apply(&mut app, &id(2));
     apply(
         &mut app,
-        &[TAB, UP, UP, Action::HexDigit(0), Action::HexDigit(2)],
+        &[
+            TAB,
+            UP,
+            UP,
+            UP,
+            RIGHT,
+            Action::HexDigit(0),
+            Action::HexDigit(2),
+        ],
     );
-    apply(&mut app, &[DOWN, DOWN, BACK, UP, TAB]);
+    apply(&mut app, &[LEFT, DOWN, DOWN, DOWN, BACK, UP, TAB]);
     apply(&mut app, &[DOWN; 15]);
     apply(&mut app, &[BACK, DOWN, TAB]);
 
@@ -368,7 +341,7 @@ fn the_song_editing_keys_are_bound_in_the_pc_tracker_preset() {
 
     assert_eq!(
         keymap.action_for(KeyPress::new(Key::Char('f'), Modifiers::CTRL)),
-        Some(Action::ToggleFill)
+        None
     );
     assert_eq!(
         keymap.action_for(KeyPress::new(Key::Char('r'), Modifiers::CTRL)),
@@ -381,5 +354,5 @@ fn left_moves_back_to_the_phrase_column_of_a_chain_entry() {
     let mut app = chain_app();
     apply(&mut app, &[RIGHT, RIGHT, LEFT, LEFT]);
 
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0[--]--- ----");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0[--]---");
 }
