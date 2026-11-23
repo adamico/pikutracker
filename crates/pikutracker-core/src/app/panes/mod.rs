@@ -9,7 +9,7 @@ pub mod phrase;
 pub mod song;
 pub mod title_number;
 
-use crate::project::{Project, SongRowEnding, SongRowMarks};
+use crate::project::{Project, SongRowMarks};
 use crate::screen::grid::{Grid, Style};
 use crate::screen::palette::Colour;
 
@@ -118,12 +118,14 @@ pub(super) fn instrument_name(project: &Project, instrument: u8) -> Option<&str>
 }
 
 const fn mark_text(marks: SongRowMarks) -> &'static str {
-    match (marks.loop_start, marks.ending) {
-        (false, None) => "",
-        (true, None) => ">",
-        (false, Some(SongRowEnding::LoopBack)) => "<",
-        (false, Some(SongRowEnding::Stop)) => "|",
-        (true, Some(SongRowEnding::LoopBack)) => "=",
-        (true, Some(SongRowEnding::Stop)) => "/",
+    match (marks.loop_start, marks.loop_back, marks.stop) {
+        (false, false, false) => "",
+        (true, false, false) => ">",
+        (false, true, false) => "<",
+        (false, false, true) => "|",
+        (true, true, false) => "=",
+        (true, false, true) => "/",
+        (false, true, true) => "[",
+        (true, true, true) => "#",
     }
 }

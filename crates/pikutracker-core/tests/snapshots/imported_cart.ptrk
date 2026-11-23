@@ -24,7 +24,7 @@
         (
             row: 1,
             tracks: "01 02 00 02",
-            ending: Some(LoopBack),
+            loop_back: true,
         ),
     ],
     chains: [

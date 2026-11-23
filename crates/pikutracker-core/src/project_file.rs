@@ -1,8 +1,8 @@
 use crate::project::{
     CART_SLOTS, CHAIN_ENTRIES, ChainEntry, ChainId, Claim, CustomInstrument, Filters,
     InstrumentSound, MAX_FILTER_LEVEL, MAX_INSTRUMENT_NAME, MAX_STEPS, NOTE_NAMES, Phrase,
-    PhraseId, Project, SONG_ROWS, SfxInstrument, SongRowEnding, SongRowMarks, Step, TRACKS,
-    TargetCart, WAVEFORM_SAMPLES, WaveformInstrument, slot_of_custom_instrument,
+    PhraseId, Project, SONG_ROWS, SfxInstrument, SongRowMarks, Step, TRACKS, TargetCart,
+    WAVEFORM_SAMPLES, WaveformInstrument, slot_of_custom_instrument,
 };
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
@@ -129,30 +129,10 @@ struct SongRowDocument {
     tracks: String,
     #[serde(default, skip_serializing_if = "is_false")]
     loop_start: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    ending: Option<EndingDocument>,
-}
-
-#[derive(Serialize, Deserialize)]
-enum EndingDocument {
-    LoopBack,
-    Stop,
-}
-
-impl EndingDocument {
-    const fn of(ending: SongRowEnding) -> Self {
-        match ending {
-            SongRowEnding::LoopBack => Self::LoopBack,
-            SongRowEnding::Stop => Self::Stop,
-        }
-    }
-
-    const fn ending(&self) -> SongRowEnding {
-        match self {
-            Self::LoopBack => SongRowEnding::LoopBack,
-            Self::Stop => SongRowEnding::Stop,
-        }
-    }
+    #[serde(default, skip_serializing_if = "is_false")]
+    loop_back: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    stop: bool,
 }
 
 #[expect(clippy::trivially_copy_pass_by_ref)]
@@ -332,7 +312,8 @@ impl SongRowDocument {
         (has_marks || cells.iter().any(Option::is_some)).then(|| Self {
             row: row as u16,
             loop_start: marks.loop_start,
-            ending: marks.ending.map(EndingDocument::of),
+            loop_back: marks.loop_back,
+            stop: marks.stop,
             tracks: cells
                 .iter()
                 .map(|cell| {
@@ -365,7 +346,8 @@ impl SongRowDocument {
             row,
             SongRowMarks {
                 loop_start: self.loop_start,
-                ending: self.ending.as_ref().map(EndingDocument::ending),
+                loop_back: self.loop_back,
+                stop: self.stop,
             },
         );
         Ok(())

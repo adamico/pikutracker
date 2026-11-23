@@ -3,7 +3,7 @@ mod support;
 use pikutracker_core::app::layout;
 use pikutracker_core::app::{Action, App, Direction, DirectoryEntry, FileRequest, FileResponse};
 use pikutracker_core::player::AudioRequest;
-use pikutracker_core::project::{SongRowEnding, SongRowMarks};
+use pikutracker_core::project::SongRowMarks;
 use std::path::{Path, PathBuf};
 use support::{TestCart, TestPattern, TestSfx};
 use support::{pane_text, status_line};
@@ -325,12 +325,13 @@ fn a_cart_with_several_songs_imports_all_its_music_in_one_step() {
     assert_eq!(first_pitch(0), 12);
     assert_eq!(first_pitch(1), 19);
     assert_eq!(first_pitch(2), 30);
-    assert_eq!(project.song_row_marks(1).ending, Some(SongRowEnding::Stop));
+    assert!(project.song_row_marks(1).stop);
     assert_eq!(
         project.song_row_marks(2),
         SongRowMarks {
             loop_start: true,
-            ending: Some(SongRowEnding::LoopBack),
+            loop_back: true,
+            stop: false,
         }
     );
     assert_eq!(

@@ -2,7 +2,7 @@ mod support;
 
 use pikutracker_core::app::{Action, App, Direction, layout};
 use pikutracker_core::keymap::{Key, KeyPress, Keymap, Modifiers, named_actions};
-use pikutracker_core::project::{ChainId, Project, SongRowEnding, SongRowMarks};
+use pikutracker_core::project::{ChainId, Project, SongRowMarks};
 use support::apply;
 
 const DOWN: Action = Action::Move(Direction::Down);
@@ -10,6 +10,14 @@ const FIRST_ROW_LINE: usize = 2;
 
 fn marks(app: &App, row: usize) -> SongRowMarks {
     app.project().song_row_marks(row)
+}
+
+const fn set(loop_start: bool, loop_back: bool, stop: bool) -> SongRowMarks {
+    SongRowMarks {
+        loop_start,
+        loop_back,
+        stop,
+    }
 }
 
 #[test]
@@ -36,48 +44,32 @@ fn loop_back_and_stop_toggle_on_the_song_row_under_the_cursor() {
     let mut app = App::new();
 
     apply(&mut app, &[DOWN, Action::ToggleLoopBack]);
-    assert_eq!(marks(&app, 1).ending, Some(SongRowEnding::LoopBack));
+    assert_eq!(marks(&app, 1), set(false, true, false));
     app.apply(Action::ToggleLoopBack);
-    assert_eq!(marks(&app, 1).ending, None);
+    assert_eq!(marks(&app, 1), SongRowMarks::default());
 
     app.apply(Action::ToggleStop);
-    assert_eq!(marks(&app, 1).ending, Some(SongRowEnding::Stop));
+    assert_eq!(marks(&app, 1), set(false, false, true));
     app.apply(Action::ToggleStop);
-    assert_eq!(marks(&app, 1).ending, None);
+    assert_eq!(marks(&app, 1), SongRowMarks::default());
 }
 
 #[test]
-fn setting_loop_back_clears_stop_and_setting_stop_clears_loop_back() {
+fn a_row_can_carry_all_three_marks_and_each_toggles_alone() {
     let mut app = App::new();
 
-    apply(&mut app, &[Action::ToggleStop, Action::ToggleLoopBack]);
-    assert_eq!(marks(&app, 0).ending, Some(SongRowEnding::LoopBack));
-
-    app.apply(Action::ToggleStop);
-    assert_eq!(marks(&app, 0).ending, Some(SongRowEnding::Stop));
-}
-
-#[test]
-fn loop_start_shares_a_row_with_loop_back_or_stop() {
-    let mut app = App::new();
-
-    apply(&mut app, &[Action::ToggleLoopStart, Action::ToggleLoopBack]);
-    assert_eq!(
-        marks(&app, 0),
-        SongRowMarks {
-            loop_start: true,
-            ending: Some(SongRowEnding::LoopBack),
-        }
+    apply(
+        &mut app,
+        &[
+            Action::ToggleLoopStart,
+            Action::ToggleLoopBack,
+            Action::ToggleStop,
+        ],
     );
+    assert_eq!(marks(&app, 0), set(true, true, true));
 
-    app.apply(Action::ToggleStop);
-    assert_eq!(
-        marks(&app, 0),
-        SongRowMarks {
-            loop_start: true,
-            ending: Some(SongRowEnding::Stop),
-        }
-    );
+    app.apply(Action::ToggleLoopBack);
+    assert_eq!(marks(&app, 0), set(true, false, true));
 }
 
 #[test]
@@ -93,10 +85,9 @@ fn each_toggle_is_one_undoable_edit() {
     );
 
     app.apply(Action::Undo);
-    assert_eq!(marks(&app, 0).ending, Some(SongRowEnding::Stop));
+    assert_eq!(marks(&app, 0), set(true, false, true));
     app.apply(Action::Undo);
-    assert_eq!(marks(&app, 0).ending, None);
-    assert!(marks(&app, 0).loop_start);
+    assert_eq!(marks(&app, 0), set(true, false, false));
     app.apply(Action::Undo);
     assert_eq!(marks(&app, 0), SongRowMarks::default());
 
@@ -115,42 +106,24 @@ fn song_line(app: &App, line: usize) -> String {
 #[test]
 fn the_song_pane_shows_each_rows_marks_after_its_number() {
     let mut project = Project::new();
-    let both = |ending| SongRowMarks {
-        loop_start: true,
-        ending: Some(ending),
-    };
-    project.set_song_row_marks(
-        1,
-        SongRowMarks {
-            loop_start: true,
-            ending: None,
-        },
-    );
-    project.set_song_row_marks(
-        2,
-        SongRowMarks {
-            loop_start: false,
-            ending: Some(SongRowEnding::LoopBack),
-        },
-    );
-    project.set_song_row_marks(
-        3,
-        SongRowMarks {
-            loop_start: false,
-            ending: Some(SongRowEnding::Stop),
-        },
-    );
-    project.set_song_row_marks(4, both(SongRowEnding::LoopBack));
-    project.set_song_row_marks(5, both(SongRowEnding::Stop));
+    project.set_song_row_marks(1, set(true, false, false));
+    project.set_song_row_marks(2, set(false, true, false));
+    project.set_song_row_marks(3, set(false, false, true));
+    project.set_song_row_marks(4, set(true, true, false));
+    project.set_song_row_marks(5, set(true, false, true));
+    project.set_song_row_marks(6, set(false, true, true));
+    project.set_song_row_marks(7, set(true, true, true));
     let app = App::with_project(project);
 
-    let rows: Vec<String> = (FIRST_ROW_LINE..FIRST_ROW_LINE + 6)
+    let rows: Vec<String> = (FIRST_ROW_LINE..FIRST_ROW_LINE + 8)
         .map(|line| song_line(&app, line))
         .collect();
 
     assert_eq!(
         rows,
-        ["00 [--]", "01> --", "02< --", "03| --", "04= --", "05/ --"]
+        [
+            "00 [--]", "01> --", "02< --", "03| --", "04= --", "05/ --", "06[ --", "07# --"
+        ]
     );
 }
 
@@ -159,13 +132,7 @@ fn marked_song() -> Project {
     for row in 0..3 {
         project.set_song_cell(row, 0, Some(ChainId::new(row as u8)));
     }
-    project.set_song_row_marks(
-        1,
-        SongRowMarks {
-            loop_start: true,
-            ending: Some(SongRowEnding::LoopBack),
-        },
-    );
+    project.set_song_row_marks(1, set(true, true, false));
     project
 }
 

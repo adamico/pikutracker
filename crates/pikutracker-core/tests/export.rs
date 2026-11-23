@@ -4,7 +4,7 @@ use pikutracker_core::cart::Cart;
 use pikutracker_core::export::{ExportFailure, export};
 use pikutracker_core::project::{
     Chain, ChainEntry, ChainId, Claim, CustomInstrument, Filters, InstrumentSound, PhraseId,
-    Project, SfxInstrument, SongRowEnding, SongRowMarks, Step, WaveformInstrument,
+    Project, SfxInstrument, SongRowMarks, Step, WaveformInstrument,
 };
 use support::{HEADER, assert_same_samples, render_notes, render_song, sound_of};
 
@@ -42,8 +42,13 @@ fn one_row_project() -> Project {
     project
 }
 
-fn mark(project: &mut Project, row: usize, loop_start: bool, ending: Option<SongRowEnding>) {
-    project.set_song_row_marks(row, SongRowMarks { loop_start, ending });
+fn mark(project: &mut Project, row: usize, loop_start: bool, loop_back: bool, stop: bool) {
+    let marks = SongRowMarks {
+        loop_start,
+        loop_back,
+        stop,
+    };
+    project.set_song_row_marks(row, marks);
 }
 
 fn exported_cart(project: &Project, claim: &Claim) -> Cart {
@@ -142,7 +147,7 @@ fn track_n_exports_to_channel_n_minus_1_with_nothing_to_pick() {
 fn loop_start_and_loop_back_on_one_row_flag_its_pattern() {
     let mut project = one_row_project();
     place(&mut project, 1, 0, 0, 0);
-    mark(&mut project, 1, true, Some(SongRowEnding::LoopBack));
+    mark(&mut project, 1, true, true, false);
 
     let cart = exported_cart(&project, &claim(&[8], (2, 3)));
 
@@ -228,8 +233,8 @@ fn a_note_out_of_range_does_not_hide_a_claim_that_is_too_small() {
 fn marks_become_flags_over_bytes_that_were_there() {
     let mut project = one_row_project();
     place(&mut project, 1, 0, 0, 0);
-    mark(&mut project, 0, true, None);
-    mark(&mut project, 1, false, Some(SongRowEnding::LoopBack));
+    mark(&mut project, 0, true, false, false);
+    mark(&mut project, 1, false, true, false);
     let mut original = blank_cart();
     original.extend(b"__music__\n07 08424344\n07 08424344\n");
 
@@ -243,11 +248,24 @@ fn marks_become_flags_over_bytes_that_were_there() {
 #[test]
 fn a_stop_mark_becomes_the_stop_flag() {
     let mut project = one_row_project();
-    mark(&mut project, 0, false, Some(SongRowEnding::Stop));
+    mark(&mut project, 0, false, false, true);
 
     let cart = exported_cart(&project, &claim(&[8], (0, 0)));
 
     assert_eq!(cart.pattern_bytes(0), [8, 0x42, 0x43 | 0x80, 0x44]);
+}
+
+#[test]
+fn a_row_with_loop_back_and_stop_exports_both_flags() {
+    let mut project = one_row_project();
+    mark(&mut project, 0, true, true, true);
+
+    let cart = exported_cart(&project, &claim(&[8], (0, 0)));
+
+    assert_eq!(
+        cart.pattern_bytes(0),
+        [8 | 0x80, 0x42 | 0x80, 0x43 | 0x80, 0x44]
+    );
 }
 
 #[test]
@@ -257,8 +275,8 @@ fn a_song_row_of_several_chain_rows_flags_its_first_and_last_patterns() {
     *project.chain_mut(ChainId::new(0)).entry_mut(1) = Some(ChainEntry::new(PhraseId::new(1)));
     *project.chain_mut(ChainId::new(0)).entry_mut(2) = Some(ChainEntry::new(PhraseId::new(0)));
     place(&mut project, 1, 0, 1, 1);
-    mark(&mut project, 0, true, Some(SongRowEnding::LoopBack));
-    mark(&mut project, 1, true, Some(SongRowEnding::Stop));
+    mark(&mut project, 0, true, true, false);
+    mark(&mut project, 1, true, false, true);
 
     let cart = exported_cart(&project, &claim(&[8, 9], (0, 3)));
 
@@ -273,7 +291,7 @@ fn an_empty_song_row_between_played_rows_becomes_an_empty_pattern_with_its_marks
     let mut project = one_row_project();
     write_phrase(&mut project, 1, 8, 9);
     place(&mut project, 2, 0, 1, 1);
-    mark(&mut project, 1, false, Some(SongRowEnding::Stop));
+    mark(&mut project, 1, false, false, true);
 
     let exported = export(&project, &claim(&[8, 9], (0, 2)), &blank_cart()).unwrap();
 
@@ -288,7 +306,7 @@ fn an_empty_song_row_between_played_rows_becomes_an_empty_pattern_with_its_marks
 fn a_loop_back_with_no_loop_start_adds_no_loop_start_flag_on_a_first_pattern_past_pattern_0() {
     let mut project = one_row_project();
     place(&mut project, 1, 0, 0, 0);
-    mark(&mut project, 1, false, Some(SongRowEnding::LoopBack));
+    mark(&mut project, 1, false, true, false);
 
     let cart = exported_cart(&project, &claim(&[8], (2, 3)));
 
@@ -300,7 +318,7 @@ fn a_loop_back_with_no_loop_start_adds_no_loop_start_flag_on_a_first_pattern_pas
 fn a_loop_back_to_song_row_00_needs_no_loop_start_on_pattern_0() {
     let mut project = one_row_project();
     place(&mut project, 1, 0, 0, 0);
-    mark(&mut project, 1, false, Some(SongRowEnding::LoopBack));
+    mark(&mut project, 1, false, true, false);
 
     let cart = exported_cart(&project, &claim(&[8], (0, 1)));
 
@@ -310,7 +328,7 @@ fn a_loop_back_to_song_row_00_needs_no_loop_start_on_pattern_0() {
 #[test]
 fn marks_after_the_last_played_song_row_are_not_exported() {
     let mut project = one_row_project();
-    mark(&mut project, 5, true, Some(SongRowEnding::Stop));
+    mark(&mut project, 5, true, false, true);
 
     let exported = export(&project, &claim(&[8], (0, 1)), &blank_cart()).unwrap();
 

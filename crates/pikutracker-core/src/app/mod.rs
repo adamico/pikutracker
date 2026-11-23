@@ -30,8 +30,7 @@ use crate::multitrack::Timeline;
 use crate::player::{AudioRequest, PlaybackReport, Playhead, TrackMix};
 use crate::project::{CHAIN_ENTRIES, FIRST_CUSTOM_INSTRUMENT, LAST_CUSTOM_INSTRUMENT, SONG_ROWS};
 use crate::project::{
-    Chain, ChainEntry, ChainId, Phrase, PhraseId, Project, SongPlace, SongRowEnding, SongRowMarks,
-    Step, Track,
+    Chain, ChainEntry, ChainId, Phrase, PhraseId, Project, SongPlace, SongRowMarks, Step, Track,
 };
 use crate::screen::grid::Grid;
 use crate::settings::AppState;
@@ -570,12 +569,14 @@ impl App {
                 self.song
                     .change_marks(&mut self.project, SongRowMarks::toggle_loop_start);
             }
-            Action::ToggleLoopBack => self.song.change_marks(&mut self.project, |marks| {
-                marks.toggle_ending(SongRowEnding::LoopBack);
-            }),
-            Action::ToggleStop => self.song.change_marks(&mut self.project, |marks| {
-                marks.toggle_ending(SongRowEnding::Stop);
-            }),
+            Action::ToggleLoopBack => {
+                self.song
+                    .change_marks(&mut self.project, SongRowMarks::toggle_loop_back);
+            }
+            Action::ToggleStop => {
+                self.song
+                    .change_marks(&mut self.project, SongRowMarks::toggle_stop);
+            }
             Action::Clear => self.clear_cells(),
             Action::PianoKey(key) if self.focus == Focus::Phrase => {
                 self.edit_phrase(|pane, phrase| pane.enter_note(phrase, key));

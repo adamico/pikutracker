@@ -4,7 +4,7 @@ use crate::cart::{
 };
 use crate::project::{
     ChainEntry, ChainRowPlace, Claim, CustomInstrument, Filters, InstrumentSound, MAX_PITCH,
-    MAX_STEPS, Phrase, Project, SongRowEnding, SongRowMarks, TRACKS, custom_instrument_of_slot,
+    MAX_STEPS, Phrase, Project, SongRowMarks, TRACKS, custom_instrument_of_slot,
     slot_of_custom_instrument,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -261,7 +261,8 @@ fn song_row_patterns(project: &Project, song_row: usize) -> Vec<SongPattern> {
             chain_row,
             marks: SongRowMarks {
                 loop_start: marks.loop_start && index == 0,
-                ending: marks.ending.filter(|_| index == last),
+                loop_back: marks.loop_back && index == last,
+                stop: marks.stop && index == last,
             },
         })
         .collect()
@@ -547,10 +548,11 @@ fn pattern_bytes(
     if marks.loop_start {
         bytes[LOOP_START_CHANNEL] |= FLAG;
     }
-    match marks.ending {
-        Some(SongRowEnding::LoopBack) => bytes[LOOP_BACK_CHANNEL] |= FLAG,
-        Some(SongRowEnding::Stop) => bytes[STOP_CHANNEL] |= FLAG,
-        None => {}
+    if marks.loop_back {
+        bytes[LOOP_BACK_CHANNEL] |= FLAG;
+    }
+    if marks.stop {
+        bytes[STOP_CHANNEL] |= FLAG;
     }
     bytes
 }
