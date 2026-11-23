@@ -4,9 +4,11 @@ pub mod file_list;
 pub mod instrument;
 pub mod log;
 pub mod midi_dialog;
+pub mod multitrack;
 pub mod phrase;
 pub mod song;
 
+use crate::project::{SongRowEnding, SongRowMarks};
 use crate::screen::grid::{Grid, Style};
 use crate::screen::palette::Colour;
 
@@ -85,5 +87,16 @@ fn draw_styled_value(
         grid.put(column + text.chars().count(), row, "]", CURSOR_BRACKET);
     } else {
         grid.put(column, row, text, style);
+    }
+}
+
+const fn mark_text(marks: SongRowMarks) -> &'static str {
+    match (marks.loop_start, marks.ending) {
+        (false, None) => "",
+        (true, None) => ">",
+        (false, Some(SongRowEnding::LoopBack)) => "<",
+        (false, Some(SongRowEnding::Stop)) => "|",
+        (true, Some(SongRowEnding::LoopBack)) => "=",
+        (true, Some(SongRowEnding::Stop)) => "/",
     }
 }

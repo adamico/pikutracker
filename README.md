@@ -22,10 +22,11 @@ To build from source, run `cargo run --release -p pikutracker`.
 
 ## How a Song is built
 
-![The pikutracker screen. On the left, the Phrase pane shows the 8 Steps of Phrase 01, from A-2 down to D-2 and back up to G-2, under its settings and the NOTE, INST, VOL and FX column headers. In the middle, the Chain pane shows Chain 00, which lists Phrases 00, 00 and 01; below it, the Song pane: in row 00, Track 1 plays Chain 00 and Track 2 plays Chain 02; in row 01 they play Chains 01 and 03. The right section is empty.](docs/images/song-chain-phrase.png)
+![The pikutracker screen. On the left, the Phrase pane shows the 8 Steps of Phrase 01, from A-2 down to D-2 and back up to G-2, under its settings and the NOTE, INST, VOL and FX column headers. In the middle, the Chain pane shows Chain 00, which lists Phrases 00, 00 and 01; below it, the Song pane: in row 00, Track 1 plays Chain 00 and Track 2 plays Chain 02; in row 01 they play Chains 01 and 03. On the right, the Multitrack shows the Song as it plays: Track 1's and Track 2's Steps in time order, with Song rows 00 and 01 numbered in its gutter.](docs/images/song-chain-phrase.png)
 
-The screen has three sections: the Phrase pane on the left, the Chain pane over the Song pane in the middle, and a right section where the file list, the Log and the Cart view open. The panes are:
+The screen has three sections: the Phrase pane on the left, the Chain pane over the Song pane in the middle, and the Multitrack on the right, where the file list, the Log and the Cart view open over it. The panes are:
 
+- **Multitrack**: the Song as it plays. Its columns, TRACK 1 to TRACK 4, show each Track's Steps in time order with their transposes applied, spaced by Ticks so that Steps side by side start together; a Step that lasts longer than its neighbours has a tail (`|`). Phrase loops repeat until their Chain row ends. Song row numbers and marks run down its gutter, and its title shows the Song row in view. With Follow on, it tracks the Playhead.
 - **Song**: the whole piece, read from top to bottom. Each Song row names one Chain for each Track, or none. A Song has up to 256 rows.
   - **Loop start, Loop back and Stop**: marks on a Song row, shown beside its number, which become PICO-8's flags of the same name. After a Loop back row (`<`), playback returns to the nearest Loop start (`>`) at or before it, or to row 00 if there is none. Playback ends after a Stop row (`|`), at an empty row, or after the last row. A row with Loop start and Loop back shows `=`, and one with Loop start and Stop shows `/`.
   - **Track**: one of the Song's 4 columns (T1 to T4), played by one voice. Track n Exports to PICO-8's channel n − 1.
