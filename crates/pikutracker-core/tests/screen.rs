@@ -264,7 +264,7 @@ fn readme_project() -> Project {
 fn the_readme_screenshot_matches_the_app() {
     let mut app = App::with_project(readme_project());
     for action in [
-        Action::FocusNext,
+        Action::FocusPrevious,
         Action::Move(Direction::Down),
         Action::Move(Direction::Down),
     ] {

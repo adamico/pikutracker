@@ -131,9 +131,9 @@ fn phrase_app(actions: &[Action]) -> App {
         &mut app,
         &[
             Action::HexDigit(0),
-            Action::FocusNext,
+            Action::FocusPrevious,
             Action::HexDigit(0),
-            Action::FocusNext,
+            Action::FocusPrevious,
         ],
     );
     apply(&mut app, actions);

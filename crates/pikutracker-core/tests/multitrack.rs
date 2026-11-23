@@ -272,7 +272,7 @@ fn with_follow_off_it_stays_where_it_is_while_the_song_plays() {
 #[test]
 fn it_scrolls_continuously_through_the_song_and_its_title_shows_the_song_row_in_view() {
     let mut app = App::with_project(long_song());
-    apply(&mut app, &[FOLLOW, TAB, TAB, TAB]);
+    apply(&mut app, &[FOLLOW, TAB]);
 
     app.apply(DOWN);
     assert_eq!(status_line(&app), "FOLLOW OFF");
@@ -294,7 +294,7 @@ fn muted_tracks_are_still_shown() {
 const UP: Action = Action::Move(Direction::Up);
 const LEFT: Action = Action::Move(Direction::Left);
 const RIGHT: Action = Action::Move(Direction::Right);
-const TO_MULTITRACK: [Action; 3] = [TAB, TAB, TAB];
+const TO_MULTITRACK: [Action; 1] = [TAB];
 
 fn fast_beside_slow() -> (Project, PhraseId, PhraseId) {
     let mut project = Project::new();
@@ -359,10 +359,10 @@ fn the_cursor_drives_the_song_row_the_chain_on_that_track_and_the_phrase_and_ste
 
     assert_eq!(app.shown_chain(), Some(ChainId::new(2)));
     assert_eq!(app.shown_phrase(), Some(slow));
-    app.apply(Action::FocusPrevious);
-    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusNext);
+    app.apply(Action::FocusNext);
     assert_eq!(pane_text(&app, layout::CHAIN, 3), "01[02]    +00");
-    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusNext);
     assert_eq!(pane_text(&app, layout::SONG, 3), "01  --[02]-- --");
 }
 

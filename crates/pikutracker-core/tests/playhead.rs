@@ -8,7 +8,7 @@ use pikutracker_core::synth::SAMPLES_PER_TICK;
 use support::{pane_text, status_line};
 
 const DOWN: Action = Action::Move(Direction::Down);
-const TAB: Action = Action::FocusNext;
+const SHIFT_TAB: Action = Action::FocusPrevious;
 const SPACE: Action = Action::PlayFocusedPane;
 const PLAY_SONG: Action = Action::PlaySongFromCursor;
 const FOLLOW: Action = Action::ToggleFollow;
@@ -96,7 +96,14 @@ fn the_phrase_pane_marks_the_step_being_played() {
 #[test]
 fn the_marker_is_separate_from_the_cursor() {
     let (app, _) = played(
-        &[DOWN, TAB, TAB, DOWN, Action::Move(Direction::Up), PLAY_SONG],
+        &[
+            DOWN,
+            SHIFT_TAB,
+            SHIFT_TAB,
+            DOWN,
+            Action::Move(Direction::Up),
+            PLAY_SONG,
+        ],
         0,
     );
 
@@ -117,7 +124,7 @@ fn a_pane_showing_something_else_has_no_marker() {
 
 #[test]
 fn the_phrase_pane_marks_a_phrase_playing_alone() {
-    let (app, _) = played(&[TAB, TAB, SPACE], 1);
+    let (app, _) = played(&[SHIFT_TAB, SHIFT_TAB, SPACE], 1);
 
     assert_eq!(label(&app, layout::PHRASE, FIRST_STEP_ROW + 1), ">1");
 }
@@ -161,7 +168,7 @@ fn follow_moves_the_panes_to_the_playhead() {
 
 #[test]
 fn follow_moves_the_cursor_down_the_chain_and_the_phrase() {
-    let (app, _) = played(&[FOLLOW, TAB, TAB, PLAY_SONG], 3);
+    let (app, _) = played(&[FOLLOW, SHIFT_TAB, SHIFT_TAB, PLAY_SONG], 3);
 
     assert_eq!(app.shown_phrase(), Some(PhraseId::new(2)));
     assert!(pane_text(&app, layout::PHRASE, FIRST_STEP_ROW + 1).contains('['));

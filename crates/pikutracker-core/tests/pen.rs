@@ -15,9 +15,9 @@ fn phrase_app(actions: &[Action]) -> App {
     let mut app = App::new();
     let chain_00_holding_phrase_00 = [
         Action::HexDigit(0),
-        Action::FocusNext,
+        Action::FocusPrevious,
         Action::HexDigit(0),
-        Action::FocusNext,
+        Action::FocusPrevious,
     ];
     for action in chain_00_holding_phrase_00 {
         app.apply(action);
@@ -146,8 +146,8 @@ fn each_pen_field_can_be_typed_directly() {
 fn the_pen_can_be_set_with_no_phrase_shown() {
     let mut app = App::new();
     for action in [
-        Action::FocusNext,
-        Action::FocusNext,
+        Action::FocusPrevious,
+        Action::FocusPrevious,
         UP,
         Action::Nudge {
             up: true,
@@ -165,8 +165,8 @@ fn the_pen_can_be_set_with_no_phrase_shown() {
 fn setting_the_pen_leaves_the_project_untouched_and_adds_no_undo_entry() {
     let mut app = App::new();
     for action in [
-        Action::FocusNext,
-        Action::FocusNext,
+        Action::FocusPrevious,
+        Action::FocusPrevious,
         UP,
         Action::HexDigit(3),
         Action::OctaveUp,

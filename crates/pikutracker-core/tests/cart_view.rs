@@ -123,9 +123,9 @@ fn clear_field(app: &mut App) {
 fn one_phrase_project() -> Project {
     let mut app = App::new();
     app.apply(Action::HexDigit(0));
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
     app.apply(Action::HexDigit(0));
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
     app.apply(Action::PianoKey(0));
     app.project().clone()
 }

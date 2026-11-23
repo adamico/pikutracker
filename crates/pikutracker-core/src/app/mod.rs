@@ -521,7 +521,7 @@ impl App {
                 self.start_selection_unless_started();
                 self.jump(direction);
             }
-            Action::FocusNext => self.focus_next(),
+            Action::FocusNext => self.set_focus(self.focus.next()),
             Action::FocusPrevious => self.set_focus(self.focus.previous()),
             Action::PlayFocusedPane => self.play_or_stop(),
             Action::PlaySongFromCursor => self.play_song(),
@@ -948,14 +948,6 @@ impl App {
             self.shown.open_chain(chain);
         }
         self.shown.open_phrase(place.phrase);
-    }
-
-    fn focus_next(&mut self) {
-        if self.focus == Focus::RightSlot && self.shows_multitrack() {
-            self.set_focus(Focus::Phrase);
-        } else {
-            self.set_focus(self.focus.next());
-        }
     }
 
     fn shows_multitrack(&self) -> bool {

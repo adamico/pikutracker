@@ -410,9 +410,9 @@ fn each_project_opens_at_the_top_of_the_song_with_the_song_pane_focused() {
         app.apply(DOWN);
     }
     app.apply(Action::Move(Direction::Right));
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
     app.apply(DOWN);
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
 
     open_file(&mut app, "song.ptrk", &other_project_text());
 
@@ -484,11 +484,11 @@ fn moving_the_cursor_never_marks_a_project_as_unsaved() {
     for action in [
         DOWN,
         Action::Move(Direction::Right),
-        Action::FocusNext,
+        Action::FocusPrevious,
         DOWN,
-        Action::FocusNext,
+        Action::FocusPrevious,
         DOWN,
-        Action::FocusNext,
+        Action::FocusPrevious,
         Action::ToggleLog,
     ] {
         app.apply(action);
@@ -576,9 +576,9 @@ fn other_keys_wait_while_a_question_is_asked() {
 fn playing_app() -> App {
     let mut app = App::new();
     app.apply(Action::HexDigit(0));
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
     app.apply(Action::HexDigit(0));
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
     app.apply(Action::PianoKey(0));
     app.apply(Action::PlayFocusedPane);
     app.take_audio_requests();

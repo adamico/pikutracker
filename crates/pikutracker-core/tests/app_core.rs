@@ -103,39 +103,51 @@ fn the_song_pane_scrolls_to_keep_the_cursor_visible() {
     assert_eq!(song_text(&app, LAST_SONG_LINE), "FF [--]-- -- --");
 }
 
+fn no_left_pane_has_the_cursor(app: &App) -> bool {
+    song_text(app, 2) == "00  -- -- -- --"
+        && chain_text(app, 2) == "00 --     ---"
+        && phrase_text(app, 7) == "00 ...  .    .   ."
+}
+
 #[test]
-fn tab_goes_through_song_chain_phrase_and_the_multitrack_then_back_to_the_phrase() {
+fn tab_follows_the_layout_from_the_phrase_through_the_chain_song_and_multitrack() {
     let app = app_after(&[Action::FocusNext]);
-    assert_eq!(song_text(&app, 2), "00  -- -- -- --");
-    assert_eq!(chain_text(&app, 2), "00[--]    ---");
+    assert!(no_left_pane_has_the_cursor(&app));
 
     let app = app_after(&[Action::FocusNext; 2]);
-    assert_eq!(chain_text(&app, 2), "00 --     ---");
     assert_eq!(phrase_text(&app, 7), "00[...] .    .   .");
 
     let app = app_after(&[Action::FocusNext; 3]);
     assert_eq!(phrase_text(&app, 7), "00 ...  .    .   .");
-    assert_eq!(song_text(&app, 2), "00  -- -- -- --");
+    assert_eq!(chain_text(&app, 2), "00[--]    ---");
 
     let app = app_after(&[Action::FocusNext; 4]);
-    assert_eq!(song_text(&app, 2), "00  -- -- -- --");
-    assert_eq!(phrase_text(&app, 7), "00[...] .    .   .");
+    assert_eq!(chain_text(&app, 2), "00 --     ---");
+    assert_eq!(song_text(&app, 2), "00 [--]-- -- --");
 }
 
 #[test]
-fn focus_previous_goes_back_from_the_song_pane_to_the_right_hand_view() {
+fn shift_tab_goes_back_from_the_song_through_the_chain_and_phrase_to_the_multitrack() {
     let app = app_after(&[Action::FocusPrevious]);
-
     assert_eq!(song_text(&app, 2), "00  -- -- -- --");
+    assert_eq!(chain_text(&app, 2), "00[--]    ---");
+
+    let app = app_after(&[Action::FocusPrevious; 2]);
     assert_eq!(chain_text(&app, 2), "00 --     ---");
-    assert_eq!(phrase_text(&app, 7), "00 ...  .    .   .");
+    assert_eq!(phrase_text(&app, 7), "00[...] .    .   .");
+
+    let app = app_after(&[Action::FocusPrevious; 3]);
+    assert!(no_left_pane_has_the_cursor(&app));
     assert_eq!(right_slot_text(&app, 0), "MULTITRACK  ROW 00");
+
+    let app = app_after(&[Action::FocusPrevious; 4]);
+    assert_eq!(song_text(&app, 2), "00 [--]-- -- --");
 }
 
 #[test]
 fn arrows_move_the_cursor_inside_the_focused_pane_only() {
     let app = app_after(&[
-        Action::FocusNext,
+        Action::FocusPrevious,
         Action::Move(Direction::Down),
         Action::Move(Direction::Right),
     ]);
@@ -144,8 +156,8 @@ fn arrows_move_the_cursor_inside_the_focused_pane_only() {
     assert_eq!(song_text(&app, 2), "00  -- -- -- --");
 
     let app = app_after(&[
-        Action::FocusNext,
-        Action::FocusNext,
+        Action::FocusPrevious,
+        Action::FocusPrevious,
         Action::Move(Direction::Down),
         Action::Move(Direction::Right),
         Action::Move(Direction::Right),
@@ -159,7 +171,7 @@ fn arrows_move_the_cursor_inside_the_focused_pane_only() {
 fn the_cursor_stops_at_the_edges_of_every_pane() {
     let app = app_after(
         &[
-            &[Action::FocusNext][..],
+            &[Action::FocusPrevious][..],
             &[Action::Move(Direction::Down); 30],
             &[Action::Move(Direction::Right); 5],
         ]
@@ -169,7 +181,7 @@ fn the_cursor_stops_at_the_edges_of_every_pane() {
 
     let app = app_after(
         &[
-            &[Action::FocusNext, Action::FocusNext][..],
+            &[Action::FocusPrevious, Action::FocusPrevious][..],
             &[Action::Move(Direction::Down); 40],
             &[Action::Move(Direction::Right); 6],
         ]
@@ -182,8 +194,8 @@ fn the_cursor_stops_at_the_edges_of_every_pane() {
 fn a_pane_keeps_its_cursor_when_focus_comes_back() {
     let app = app_after(&[
         Action::Move(Direction::Down),
-        Action::FocusNext,
         Action::FocusPrevious,
+        Action::FocusNext,
     ]);
 
     assert_eq!(song_text(&app, 3), "01 [--]-- -- --");

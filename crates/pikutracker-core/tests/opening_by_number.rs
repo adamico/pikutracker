@@ -9,8 +9,8 @@ use support::{apply, pane_text};
 const UP: Action = Action::Move(Direction::Up);
 const DOWN: Action = Action::Move(Direction::Down);
 const RIGHT: Action = Action::Move(Direction::Right);
+const SHIFT_TAB: Action = Action::FocusPrevious;
 const TAB: Action = Action::FocusNext;
-const BACK: Action = Action::FocusPrevious;
 const SPACE: Action = Action::PlayFocusedPane;
 
 const PHRASE_HEADER_ROWS: usize = 5;
@@ -54,11 +54,11 @@ fn project_with_a_loose_chain() -> Project {
 }
 
 fn to_the_chain_title() -> Vec<Action> {
-    vec![TAB, UP]
+    vec![SHIFT_TAB, UP]
 }
 
 fn to_the_phrase_title() -> Vec<Action> {
-    [&[TAB, TAB][..], &[UP; PHRASE_HEADER_ROWS + 1]].concat()
+    [&[SHIFT_TAB, SHIFT_TAB][..], &[UP; PHRASE_HEADER_ROWS + 1]].concat()
 }
 
 #[test]
@@ -118,7 +118,7 @@ fn moving_the_chain_cursor_shows_the_phrase_under_it_again() {
         &[to_the_phrase_title(), number(5).to_vec()].concat(),
     );
 
-    apply(&mut app, &[BACK, DOWN]);
+    apply(&mut app, &[TAB, DOWN]);
     assert_eq!(app.shown_phrase(), None);
 
     app.apply(UP);
@@ -133,7 +133,7 @@ fn moving_the_song_cursor_shows_the_chain_under_it_again() {
         &[to_the_chain_title(), number(3).to_vec()].concat(),
     );
 
-    apply(&mut app, &[BACK, RIGHT]);
+    apply(&mut app, &[TAB, RIGHT]);
     assert_eq!(app.shown_chain(), None);
 
     app.apply(Action::Move(Direction::Left));
@@ -160,7 +160,7 @@ fn a_note_goes_into_the_phrase_opened_by_number_and_undo_returns_to_it() {
         project.chain(ChainId::new(0))
     );
 
-    apply(&mut app, &[Action::FocusPrevious, DOWN]);
+    apply(&mut app, &[Action::FocusNext, DOWN]);
     assert_eq!(app.shown_phrase(), None);
 
     app.apply(Action::Undo);

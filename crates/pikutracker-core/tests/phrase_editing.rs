@@ -18,9 +18,9 @@ fn phrase_app(actions: &[Action]) -> App {
     let mut app = App::new();
     let chain_00_holding_phrase_00 = [
         Action::HexDigit(0),
-        Action::FocusNext,
+        Action::FocusPrevious,
         Action::HexDigit(0),
-        Action::FocusNext,
+        Action::FocusPrevious,
     ];
     for action in chain_00_holding_phrase_00 {
         app.apply(action);
@@ -271,7 +271,7 @@ fn piano_keys_do_nothing_outside_the_pitch_column() {
 
 #[test]
 fn step_edits_do_nothing_outside_the_phrase_pane() {
-    let app = phrase_app(&[Action::FocusNext, C, Action::HexDigit(3)]);
+    let app = phrase_app(&[Action::FocusPrevious, C, Action::HexDigit(3)]);
 
     assert_eq!(step(&app, 0), Step::default());
 }
@@ -281,8 +281,8 @@ fn the_key_context_follows_the_phrase_cursor() {
     let mut app = App::new();
     assert_eq!(app.key_context(), KeyContext::ReferenceValue);
 
-    app.apply(Action::FocusNext);
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusPrevious);
     assert_eq!(app.key_context(), KeyContext::PhrasePitch);
 
     app.apply(RIGHT);

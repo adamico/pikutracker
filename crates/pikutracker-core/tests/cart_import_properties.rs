@@ -249,7 +249,7 @@ fn the_app_shows_the_warnings_of_random_carts_without_crashing() {
 }
 
 fn jump_to_the_place_of_every_warning_in_the_log(app: &mut App) {
-    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusNext);
     for _ in 0..8 {
         app.apply(Action::Confirm);
         app.apply(Action::Move(Direction::Down));

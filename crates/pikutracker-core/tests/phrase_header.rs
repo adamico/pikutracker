@@ -27,9 +27,9 @@ fn phrase_app(actions: &[Action]) -> App {
     let mut app = App::new();
     let chain_00_holding_phrase_00 = [
         Action::HexDigit(0),
-        Action::FocusNext,
+        Action::FocusPrevious,
         Action::HexDigit(0),
-        Action::FocusNext,
+        Action::FocusPrevious,
     ];
     for action in chain_00_holding_phrase_00 {
         app.apply(action);

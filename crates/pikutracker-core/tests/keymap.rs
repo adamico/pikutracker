@@ -115,8 +115,8 @@ fn key_presses_drive_the_headless_app_through_the_preset() {
     let keymap = Keymap::pc_tracker();
     let mut app = App::new();
 
-    for key in [Key::Tab, Key::Down] {
-        let action = keymap.action_for(KeyPress::new(key, NONE)).unwrap();
+    for (key, modifiers) in [(Key::Tab, SHIFT), (Key::Down, NONE)] {
+        let action = keymap.action_for(KeyPress::new(key, modifiers)).unwrap();
         app.apply(action);
     }
 

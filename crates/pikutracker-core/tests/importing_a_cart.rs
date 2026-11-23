@@ -234,7 +234,7 @@ fn enter_on_a_timing_warning_jumps_to_the_step_it_is_about() {
     import_file(&mut app, "demo.p8", cart.p8());
     let cut_off = app.project().chain_row_entry(1, 1, 0).unwrap().phrase();
 
-    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusNext);
     app.apply(Action::Confirm);
 
     assert_eq!(app.shown_phrase(), Some(cut_off));

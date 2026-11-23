@@ -8,7 +8,7 @@ use pikutracker_core::synth::{SAMPLE_RATE, SAMPLES_PER_TICK};
 use support::pane_text;
 
 const PLAY_SONG: Action = Action::PlaySongFromCursor;
-const TAB: Action = Action::FocusNext;
+const SHIFT_TAB: Action = Action::FocusPrevious;
 const SPACE: Action = Action::PlayFocusedPane;
 
 const SPEED: i32 = 8;
@@ -215,7 +215,7 @@ fn a_mute_during_playback_is_heard_without_changing_the_timing() {
 fn the_chain_pane_plays_a_muted_track_all_the_same() {
     let samples = hear(
         two_tracks(),
-        &[Action::Mute { track_number: 1 }, TAB, SPACE],
+        &[Action::Mute { track_number: 1 }, SHIFT_TAB, SPACE],
         2,
     );
 
@@ -226,7 +226,12 @@ fn the_chain_pane_plays_a_muted_track_all_the_same() {
 fn the_phrase_pane_plays_a_muted_track_all_the_same() {
     let samples = hear(
         two_tracks(),
-        &[Action::Mute { track_number: 1 }, TAB, TAB, SPACE],
+        &[
+            Action::Mute { track_number: 1 },
+            SHIFT_TAB,
+            SHIFT_TAB,
+            SPACE,
+        ],
         2,
     );
 

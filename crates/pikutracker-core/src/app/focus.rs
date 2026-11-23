@@ -10,19 +10,19 @@ pub enum Focus {
 impl Focus {
     pub const fn next(self) -> Self {
         match self {
-            Focus::Song => Focus::Chain,
-            Focus::Chain => Focus::Phrase,
-            Focus::Phrase => Focus::RightSlot,
-            Focus::RightSlot => Focus::Song,
+            Focus::Phrase => Focus::Chain,
+            Focus::Chain => Focus::Song,
+            Focus::Song => Focus::RightSlot,
+            Focus::RightSlot => Focus::Phrase,
         }
     }
 
     pub const fn previous(self) -> Self {
         match self {
-            Focus::Song => Focus::RightSlot,
-            Focus::Chain => Focus::Song,
-            Focus::Phrase => Focus::Chain,
-            Focus::RightSlot => Focus::Phrase,
+            Focus::Phrase => Focus::RightSlot,
+            Focus::Chain => Focus::Phrase,
+            Focus::Song => Focus::Chain,
+            Focus::RightSlot => Focus::Song,
         }
     }
 }

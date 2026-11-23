@@ -22,9 +22,9 @@ fn phrase_app() -> App {
         &mut app,
         &[
             Action::HexDigit(0),
-            Action::FocusNext,
+            Action::FocusPrevious,
             Action::HexDigit(0),
-            Action::FocusNext,
+            Action::FocusPrevious,
             RIGHT,
             Action::HexDigit(0),
             LEFT,
@@ -161,7 +161,7 @@ fn moving_the_cursor_or_focus_does_not_change_what_is_playing() {
     app.apply(SPACE);
     app.take_audio_requests();
 
-    apply(&mut app, &[DOWN, Action::FocusNext, Action::FocusPrevious]);
+    apply(&mut app, &[DOWN, Action::FocusPrevious, Action::FocusNext]);
 
     assert!(app.take_audio_requests().is_empty());
 }
@@ -169,7 +169,7 @@ fn moving_the_cursor_or_focus_does_not_change_what_is_playing() {
 #[test]
 fn space_stops_the_phrase_from_any_pane() {
     let mut app = two_note_app();
-    apply(&mut app, &[SPACE, Action::FocusPrevious]);
+    apply(&mut app, &[SPACE, Action::FocusNext]);
     app.take_audio_requests();
 
     app.apply(SPACE);
@@ -183,7 +183,7 @@ fn space_stops_the_phrase_from_any_pane() {
 #[test]
 fn space_in_the_right_hand_view_plays_the_last_focused_phrase_pane() {
     let mut app = two_note_app();
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
 
     app.apply(SPACE);
 
