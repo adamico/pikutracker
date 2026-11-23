@@ -129,6 +129,13 @@ impl Timeline {
             })
     }
 
+    pub fn song_row_start(&self, song_row: usize) -> Option<u32> {
+        self.song_row_starts()
+            .chain(self.empty_song_rows.iter().copied())
+            .find(|start| start.song_row == song_row)
+            .map(|start| start.tick)
+    }
+
     pub fn lines(&self) -> Vec<MultitrackLine> {
         let mut starts: Vec<u32> = self
             .tracks

@@ -278,15 +278,25 @@ fn the_playhead_is_marked_on_the_pass_of_a_phrase_loop_that_is_playing() {
 }
 
 #[test]
-fn with_follow_off_it_stays_where_it_is_while_the_song_plays() {
+fn with_follow_off_it_still_tracks_the_playhead_while_the_song_plays() {
     let mut app = App::with_project(long_song());
     let mut player = Player::new();
     apply(&mut app, &[PLAY_SONG]);
 
     play_on(&mut app, &mut player, 2 * 32 + 5);
 
-    assert_eq!(line(&app, TITLE_LINE), "MULTITRACK  ROW 00");
-    assert_eq!(line(&app, FIRST_LINE), "00  C-2 2 5 0");
+    assert_eq!(line(&app, TITLE_LINE), "MULTITRACK  ROW 02");
+    assert_eq!(line(&app, FIRST_LINE + CENTRE_LINE), ">   C-2 2 5 0");
+}
+
+#[test]
+fn moving_the_song_cursor_scrolls_the_multitrack_to_its_song_row() {
+    let mut app = App::with_project(long_song());
+
+    apply(&mut app, &[DOWN, DOWN]);
+
+    assert_eq!(line(&app, TITLE_LINE), "MULTITRACK  ROW 02");
+    assert_eq!(line(&app, FIRST_LINE + CENTRE_LINE), "02  C-2 2 5 0");
 }
 
 #[test]

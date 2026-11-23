@@ -117,7 +117,7 @@ The view of the Song as it plays: each Track's Steps in time order with their tr
 _Avoid_: Pattern view
 
 **Follow**:
-A mode in which the panes track the Playhead. Moving the cursor by hand turns it off.
+A mode in which the Chain and Phrase panes track the Playhead. Moving the cursor by hand turns it off. The Song cursor and the Multitrack track the Playhead whenever the Song plays, with or without Follow.
 _Avoid_: Auto-scroll
 
 **Mute**:

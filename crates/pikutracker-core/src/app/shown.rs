@@ -46,6 +46,18 @@ impl Shown {
         self.phrase = Some(phrase);
     }
 
+    pub(super) fn keep_on_show_past_the_song_cursor(
+        &mut self,
+        project: &Project,
+        cursors: CursorPlaces,
+    ) {
+        self.song_cursor_last_seen = Some(SongCursorPlaceSeen {
+            row: cursors.song_row,
+            track: cursors.track,
+            chain: project.song_cell(cursors.song_row, cursors.track.index()),
+        });
+    }
+
     pub(super) fn follow_cursors(&mut self, project: &Project, cursors: CursorPlaces) {
         let CursorPlaces {
             song_row,

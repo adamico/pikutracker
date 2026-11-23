@@ -152,10 +152,12 @@ fn f10_turns_follow_on_and_off_and_says_so() {
 }
 
 #[test]
-fn the_panes_stay_put_while_follow_is_off() {
-    let (app, _) = played(&[PLAY_SONG], 4);
+fn while_follow_is_off_the_song_cursor_tracks_the_playhead_and_the_chain_and_phrase_stay_put() {
+    let (app, _) = played(&[PLAY_SONG], 5);
 
+    assert!(pane_text(&app, layout::SONG, FIRST_SONG_ROW + 1).contains('['));
     assert_eq!(app.shown_chain_id(), Some(ChainId::new(0)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(1)));
 }
 
 #[test]

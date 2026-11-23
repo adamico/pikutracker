@@ -212,12 +212,16 @@ impl App {
         self.show_what_the_cursors_point_at();
     }
 
-    fn show_what_the_cursors_point_at(&mut self) {
-        let cursors = CursorPlaces {
+    fn cursor_places(&self) -> CursorPlaces {
+        CursorPlaces {
             song_row: self.song.row(),
             track: Track::from_index(self.song.track()),
             chain_entry: self.chain.entry(),
-        };
+        }
+    }
+
+    fn show_what_the_cursors_point_at(&mut self) {
+        let cursors = self.cursor_places();
         self.shown.follow_cursors(&self.project, cursors);
     }
 
@@ -268,7 +272,7 @@ impl App {
         let playhead = report.playhead.filter(|_| self.playing);
         let moved = playhead != self.playhead;
         self.playhead = playhead;
-        if moved && self.follow && self.selection_start.is_none() {
+        if moved && self.selection_start.is_none() {
             self.follow_playhead();
         }
         moved
@@ -329,6 +333,18 @@ impl App {
         };
         if let Some(place) = playhead.chain_row {
             self.song.follow(place.song_row);
+            let timeline = Timeline::of(&self.project);
+            if let Some(tick) = playhead_tick(&timeline, &playhead) {
+                self.multitrack.follow(tick, &timeline);
+            }
+        }
+        if !self.follow {
+            let cursors = self.cursor_places();
+            self.shown
+                .keep_on_show_past_the_song_cursor(&self.project, cursors);
+            return;
+        }
+        if let Some(place) = playhead.chain_row {
             self.chain.follow(place.entry);
         }
         if let Some(place) = playhead.chain_alone {
@@ -342,9 +358,13 @@ impl App {
         if let Some(step) = step {
             self.phrase.follow(step);
         }
+    }
+
+    fn show_the_song_cursor_in_the_multitrack(&mut self) {
         let timeline = Timeline::of(&self.project);
-        if let Some(tick) = playhead_tick(&timeline, &playhead) {
-            self.multitrack.follow(tick, &timeline);
+        if let Some(tick) = timeline.song_row_start(self.song.row()) {
+            let track = Track::from_index(self.song.track());
+            self.multitrack.show_song_row(track, tick, &timeline);
         }
     }
 
@@ -393,7 +413,12 @@ impl App {
             _ => None,
         };
         self.history.begin(&self.project, self.cursor_place());
+        let song_cursor = (self.song.row(), self.song.track());
+        let from_the_multitrack = self.focus == Focus::RightSlot;
         self.perform(action);
+        if !from_the_multitrack && song_cursor != (self.song.row(), self.song.track()) {
+            self.show_the_song_cursor_in_the_multitrack();
+        }
         self.show_what_the_cursors_point_at();
         self.history
             .finish(&self.project, self.cursor_place(), merge);

@@ -68,6 +68,11 @@ impl MultitrackPane {
         }
     }
 
+    pub fn show_song_row(&mut self, track: Track, tick: u32, timeline: &Timeline) {
+        self.track = track;
+        self.follow(tick, timeline);
+    }
+
     pub fn follow(&mut self, tick: u32, timeline: &Timeline) {
         self.tick = timeline
             .step_sounding_at(self.track, tick)
