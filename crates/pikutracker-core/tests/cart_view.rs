@@ -454,16 +454,40 @@ fn a_newly_picked_cart_gets_a_suggested_claim_of_the_lowest_free_slots() {
     assert_eq!(right_slot(&app, 6), " 01");
 }
 
-#[test]
-fn the_suggestion_leaves_room_in_00_to_07_for_custom_instruments() {
+fn playing_custom_instrument(instrument: u8) -> App {
     let mut project = one_phrase_project();
     let id = app_phrase(&project);
-    project.phrase_mut(id).step_mut(0).set_instrument(0x08);
-    let mut app = App::with_project(project);
+    project
+        .phrase_mut(id)
+        .step_mut(0)
+        .set_instrument(i32::from(instrument));
+    App::with_project(project)
+}
+
+#[test]
+fn the_suggestion_claims_sfx_k_for_custom_instrument_8_plus_k() {
+    let mut app = playing_custom_instrument(0x0C);
 
     pick_cart(&mut app, busy_cart().p8());
 
     assert_eq!(claim(&app).sfx, [2, 4]);
+}
+
+#[test]
+fn a_claim_without_sfx_k_shows_err_naming_the_instrument_and_the_slot() {
+    let mut app = playing_custom_instrument(0x08);
+
+    pick_cart(&mut app, busy_cart().p8());
+
+    let checks = right_slot_rows(&app)
+        .iter()
+        .map(|row| row.trim())
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(
+        checks.contains("ERR INSTRUMENT 8 NEEDS SFX 00, WHICH THE CLAIM LACKS"),
+        "{checks}"
+    );
 }
 
 fn app_phrase(project: &Project) -> pikutracker_core::project::PhraseId {

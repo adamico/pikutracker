@@ -6,8 +6,8 @@ use crate::app::focus::Focus;
 use crate::app::layout::Area;
 use crate::app::messages::Severity;
 use crate::cart::{Cart, SLOTS, Slots};
-use crate::export::{ExportNeeds, INSTRUMENT_SLOTS};
-use crate::project::{Claim, TargetCart};
+use crate::export::{ExportFailure, ExportNeeds};
+use crate::project::{Claim, TargetCart, custom_instrument_of_slot};
 use crate::screen::grid::{Grid, Style};
 use crate::screen::palette::Colour;
 
@@ -111,8 +111,23 @@ impl SlotUse {
     }
 }
 
-fn suggestion(slot_use: &SlotUse, needs: ExportNeeds) -> Claim {
+fn suggestion(slot_use: &SlotUse, needs: &ExportNeeds) -> Claim {
     let free_sfx = SlotUse::free_or_own(&slot_use.used.sfx, &slot_use.own.sfx);
+    let instrument_slots = &needs.instrument_slots;
+    let phrase_sfx = needs.sfx.saturating_sub(instrument_slots.len());
+    let mut sfx: Vec<u8> = free_sfx
+        .iter()
+        .copied()
+        .filter(|slot| !instrument_slots.contains(slot))
+        .take(phrase_sfx)
+        .chain(
+            instrument_slots
+                .iter()
+                .copied()
+                .filter(|slot| free_sfx.contains(slot)),
+        )
+        .collect();
+    sfx.sort_unstable();
     let free_patterns = SlotUse::free_or_own(&slot_use.used.patterns, &slot_use.own.patterns);
     let patterns = (needs.patterns > 0)
         .then(|| {
@@ -123,7 +138,7 @@ fn suggestion(slot_use: &SlotUse, needs: ExportNeeds) -> Claim {
         })
         .flatten();
     Claim {
-        sfx: free_sfx.into_iter().take(needs.sfx).collect(),
+        sfx,
         first_and_last_pattern: patterns,
     }
 }
@@ -251,7 +266,7 @@ impl CartView {
         };
     }
 
-    pub fn suggested_claim(&self, hash: Option<&str>, needs: ExportNeeds) -> Option<Claim> {
+    pub fn suggested_claim(&self, hash: Option<&str>, needs: &ExportNeeds) -> Option<Claim> {
         match &self.contents {
             TargetCartContents::Read(cart) => Some(suggestion(&SlotUse::of(cart, hash), needs)),
             TargetCartContents::Unknown | TargetCartContents::Unreadable(_) => None,
@@ -264,7 +279,7 @@ impl CartView {
         area: Area,
         focused: bool,
         target: Option<&TargetCart>,
-        needs: ExportNeeds,
+        needs: &ExportNeeds,
     ) {
         draw_title(grid, area.column, 0, "CART", focused);
         let claimed = claimed_slots(
@@ -351,7 +366,7 @@ impl CartView {
         &self,
         target: Option<&TargetCart>,
         claimed: &Slots,
-        needs: ExportNeeds,
+        needs: &ExportNeeds,
         overwritten: &[Vec<u8>],
     ) -> Vec<(Severity, String)> {
         let mut checks = Vec::new();
@@ -372,13 +387,14 @@ impl CartView {
             checks.push((Severity::Failure, "PATTERN TEXT IS INCOMPLETE".to_owned()));
         }
         checks.push(room_check(needs.sfx, claimed.sfx.len(), "SFX"));
-        if needs.instrument_sfx > 0 {
-            let in_reach = claimed
-                .sfx
-                .iter()
-                .filter(|slot| **slot < INSTRUMENT_SLOTS)
-                .count();
-            checks.push(room_check(needs.instrument_sfx, in_reach, "IN 00-07"));
+        for &slot in &needs.instrument_slots {
+            if !claimed.sfx.contains(&slot) {
+                let failure = ExportFailure::MissingInstrumentSlot {
+                    instrument: custom_instrument_of_slot(slot),
+                    slot,
+                };
+                checks.push((Severity::Failure, failure.to_string()));
+            }
         }
         checks.push(room_check(
             needs.patterns,

@@ -1,7 +1,7 @@
 use crate::cart::{Cart, CartNote, Pattern, SFX_NOTES, Sfx, WAVEFORM_INSTRUMENT_BIT};
 use crate::project::{
-    ARPEGGIO_GROUP, FIRST_CUSTOM_INSTRUMENT, Filters, MAX_STEPS, Phrase, Step, TRACKS,
-    arpeggio_group_start,
+    ARPEGGIO_GROUP, Filters, MAX_STEPS, Phrase, Step, TRACKS, arpeggio_group_start,
+    custom_instrument_of_slot,
 };
 use std::collections::BTreeSet;
 
@@ -123,10 +123,6 @@ fn carry_arpeggio_pitches(
     changed
 }
 
-pub(super) const fn instrument_of_slot(slot: u8) -> u8 {
-    FIRST_CUSTOM_INSTRUMENT + slot
-}
-
 pub(super) fn built_in_step(note: CartNote) -> Step {
     Step::new(note.pitch, note.instrument, note.volume, note.effect).unwrap_or_default()
 }
@@ -134,7 +130,7 @@ pub(super) fn built_in_step(note: CartNote) -> Step {
 fn step_of(note: CartNote) -> Step {
     let mut step = built_in_step(note);
     if note.custom {
-        step.set_instrument(i32::from(instrument_of_slot(note.instrument)));
+        step.set_instrument(i32::from(custom_instrument_of_slot(note.instrument)));
     }
     step
 }

@@ -10,7 +10,7 @@ use pikutracker_core::synth::SAMPLES_PER_TICK;
 use support::{HEADER, assert_same_samples, render_music, render_song};
 
 const SFX_INSTRUMENT: u8 = 0x0C;
-const WAVEFORM_INSTRUMENT: u8 = 0x20;
+const WAVEFORM_INSTRUMENT: u8 = 0x09;
 const FIRST_PATTERN: u8 = 12;
 const TAIL_TICKS: usize = 40;
 
@@ -102,7 +102,7 @@ fn instrumented_project() -> Project {
 
 fn assert_exports_sample_for_sample(project: &Project, song_ticks: usize) {
     let claim = Claim {
-        sfx: (0..4).chain(10..30).collect(),
+        sfx: (0..8).chain(10..30).collect(),
         first_and_last_pattern: Some((FIRST_PATTERN, 30)),
     };
     let original = format!("{HEADER}__lua__\nprint(1)\n");

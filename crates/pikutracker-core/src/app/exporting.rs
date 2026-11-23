@@ -42,7 +42,7 @@ const fn is_about_the_claim(failure: ExportFailure) -> bool {
             | ExportFailure::BadClaim
             | ExportFailure::TooFewSfx { .. }
             | ExportFailure::TooFewPatterns { .. }
-            | ExportFailure::TooFewInstrumentSlots { .. }
+            | ExportFailure::MissingInstrumentSlot { .. }
     )
 }
 

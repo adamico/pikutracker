@@ -1,8 +1,8 @@
 use crate::project::{
-    CART_SLOTS, CHAIN_ENTRIES, ChainEntry, ChainId, Claim, CustomInstrument,
-    FIRST_CUSTOM_INSTRUMENT, Filters, InstrumentSound, MAX_FILTER_LEVEL, MAX_INSTRUMENT_NAME,
-    MAX_STEPS, NOTE_NAMES, Phrase, PhraseId, Project, SONG_ROWS, SfxInstrument, Step, TRACKS,
-    TargetCart, WAVEFORM_SAMPLES, WaveformInstrument,
+    CART_SLOTS, CHAIN_ENTRIES, ChainEntry, ChainId, Claim, CustomInstrument, Filters,
+    InstrumentSound, MAX_FILTER_LEVEL, MAX_INSTRUMENT_NAME, MAX_STEPS, NOTE_NAMES, Phrase,
+    PhraseId, Project, SONG_ROWS, SfxInstrument, Step, TRACKS, TargetCart, WAVEFORM_SAMPLES,
+    WaveformInstrument, slot_of_custom_instrument,
 };
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
@@ -14,7 +14,7 @@ pub type Migration = fn(&str) -> Result<String, String>;
 
 const MIGRATIONS: [Migration; FORMAT_VERSION as usize - 1] = [];
 
-const SILENT_TOKEN: &str = "--- -- - -";
+const SILENT_TOKEN: &str = "--- - - -";
 const EMPTY_CELL: &str = "--";
 const SEMITONES_PER_OCTAVE: u8 = 12;
 
@@ -470,7 +470,7 @@ impl InstrumentDocument {
 
     fn read_into(self, project: &mut Project) -> Result<(), String> {
         require(
-            self.id >= FIRST_CUSTOM_INSTRUMENT,
+            slot_of_custom_instrument(self.id).is_some(),
             "CUSTOM INSTRUMENT NUMBER IS OUT OF RANGE",
         )?;
         if let Some(name) = &self.name {
@@ -548,7 +548,7 @@ fn step_token(step: Step) -> String {
     let name = NOTE_NAMES[usize::from(step.pitch() % SEMITONES_PER_OCTAVE)];
     let octave = step.pitch() / SEMITONES_PER_OCTAVE;
     format!(
-        "{name}{octave} {:02X} {} {}",
+        "{name}{octave} {:X} {} {}",
         step.instrument(),
         step.volume(),
         step.effect()
@@ -578,14 +578,22 @@ fn read_step(token: &str) -> Option<Step> {
     let pitch = single_digit(octave)?.checked_mul(SEMITONES_PER_OCTAVE)? + semitone;
     Step::new(
         pitch,
-        parse_hex(instrument)?,
+        single_hex_digit(instrument)?,
         single_digit(volume)?,
         single_digit(effect)?,
     )
 }
 
 fn single_digit(text: &str) -> Option<u8> {
+    single_digit_in_radix(text, 10)
+}
+
+fn single_hex_digit(text: &str) -> Option<u8> {
+    single_digit_in_radix(text, 16)
+}
+
+fn single_digit_in_radix(text: &str, radix: u32) -> Option<u8> {
     let mut chars = text.chars();
-    let digit = chars.next()?.to_digit(10)? as u8;
+    let digit = chars.next()?.to_digit(radix)? as u8;
     chars.next().is_none().then_some(digit)
 }

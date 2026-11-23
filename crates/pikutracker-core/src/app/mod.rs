@@ -26,7 +26,7 @@ use crate::export;
 use crate::keymap::{Key, KeyPress, Keyboard};
 use crate::midi_import::MidiTable;
 use crate::player::{AudioRequest, PlaybackReport, Playhead, SCOPE_COLUMNS, TrackMix};
-use crate::project::{CHAIN_ENTRIES, FIRST_CUSTOM_INSTRUMENT, SONG_ROWS};
+use crate::project::{CHAIN_ENTRIES, FIRST_CUSTOM_INSTRUMENT, LAST_CUSTOM_INSTRUMENT, SONG_ROWS};
 use crate::project::{Chain, ChainEntry, ChainId, Phrase, PhraseId, Project, Step};
 use crate::screen::grid::Grid;
 use crate::settings::AppState;
@@ -62,6 +62,7 @@ const NOTHING_TO_REDO: &str = "NOTHING TO REDO";
 const FOLLOW_ON: &str = "FOLLOW ON";
 const FOLLOW_OFF: &str = "FOLLOW OFF";
 const BUILT_IN_INSTRUMENT: &str = "BUILT-IN INSTRUMENTS HAVE NO SETTINGS";
+const CUSTOM_INSTRUMENTS_END_AT_F: &str = "CUSTOM INSTRUMENTS END AT F";
 const OPEN_LIST_KEYS: &str = "UP/DOWN PICK  ENTER CHOOSE  ESC CANCEL";
 const SAVE_LIST_KEYS: &str = "TYPE A NAME  UP/DOWN PICK  ENTER CHOOSE  ESC CANCEL";
 
@@ -636,6 +637,9 @@ impl App {
             Action::Save => self.save(),
             Action::OctaveUp => self.phrase.change_octave(1),
             Action::OctaveDown => self.phrase.change_octave(-1),
+            Action::Jump(Direction::Right) if view.id() == LAST_CUSTOM_INSTRUMENT => {
+                self.remark = Some(CUSTOM_INSTRUMENTS_END_AT_F);
+            }
             Action::Jump(direction) => {
                 let id = match direction {
                     Direction::Left => view.id().saturating_sub(1),
@@ -667,9 +671,19 @@ impl App {
         match self.focus {
             Focus::Song => self.song.nudge(&mut self.project, up, coarse),
             Focus::Chain => self.edit_chain(|pane, chain| pane.nudge(chain, up, coarse)),
+            Focus::Phrase if up && self.goes_past_the_last_instrument() => {
+                self.remark = Some(CUSTOM_INSTRUMENTS_END_AT_F);
+            }
             Focus::Phrase => self.edit_phrase(|pane, phrase| pane.nudge(phrase, up, coarse)),
             Focus::RightSlot => {}
         }
+    }
+
+    fn goes_past_the_last_instrument(&self) -> bool {
+        self.phrase_under_cursor().is_some_and(|id| {
+            self.phrase
+                .is_on_the_last_instrument(self.project.phrase(id))
+        })
     }
 
     fn edit_chain(&mut self, edit: impl FnOnce(&mut ChainPane, &mut Chain)) {
@@ -899,7 +913,7 @@ impl App {
                 layout::RIGHT_SLOT,
                 right_slot_focused,
                 self.project.target_cart(),
-                export::needs(&self.project),
+                &export::needs(&self.project),
             );
         } else {
             scope::draw(

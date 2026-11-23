@@ -3,8 +3,9 @@ use crate::cart::{
     SLOTS, SPEED_BYTE, WAVEFORM_INSTRUMENT_BIT, note_word,
 };
 use crate::project::{
-    CHAIN_ENTRIES, ChainEntry, Claim, CustomInstrument, FIRST_CUSTOM_INSTRUMENT, Filters,
-    InstrumentSound, MAX_PITCH, MAX_STEPS, Phrase, Project, SONG_ROWS, Step, TRACKS,
+    CHAIN_ENTRIES, ChainEntry, Claim, CustomInstrument, Filters, InstrumentSound, MAX_PITCH,
+    MAX_STEPS, Phrase, Project, SONG_ROWS, TRACKS, custom_instrument_of_slot,
+    slot_of_custom_instrument,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -17,7 +18,6 @@ const DETUNE_UNIT: u8 = 8;
 const REVERB_UNIT: u8 = 24;
 const DAMPEN_UNIT: u8 = 72;
 
-pub const INSTRUMENT_SLOTS: u8 = 8;
 const WAVEFORM_SPEED: u8 = 16;
 
 const LOOP_START_CHANNEL: usize = 0;
@@ -46,9 +46,9 @@ pub enum ExportFailure {
         song_row: usize,
         chain_row: usize,
     },
-    TooFewInstrumentSlots {
-        needed: usize,
-        claimed: usize,
+    MissingInstrumentSlot {
+        instrument: u8,
+        slot: u8,
     },
     UnreadableCart(CartError),
 }
@@ -81,9 +81,9 @@ impl fmt::Display for ExportFailure {
                 "PHRASE {phrase:02X} STEP {step:02X} ON T{} IS OUTSIDE C-0 TO D#5",
                 track + 1
             ),
-            Self::TooFewInstrumentSlots { needed, claimed } => write!(
+            Self::MissingInstrumentSlot { instrument, slot } => write!(
                 formatter,
-                "NEEDS {needed} SFX IN 00-07 FOR CUSTOM INSTRUMENTS, THE CLAIM HAS {claimed}"
+                "INSTRUMENT {instrument:X} NEEDS SFX {slot:02X}, WHICH THE CLAIM LACKS"
             ),
             Self::UnreadableCart(error) => write!(formatter, "CANNOT READ THE CART: {error}"),
         }
@@ -108,7 +108,7 @@ type CompiledPattern = [Option<usize>; TRACKS];
 
 #[derive(Default)]
 struct CompiledSong {
-    instruments: Vec<[u8; SFX_BYTES]>,
+    instruments: BTreeMap<u8, [u8; SFX_BYTES]>,
     sfx: Vec<[u8; SFX_BYTES]>,
     patterns: Vec<CompiledPattern>,
     loop_target: Option<usize>,
@@ -149,7 +149,6 @@ fn without_repeats(claim: &Claim) -> Claim {
 
 struct ClaimedSlots {
     sfx: Vec<u8>,
-    instruments: Vec<u8>,
     patterns: Vec<u8>,
 }
 
@@ -162,19 +161,10 @@ impl ClaimedSlots {
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
-        let instruments = sfx
-            .iter()
-            .copied()
-            .filter(|slot| *slot < INSTRUMENT_SLOTS)
-            .collect();
         let patterns = claim
             .first_and_last_pattern
             .map_or(Vec::new(), |(first, last)| (first..=last).collect());
-        Self {
-            sfx,
-            instruments,
-            patterns,
-        }
+        Self { sfx, patterns }
     }
 }
 
@@ -198,7 +188,7 @@ pub fn export(
         failures.push(ExportFailure::EmptySong);
     }
     let slots = ClaimedSlots::of(claim);
-    let song = compile_song(project, &chain_rows, &slots.instruments, &mut failures);
+    let song = compile_song(project, &chain_rows, &mut failures);
     if !claim_is_empty && claim_is_valid {
         check_room(&song, &slots, &mut failures);
     }
@@ -223,24 +213,18 @@ pub fn export(
     })
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ExportNeeds {
     pub sfx: usize,
-    pub instrument_sfx: usize,
+    pub instrument_slots: Vec<u8>,
     pub patterns: usize,
 }
 
 pub fn needs(project: &Project) -> ExportNeeds {
-    let every_instrument_slot: Vec<u8> = (0..INSTRUMENT_SLOTS).collect();
-    let song = compile_song(
-        project,
-        &chain_rows(project),
-        &every_instrument_slot,
-        &mut Vec::new(),
-    );
+    let song = compile_song(project, &chain_rows(project), &mut Vec::new());
     ExportNeeds {
         sfx: song.instruments.len() + song.sfx.len(),
-        instrument_sfx: song.instruments.len(),
+        instrument_slots: song.instruments.keys().copied().collect(),
         patterns: song.patterns.len(),
     }
 }
@@ -269,27 +253,21 @@ fn chain_rows(project: &Project) -> Vec<(usize, usize)> {
 fn compile_song(
     project: &Project,
     chain_rows: &[(usize, usize)],
-    instrument_slots: &[u8],
     failures: &mut Vec<ExportFailure>,
 ) -> CompiledSong {
     let rows: Vec<ExportedChainRow> = chain_rows
         .iter()
         .map(|&(song_row, chain_row)| ExportedChainRow::of(project, song_row, chain_row))
         .collect();
-    let instruments_played = rows
-        .iter()
-        .flat_map(|row| row.channels.iter().flatten())
-        .flat_map(|entry| custom_instruments_played(project.phrase(entry.phrase())))
-        .collect::<BTreeSet<u8>>();
-    let slot_of_instrument: BTreeMap<u8, u8> = instruments_played
-        .iter()
-        .copied()
-        .zip(instrument_slots.iter().copied())
-        .collect();
     let mut song = CompiledSong {
-        instruments: instruments_played
+        instruments: rows
             .iter()
-            .map(|id| instrument_sfx(project.custom_instrument(*id)))
+            .flat_map(|row| row.channels.iter().flatten())
+            .flat_map(|entry| custom_instrument_slots_played(project.phrase(entry.phrase())))
+            .map(|slot| {
+                let instrument = project.custom_instrument(custom_instrument_of_slot(slot));
+                (slot, instrument_sfx(instrument))
+            })
             .collect(),
         ..CompiledSong::default()
     };
@@ -310,7 +288,7 @@ fn compile_song(
                 });
             }
             let ending = row.ending(project, track);
-            let sfx = bake_sfx(phrase, entry.transpose(), ending, &slot_of_instrument);
+            let sfx = bake_sfx(phrase, entry.transpose(), ending);
             pattern[track] = Some(song.sfx_index(sfx));
         }
         song.patterns.push(pattern);
@@ -371,14 +349,12 @@ impl ExportedChainRow {
     }
 }
 
-fn custom_instruments_played(phrase: &Phrase) -> impl Iterator<Item = u8> + '_ {
+fn custom_instrument_slots_played(phrase: &Phrase) -> impl Iterator<Item = u8> + '_ {
     let under_reverb = phrase.filters().reverb() > 0;
     (0..phrase.length())
         .map(|index| phrase.step(index))
-        .filter(move |step| {
-            (under_reverb || !step.is_silent()) && step.instrument() >= FIRST_CUSTOM_INSTRUMENT
-        })
-        .map(Step::instrument)
+        .filter(move |step| under_reverb || !step.is_silent())
+        .filter_map(|step| slot_of_custom_instrument(step.instrument()))
 }
 
 fn instrument_sfx(instrument: Option<&CustomInstrument>) -> [u8; SFX_BYTES] {
@@ -420,21 +396,15 @@ fn instrument_sfx(instrument: Option<&CustomInstrument>) -> [u8; SFX_BYTES] {
     sfx
 }
 
-fn bake_sfx(
-    phrase: &Phrase,
-    transpose: i8,
-    ending: Ending,
-    slot_of_instrument: &BTreeMap<u8, u8>,
-) -> [u8; SFX_BYTES] {
+fn bake_sfx(phrase: &Phrase, transpose: i8, ending: Ending) -> [u8; SFX_BYTES] {
     let mut sfx = [0; SFX_BYTES];
     let read = phrase.steps_read_by_arpeggios();
     for (index, read) in read.into_iter().enumerate() {
         let step = phrase.step(index);
         let pitch = (i32::from(step.pitch()) + i32::from(transpose)).clamp(0, MAX_PITCH) as u16;
         let word = if index < phrase.length() {
-            let (instrument, custom) = slot_of_instrument
-                .get(&step.instrument())
-                .map_or((step.instrument() & 7, 0), |slot| (*slot, 1));
+            let (instrument, custom) = slot_of_custom_instrument(step.instrument())
+                .map_or((step.instrument(), 0), |slot| (slot, 1));
             note_word(
                 pitch,
                 u16::from(instrument),
@@ -483,13 +453,14 @@ fn filters_byte(filters: Filters) -> u8 {
 }
 
 fn check_room(song: &CompiledSong, slots: &ClaimedSlots, failures: &mut Vec<ExportFailure>) {
-    let (sfx_slots, instrument_slots, pattern_slots) =
-        (&slots.sfx, &slots.instruments, &slots.patterns);
-    if song.instruments.len() > instrument_slots.len() {
-        failures.push(ExportFailure::TooFewInstrumentSlots {
-            needed: song.instruments.len(),
-            claimed: instrument_slots.len(),
-        });
+    let (sfx_slots, pattern_slots) = (&slots.sfx, &slots.patterns);
+    for &slot in song.instruments.keys() {
+        if !sfx_slots.contains(&slot) {
+            failures.push(ExportFailure::MissingInstrumentSlot {
+                instrument: custom_instrument_of_slot(slot),
+                slot,
+            });
+        }
     }
     let needed = song.instruments.len() + song.sfx.len();
     if needed > sfx_slots.len() {
@@ -508,14 +479,13 @@ fn check_room(song: &CompiledSong, slots: &ClaimedSlots, failures: &mut Vec<Expo
 
 fn place_song(song: &CompiledSong, slots: &ClaimedSlots, cart: &mut Cart) {
     let blank = Cart::default();
-    let taken = &slots.instruments[..song.instruments.len()];
     let phrase_slots: Vec<u8> = slots
         .sfx
         .iter()
         .copied()
-        .filter(|slot| !taken.contains(slot))
+        .filter(|slot| !song.instruments.contains_key(slot))
         .collect();
-    for (&slot, sfx) in taken.iter().zip(&song.instruments) {
+    for (&slot, sfx) in &song.instruments {
         cart.set_sfx_bytes(slot, *sfx);
     }
     for (index, &slot) in phrase_slots.iter().enumerate() {

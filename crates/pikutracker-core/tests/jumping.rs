@@ -94,18 +94,17 @@ fn in_the_phrase_pane_left_and_right_jump_track() {
 #[test]
 fn in_the_instrument_view_left_and_right_jump_instrument() {
     let mut app = app(&[TAB, TAB, Action::Move(Direction::Right)]);
-    app.apply(Action::HexDigit(0));
     app.apply(Action::HexDigit(8));
     app.apply(Action::Confirm);
-    assert!(app.grid().text_dump().contains("INSTRUMENT 08"));
+    assert!(app.grid().text_dump().contains("INSTRUMENT 8"));
 
     app.apply(RIGHT);
-    assert!(app.grid().text_dump().contains("INSTRUMENT 09"));
+    assert!(app.grid().text_dump().contains("INSTRUMENT 9"));
     app.apply(LEFT);
     app.apply(LEFT);
 
     assert!(
-        app.grid().text_dump().contains("INSTRUMENT 08"),
+        app.grid().text_dump().contains("INSTRUMENT 8"),
         "the Built-in Instruments have no view"
     );
 }

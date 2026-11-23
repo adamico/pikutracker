@@ -5,7 +5,9 @@ use super::{
 use crate::app::layout::Area;
 use crate::app::selection::{CellPosition, CellRange};
 use crate::app::{Direction, KeyContext};
-use crate::project::{FIRST_CUSTOM_INSTRUMENT, MAX_STEPS, NOTE_NAMES, Phrase, PhraseId, Step};
+use crate::project::{
+    FIRST_CUSTOM_INSTRUMENT, LAST_CUSTOM_INSTRUMENT, MAX_STEPS, NOTE_NAMES, Phrase, PhraseId, Step,
+};
 use crate::screen::grid::Grid;
 use crate::settings::{DEFAULT_OCTAVE, MAX_OCTAVE};
 use std::ops::RangeInclusive;
@@ -28,9 +30,9 @@ pub(super) enum StepCell {
 
 pub(super) const STEP_CELLS: [(StepCell, usize, &str); 4] = [
     (StepCell::Pitch, 3, "..."),
-    (StepCell::Instrument, 7, ".."),
-    (StepCell::Volume, 10, "."),
-    (StepCell::Effect, 12, "."),
+    (StepCell::Instrument, 7, "."),
+    (StepCell::Volume, 9, "."),
+    (StepCell::Effect, 11, "."),
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -208,6 +210,11 @@ impl PhrasePane {
         })
     }
 
+    pub fn is_on_the_last_instrument(&self, phrase: &Phrase) -> bool {
+        self.step_cell() == Some(StepCell::Instrument)
+            && phrase.step(self.step).instrument() == LAST_CUSTOM_INSTRUMENT
+    }
+
     pub fn octave(&self) -> u8 {
         self.octave
     }
@@ -226,11 +233,10 @@ impl PhrasePane {
 
     pub fn type_digit(&mut self, phrase: &mut Phrase, digit: u8) {
         let typed = self.first_digit.map_or(0, |high| high << 4) | digit;
-        let two_digits = matches!(self.step_cell(), Some(StepCell::Instrument))
-            || matches!(
-                self.header_cell(),
-                Some(HeaderCell::Speed | HeaderCell::LoopStart | HeaderCell::LoopEnd)
-            );
+        let two_digits = matches!(
+            self.header_cell(),
+            Some(HeaderCell::Speed | HeaderCell::LoopStart | HeaderCell::LoopEnd)
+        );
         self.first_digit = two_digits.then_some(digit);
         let value = i32::from(if two_digits { typed } else { digit });
         self.set_cell(phrase, value);
@@ -383,7 +389,7 @@ impl PhrasePane {
         let title = format!("PHRASE {number}   OCT {}", self.octave);
         draw_title(grid, area.column, 0, &title, focused);
         self.draw_header(grid, area, focused, phrase);
-        grid.put(area.column, HEADER_ROWS - 1, "   NOT IN V F", HEADING);
+        grid.put(area.column, HEADER_ROWS - 1, "   NOT I V F", HEADING);
         let loop_start = phrase.phrase_loop().map(|steps| steps.start);
 
         for index in 0..MAX_STEPS {
@@ -515,7 +521,7 @@ pub(super) fn step_texts(step: Step) -> [String; 4] {
     let pitch = usize::from(step.pitch());
     [
         format!("{}{}", NOTE_NAMES[pitch % 12], pitch / 12),
-        format!("{:02X}", step.instrument()),
+        format!("{:X}", step.instrument()),
         step.volume().to_string(),
         step.effect().to_string(),
     ]

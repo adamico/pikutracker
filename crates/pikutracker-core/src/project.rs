@@ -13,6 +13,7 @@ pub const CHAIN_ENTRIES: usize = 16;
 pub const SONG_ROWS: usize = 256;
 pub const WAVEFORM_SAMPLES: usize = 64;
 pub const FIRST_CUSTOM_INSTRUMENT: u8 = 8;
+pub const LAST_CUSTOM_INSTRUMENT: u8 = 0xF;
 pub const MAX_INSTRUMENT_NAME: usize = 12;
 pub const CART_SLOTS: u8 = 64;
 pub const MAX_FILTER_LEVEL: i32 = 2;
@@ -29,7 +30,7 @@ const DEFAULT_LENGTH: usize = 16;
 const DEFAULT_SPEED: u8 = 16;
 const DEFAULT_PITCH: u8 = 24;
 pub(crate) const MAX_PITCH: i32 = 63;
-const MAX_INSTRUMENT: i32 = u8::MAX as i32;
+const MAX_INSTRUMENT: i32 = LAST_CUSTOM_INSTRUMENT as i32;
 const MAX_VOLUME: i32 = 7;
 const MAX_EFFECT: i32 = 7;
 const EFFECT_ARPEGGIO_FAST: u8 = 6;
@@ -51,6 +52,18 @@ pub struct Step {
     effect: u8,
 }
 
+pub const fn custom_instrument_of_slot(slot: u8) -> u8 {
+    FIRST_CUSTOM_INSTRUMENT + slot
+}
+
+pub const fn slot_of_custom_instrument(instrument: u8) -> Option<u8> {
+    if instrument >= FIRST_CUSTOM_INSTRUMENT && instrument <= LAST_CUSTOM_INSTRUMENT {
+        Some(instrument - FIRST_CUSTOM_INSTRUMENT)
+    } else {
+        None
+    }
+}
+
 impl Default for Step {
     fn default() -> Self {
         Self {
@@ -64,7 +77,11 @@ impl Default for Step {
 
 impl Step {
     pub const fn new(pitch: u8, instrument: u8, volume: u8, effect: u8) -> Option<Self> {
-        if pitch as i32 > MAX_PITCH || volume as i32 > MAX_VOLUME || effect as i32 > MAX_EFFECT {
+        if pitch as i32 > MAX_PITCH
+            || instrument as i32 > MAX_INSTRUMENT
+            || volume as i32 > MAX_VOLUME
+            || effect as i32 > MAX_EFFECT
+        {
             return None;
         }
         Some(Self {
@@ -580,6 +597,9 @@ impl Project {
     }
 
     pub fn set_custom_instrument(&mut self, id: u8, instrument: Option<CustomInstrument>) {
+        if slot_of_custom_instrument(id).is_none() {
+            return;
+        }
         match instrument {
             Some(instrument) => self.custom_instruments.insert(id, instrument),
             None => self.custom_instruments.remove(&id),

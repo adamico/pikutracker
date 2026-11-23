@@ -44,7 +44,7 @@ fn fixture_project() -> Project {
     *phrase.step_mut(0) = step(25, 8, 5, 3);
     *phrase.step_mut(1) = step(25, 8, 0, 3);
     *phrase.step_mut(2) = step(0, 0, 0, 0);
-    *phrase.step_mut(3) = step(63, 0xFF, 7, 7);
+    *phrase.step_mut(3) = step(63, 0xF, 7, 7);
 
     let phrase = project.phrase_mut(PhraseId::new(1));
     phrase.set_loop(4, 32);
@@ -86,7 +86,7 @@ fn fixture_project() -> Project {
         *sample = index as i8 - 2;
     }
     project.set_custom_instrument(
-        0xFF,
+        0xF,
         Some(CustomInstrument {
             name: None,
             sound: InstrumentSound::Waveform(WaveformInstrument {
@@ -126,7 +126,7 @@ fn steps_are_written_as_tracker_tokens() {
     let mut project = Project::new();
     *project.phrase_mut(PhraseId::new(0)).step_mut(0) = step(25, 8, 5, 3);
 
-    assert!(project_file::write(&project).contains("\"C#2 08 5 3\""));
+    assert!(project_file::write(&project).contains("\"C#2 8 5 3\""));
 }
 
 #[test]
@@ -136,7 +136,7 @@ fn a_silent_step_holding_data_is_written_in_full() {
 
     let text = project_file::write(&project);
 
-    assert!(text.contains("\"C#2 08 0 3\""));
+    assert!(text.contains("\"C#2 8 0 3\""));
     assert_eq!(
         project_file::parse(&text)
             .unwrap()
@@ -154,8 +154,8 @@ fn only_a_step_of_all_zeros_is_written_as_dashes() {
 
     let text = project_file::write(&project);
 
-    assert!(text.contains("\"--- -- - -\""));
-    assert!(text.contains("\"C-0 00 0 1\""));
+    assert!(text.contains("\"--- - - -\""));
+    assert!(text.contains("\"C-0 0 0 1\""));
 }
 
 #[test]
@@ -207,7 +207,7 @@ impl SeededRandom {
 fn random_step(random: &mut SeededRandom) -> Step {
     step(
         random.below(64),
-        random.below(256),
+        random.below(16),
         random.below(8),
         random.below(8),
     )
@@ -341,12 +341,13 @@ fn version_zero_is_refused() {
 #[test]
 fn values_outside_their_limits_are_refused() {
     let damaged = [
-        ("\"C#2 08 5 3\"", "\"E-5 08 5 3\""),
-        ("\"C#2 08 5 3\"", "\"C#2 08 8 3\""),
-        ("\"C#2 08 5 3\"", "\"C#2 08 5 8\""),
-        ("\"C#2 08 5 3\"", "\"H-2 08 5 3\""),
-        ("\"C#2 08 5 3\"", "\"C#2 8 5 3\""),
-        ("\"C#2 08 5 3\"", "\"C#2 08 5\""),
+        ("\"C#2 8 5 3\"", "\"E-5 8 5 3\""),
+        ("\"C#2 8 5 3\"", "\"C#2 8 8 3\""),
+        ("\"C#2 8 5 3\"", "\"C#2 8 5 8\""),
+        ("\"C#2 8 5 3\"", "\"H-2 8 5 3\""),
+        ("\"C#2 8 5 3\"", "\"C#2 08 5 3\""),
+        ("\"C#2 8 5 3\"", "\"C#2 G 5 3\""),
+        ("\"C#2 8 5 3\"", "\"C#2 8 5\""),
         ("loop_start: 3", "loop_start: 33"),
         ("loop_end: 0", "loop_end: 33"),
         ("speed: 8", "speed: 0"),
@@ -363,8 +364,9 @@ fn values_outside_their_limits_are_refused() {
         ("-- -- -- FF\"", "-- -- FF\""),
         ("(index: 15,", "(index: 16,"),
         ("id: 8,", "id: 7,"),
+        ("id: 15,\n            name", "id: 16,\n            name"),
         ("\"BASS\"", "\"THIRTEEN CHAR\""),
-        ("steps: [\"C-2 03 5 0\", \"G-2 03 4 1\"]", "steps: []"),
+        ("steps: [\"C-2 3 5 0\", \"G-2 3 4 1\"]", "steps: []"),
         ("loop_end: 2", "loop_end: 33"),
         ("-128, 127, 0,", "-128, 127,"),
     ];
