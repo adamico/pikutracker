@@ -284,7 +284,7 @@ fn compile_song(
         instruments: rows
             .iter()
             .flatten()
-            .flat_map(|row| row.channels.iter().flatten())
+            .flat_map(|row| row.entries.iter().flatten())
             .flat_map(|entry| custom_instrument_slots_played(project.phrase(entry.phrase())))
             .map(|slot| {
                 let instrument = project.custom_instrument(custom_instrument_of_slot(slot));
@@ -301,7 +301,7 @@ fn compile_song(
             continue;
         };
         let song_row = place.song_row;
-        for (track, played) in row.channels.iter().enumerate() {
+        for (track, played) in row.entries.iter().enumerate() {
             let Some(entry) = *played else {
                 continue;
             };
@@ -328,18 +328,18 @@ fn compile_song(
 }
 
 struct ExportedChainRow {
-    channels: [Option<ChainEntry>; TRACKS],
-    length_channel: usize,
+    entries: [Option<ChainEntry>; TRACKS],
+    length_track: usize,
 }
 
 impl ExportedChainRow {
     fn of(project: &Project, song_row: usize, chain_row: usize) -> Self {
-        let channels =
+        let entries =
             std::array::from_fn(|track| project.chain_row_entry(song_row, track, chain_row));
         let ticks = project.chain_row_ticks(song_row, chain_row);
         let loops = |entry: &ChainEntry| project.phrase(entry.phrase()).loops();
-        let all_loop = channels.iter().flatten().all(loops);
-        let length_channel = channels
+        let all_loop = entries.iter().flatten().all(loops);
+        let length_track = entries
             .iter()
             .position(|played| {
                 played.is_some_and(|entry| {
@@ -348,25 +348,25 @@ impl ExportedChainRow {
             })
             .expect("a Chain row that plays has an entry that sets its length");
         Self {
-            channels,
-            length_channel,
+            entries,
+            length_track,
         }
     }
 
-    fn ending(&self, project: &Project, channel: usize) -> Ending {
-        let Some(entry) = self.channels[channel] else {
+    fn ending(&self, project: &Project, track: usize) -> Ending {
+        let Some(entry) = self.entries[track] else {
             return Ending::Len;
         };
         let phrase = project.phrase(entry.phrase());
         let length = phrase.length() as u8;
-        if self.length_channel == channel {
+        if self.length_track == track {
             Ending::Len
         } else if phrase.loops() {
             Ending::Loop {
                 start: phrase.loop_start(),
                 end: phrase.loop_end(),
             }
-        } else if channel < self.length_channel {
+        } else if track < self.length_track {
             Ending::Loop {
                 start: length,
                 end: length + 1,
