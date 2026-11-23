@@ -712,23 +712,7 @@ impl App {
                 let phrase = PhrasePane::nudged_title(self.shown_phrase_id(), up, coarse);
                 self.shown.open_phrase(phrase);
             }
-            (
-                _,
-                Action::Clear
-                | Action::Copy
-                | Action::Cut
-                | Action::Paste
-                | Action::Clone
-                | Action::DeepClone
-                | Action::NewUnused
-                | Action::InsertRow
-                | Action::DeleteRow
-                | Action::MoveRows { .. }
-                | Action::StartSelection
-                | Action::Select(_)
-                | Action::SelectJump(_)
-                | Action::PianoKey(_),
-            ) => {}
+            (_, action) if action.acts_on_cells() => {}
             _ => return false,
         }
         true
