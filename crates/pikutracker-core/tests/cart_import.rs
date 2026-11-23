@@ -4,7 +4,7 @@ use pikutracker_core::cart::Cart;
 use pikutracker_core::cart_import::{import, import_song, songs};
 use pikutracker_core::project::{
     ChainId, CustomInstrument, InstrumentSound, Phrase, PhraseId, Project, SfxInstrument, Step,
-    TRACKS, WaveformInstrument,
+    WaveformInstrument,
 };
 use pikutracker_core::project_file;
 use support::{TestCart, TestPattern, TestSfx, music_samples, render_music, render_song};
@@ -58,26 +58,8 @@ fn each_pattern_becomes_one_song_row_with_channel_n_on_track_n() {
             let entry = project.chain_row_entry(row, track, 0).unwrap();
             assert_eq!(project.phrase(entry.phrase()).step(0).pitch(), *pitch);
         }
-        for track in 4..TRACKS {
-            assert_eq!(project.song_cell(row, track), None);
-        }
     }
     assert!(project.song_row_is_empty(2));
-}
-
-#[test]
-fn the_export_tracks_are_tracks_1_to_4() {
-    let cart = TestCart {
-        sfx: two_sfx(),
-        patterns: vec![pattern([Some(0), None, None, None])],
-    };
-
-    let (project, _) = imported(&cart);
-
-    assert_eq!(
-        project.export_track_numbers(),
-        [Some(1), Some(2), Some(3), Some(4)]
-    );
 }
 
 #[test]

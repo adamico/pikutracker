@@ -2,9 +2,8 @@ mod support;
 
 use pikutracker_core::app::{Action, App, Direction, DirectoryEntry, FileRequest, FileResponse};
 use pikutracker_core::cart::Cart;
-use pikutracker_core::keymap::{Key, KeyPress, Keymap, Modifiers};
 use pikutracker_core::player::AudioRequest;
-use pikutracker_core::project::{ChainEntry, ChainId, Claim, PhraseId, Project, Step, TargetCart};
+use pikutracker_core::project::{Claim, PhraseId, Project, TargetCart};
 use pikutracker_core::project_file;
 use std::path::{Path, PathBuf};
 use support::status_line;
@@ -95,132 +94,28 @@ fn stored_hash(app: &App) -> Option<String> {
         .clone()
 }
 
-fn focus_overview(app: &mut App) {
+fn focus_right_slot(app: &mut App) {
     app.apply(Action::FocusPrevious);
 }
 
-#[test]
-fn overview_shows_each_channels_track() {
-    let mut project = Project::new();
-    project.set_export_track(0, Some(3));
-    project.set_export_track(2, Some(8));
-
-    let app = App::with_project(project);
-
-    assert_eq!(right_slot(&app, 2), "CH0  T3");
-    assert_eq!(right_slot(&app, 3), "CH1  --");
-    assert_eq!(right_slot(&app, 4), "CH2  T8");
-    assert_eq!(right_slot(&app, 5), "CH3  --");
+fn with_more_song_rows_than_the_claim_holds(app: &App) -> App {
+    let mut project = app.project().clone();
+    project.set_song_cell(2, 0, project.song_cell(0, 0));
+    App::with_project(project)
 }
 
 #[test]
-fn typing_a_digit_in_overview_sets_the_channels_track() {
+fn the_right_slot_keeps_only_the_scope() {
+    let app = App::new();
+
+    assert_eq!(right_slot(&app, 0), "SCOPE");
+    assert!(!app.grid().text_dump().contains("EXPORT TRACKS"));
+}
+
+#[test]
+fn escape_in_the_right_slot_moves_focus_to_the_phrase_pane() {
     let mut app = App::new();
-    focus_overview(&mut app);
-
-    app.apply(DOWN);
-    app.apply(Action::HexDigit(6));
-
-    assert_eq!(
-        app.project().export_track_numbers(),
-        [None, Some(6), None, None]
-    );
-}
-
-#[test]
-fn the_keys_of_the_overview_reach_its_actions() {
-    let keymap = Keymap::pc_tracker();
-    let mut app = App::new();
-    focus_overview(&mut app);
-    let context = app.key_context();
-    let action = |key, modifiers| keymap.action_in(KeyPress::new(key, modifiers), context);
-
-    assert_eq!(
-        action(Key::Char('3'), Modifiers::NONE),
-        Some(Action::HexDigit(3))
-    );
-    assert_eq!(action(Key::Delete, Modifiers::NONE), Some(Action::Clear));
-    assert_eq!(
-        action(Key::Char('e'), Modifiers::CTRL),
-        Some(Action::Export)
-    );
-}
-
-#[test]
-fn digits_that_name_no_track_are_ignored() {
-    let mut app = App::new();
-    focus_overview(&mut app);
-
-    for digit in [0, 9, 10, 15] {
-        app.apply(Action::HexDigit(digit));
-    }
-
-    assert_eq!(app.project().export_track_numbers(), [None; 4]);
-}
-
-#[test]
-fn clear_takes_the_track_off_a_channel() {
-    let mut project = Project::new();
-    project.set_export_track(0, Some(2));
-    let mut app = App::with_project(project);
-    focus_overview(&mut app);
-
-    app.apply(Action::Clear);
-
-    assert_eq!(app.project().export_track_numbers(), [None; 4]);
-}
-
-#[test]
-fn choosing_a_track_used_elsewhere_swaps_the_two() {
-    let mut project = Project::new();
-    project.set_export_track(0, Some(1));
-    project.set_export_track(1, Some(2));
-    let mut app = App::with_project(project);
-    focus_overview(&mut app);
-
-    app.apply(Action::HexDigit(2));
-
-    assert_eq!(
-        app.project().export_track_numbers(),
-        [Some(2), Some(1), None, None]
-    );
-}
-
-#[test]
-fn choosing_a_track_from_an_empty_channel_moves_it() {
-    let mut project = Project::new();
-    project.set_export_track(1, Some(2));
-    let mut app = App::with_project(project);
-    focus_overview(&mut app);
-
-    app.apply(Action::HexDigit(2));
-
-    assert_eq!(
-        app.project().export_track_numbers(),
-        [Some(2), None, None, None]
-    );
-}
-
-#[test]
-fn each_channel_edit_is_its_own_undo_step() {
-    let mut app = App::new();
-    focus_overview(&mut app);
-    app.apply(Action::HexDigit(1));
-    app.apply(DOWN);
-    app.apply(Action::HexDigit(2));
-
-    app.apply(Action::Undo);
-
-    assert_eq!(
-        app.project().export_track_numbers(),
-        [Some(1), None, None, None]
-    );
-}
-
-#[test]
-fn escape_in_overview_moves_focus_to_the_phrase_pane() {
-    let mut app = App::new();
-    focus_overview(&mut app);
+    focus_right_slot(&mut app);
 
     app.apply(Action::Cancel);
 
@@ -231,14 +126,10 @@ fn escape_in_overview_moves_focus_to_the_phrase_pane() {
 }
 
 #[test]
-fn the_song_headers_show_each_exported_tracks_channel() {
-    let mut project = Project::new();
-    project.set_export_track(0, Some(3));
-    project.set_export_track(3, Some(1));
+fn the_song_pane_shows_tracks_1_to_4_only() {
+    let app = App::new();
 
-    let app = App::with_project(project);
-
-    assert_eq!(&line(&app, 1)[..28], "    T13T2 T30T4 T5 T6 T7 T8 ");
+    assert_eq!(line(&app, 1)[..28].trim_end(), "    T1 T2 T3 T4");
 }
 
 #[test]
@@ -252,7 +143,20 @@ fn export_writes_the_cart_and_says_what_it_wrote() {
     assert_eq!(cart.pattern(0).channel(0), Some(0));
     assert_eq!(cart.pattern(0).channel(2), Some(1));
     assert!(cart.pattern(1).stop());
-    assert!(status_line(&app).starts_with("EXPORTED TO GAME.P8: 2 SFX, 2 PATTERNS. T1-T4"));
+    assert!(status_line(&app).starts_with("EXPORTED TO GAME.P8: 2 SFX, 2 PATTERNS."));
+}
+
+#[test]
+fn mute_and_solo_change_nothing_export_writes() {
+    let original = simple_cart().p8();
+    let mut plain = imported(original.clone());
+    let mut mixed = imported(original.clone());
+    mixed.apply(Action::Mute { track_number: 1 });
+    mixed.apply(Action::Solo { track_number: 2 });
+
+    let written = export_ok(&mut mixed, original.clone());
+
+    assert_eq!(written, export_ok(&mut plain, original));
 }
 
 #[test]
@@ -314,19 +218,14 @@ fn an_export_leaves_the_project_to_be_saved_so_the_hash_is_kept() {
 #[test]
 fn a_failed_export_writes_nothing_and_lists_every_problem() {
     let original = simple_cart().p8();
-    let mut app = imported(original.clone());
+    let mut app = with_more_song_rows_than_the_claim_holds(&imported(original.clone()));
     let hash = stored_hash(&app);
-    focus_overview(&mut app);
-    for _ in 0..4 {
-        app.apply(Action::Clear);
-        app.apply(DOWN);
-    }
 
     let requests = export_with(&mut app, original);
 
     assert!(requests.is_empty());
     assert_eq!(stored_hash(&app), hash);
-    assert!(status_line(&app).contains("EXPORT FAILED: NO EXPORT TRACKS"));
+    assert!(status_line(&app).contains("EXPORT FAILED: 1 PROBLEM"));
     assert_eq!(right_slot(&app, 0), "LOG");
 }
 
@@ -338,7 +237,6 @@ fn an_empty_claim_fails_with_the_no_claim_message() {
         claim: Claim::default(),
         claimed_bytes_hash: None,
     }));
-    project.set_export_track(0, Some(1));
     let mut app = App::with_project(project);
 
     let requests = export_with(&mut app, HEADER.as_bytes().to_vec());
@@ -423,16 +321,11 @@ fn esc_leaves_the_changed_cart_alone() {
 
 #[test]
 fn a_failing_export_reports_its_failures_before_asking_to_overwrite() {
-    let mut app = imported(simple_cart().p8());
-    focus_overview(&mut app);
-    for _ in 0..4 {
-        app.apply(Action::Clear);
-        app.apply(DOWN);
-    }
+    let mut app = with_more_song_rows_than_the_claim_holds(&imported(simple_cart().p8()));
 
     export_with(&mut app, edited_in_pico8());
 
-    assert!(status_line(&app).contains("EXPORT FAILED: NO EXPORT TRACKS"));
+    assert!(status_line(&app).contains("EXPORT FAILED: 1 PROBLEM"));
 }
 
 #[test]
@@ -707,39 +600,6 @@ fn the_target_cart_path_is_relative_to_the_project_file() {
             path: Path::new(".").join("carts/game.p8")
         }]
     );
-}
-
-#[test]
-fn export_warnings_are_counted_on_the_status_line_and_listed_in_the_log() {
-    let mut project = Project::new();
-    let phrase = project.phrase_mut(PhraseId::new(0));
-    *phrase.step_mut(0) = Step::new(24, 0, 3, 0).unwrap();
-    project.phrase_mut(PhraseId::new(1)).set_length(32);
-    *project.chain_mut(ChainId::new(0)).entry_mut(0) = Some(ChainEntry::new(PhraseId::new(0)));
-    *project.chain_mut(ChainId::new(1)).entry_mut(0) = Some(ChainEntry::new(PhraseId::new(1)));
-    for track in 0..4 {
-        project.set_song_cell(0, track, Some(ChainId::new(0)));
-        project.set_export_track(track, Some(track as u8 + 1));
-    }
-    project.set_song_cell(0, 5, Some(ChainId::new(1)));
-    project.set_target_cart(Some(TargetCart {
-        path: CART_NAME.to_owned(),
-        claim: Claim {
-            sfx: vec![8],
-            first_and_last_pattern: Some((0, 0)),
-        },
-        claimed_bytes_hash: None,
-    }));
-    let mut app = App::with_project(project);
-
-    export_ok(&mut app, format!("{HEADER}__lua__\n").into_bytes());
-
-    assert_eq!(
-        status_line(&app),
-        "! EXPORTED TO GAME.P8: 1 SFX, 1 PATTERNS. T1-T4 WITH 1 WARNING  ^L LOG"
-    );
-    let dump = app.grid().text_dump();
-    assert!(dump.contains("LENGTH FROM T6,"), "{dump}");
 }
 
 #[test]

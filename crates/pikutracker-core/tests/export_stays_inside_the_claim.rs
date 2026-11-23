@@ -78,12 +78,8 @@ fn random_project(rng: &mut Rng) -> (Project, Needs) {
         let instrument = CustomInstrument { name: None, sound };
         project.set_custom_instrument(FIRST_CUSTOM_INSTRUMENT + id as u8, Some(instrument));
     }
-    let tracks = rng.shuffled((1..=8).collect());
+    let tracks = rng.shuffled((1..=4).collect());
     let track_count = rng.between(1, 4);
-    let channels = rng.shuffled(vec![0, 1, 2, 3]);
-    for (channel, track) in channels.iter().zip(&tracks[..track_count]) {
-        project.set_export_track(usize::from(*channel), Some(*track));
-    }
 
     let song_rows = rng.between(1, 4);
     let (mut next_phrase, mut next_chain, mut patterns) = (0, 0, 0);
@@ -439,10 +435,12 @@ fn break_export(rng: &mut Rng, project: &mut Project, claim: &mut Claim) -> &'st
             "no room in 00-07 for Custom Instruments"
         }
         0 | 5 => {
-            for channel in 0..4 {
-                project.set_export_track(channel, None);
+            for row in 0..4 {
+                for track in 0..4 {
+                    project.set_song_cell(row, track, None);
+                }
             }
-            "no Export Tracks"
+            "an empty Song"
         }
         1 => {
             claim.sfx.sort_unstable();
@@ -462,13 +460,9 @@ fn break_export(rng: &mut Rng, project: &mut Project, claim: &mut Claim) -> &'st
             "an empty Claim"
         }
         _ => {
-            let track = project
-                .export_track_numbers()
-                .into_iter()
-                .flatten()
-                .next()
+            let chain = (0..4)
+                .find_map(|track| project.song_cell(0, track))
                 .unwrap();
-            let chain = project.song_cell(0, usize::from(track) - 1).unwrap();
             let entry = project.chain_mut(chain).entry_mut(0).as_mut().unwrap();
             entry.set_transpose(1);
             let phrase = entry.phrase();

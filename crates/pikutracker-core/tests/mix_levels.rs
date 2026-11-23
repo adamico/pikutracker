@@ -11,8 +11,8 @@ const STEP_SAMPLES: usize = SPEED as usize * SAMPLES_PER_TICK as usize;
 const CROSSFADE_SAMPLES: usize = 300;
 const TRIANGLE: i32 = 0;
 const SQUARE: i32 = 3;
-const OVERVIEW_COLUMN: usize = 83;
-const FIRST_SCOPE_ROW: usize = 8;
+const RIGHT_SLOT_COLUMN: usize = 83;
+const FIRST_SCOPE_ROW: usize = 1;
 
 fn write(project: &mut Project, id: u8, instrument: i32, volume: i32, steps: usize) -> PhraseId {
     let id = PhraseId::new(id);
@@ -29,7 +29,7 @@ fn write(project: &mut Project, id: u8, instrument: i32, volume: i32, steps: usi
 }
 
 fn place(project: &mut Project, row: usize, track: usize, phrase: PhraseId) {
-    let id = ChainId::new((row * 8 + track) as u8);
+    let id = ChainId::new((row * 4 + track) as u8);
     *project.chain_mut(id).entry_mut(0) = Some(ChainEntry::new(phrase));
     project.set_song_cell(row, track, Some(id));
 }
@@ -70,15 +70,15 @@ fn a_mix_below_the_knee_plays_as_a_plain_sum() {
 }
 
 #[test]
-fn a_loud_eight_track_mix_never_leaves_the_range() {
-    let samples = hear(unison(TRIANGLE, 7, 8, 8), STEP_SAMPLES * 4);
+fn a_loud_four_track_mix_never_leaves_the_range() {
+    let samples = hear(unison(TRIANGLE, 7, 4, 8), STEP_SAMPLES * 4);
 
     assert!(peak(&samples) <= 1.0);
 }
 
 #[test]
 fn the_level_comes_back_after_a_loud_passage() {
-    let mut project = unison(TRIANGLE, 7, 8, 4);
+    let mut project = unison(TRIANGLE, 7, 4, 4);
     let quiet = write(&mut project, 2, TRIANGLE, 5, 8);
     place(&mut project, 1, 0, quiet);
 
@@ -101,7 +101,7 @@ fn scope_marks(app: &App) -> usize {
         .take(36)
         .map(|line| {
             line.chars()
-                .skip(OVERVIEW_COLUMN)
+                .skip(RIGHT_SLOT_COLUMN)
                 .filter(|ch| *ch == '*')
                 .count()
         })

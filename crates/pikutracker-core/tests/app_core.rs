@@ -63,56 +63,35 @@ fn arrows_move_the_cursor_in_the_song_pane() {
         Action::Move(Direction::Right),
     ]);
 
-    assert_eq!(
-        song_text(&app, FIRST_SONG_LINE),
-        "00  -- -- -- -- -- -- -- --"
-    );
-    assert_eq!(
-        song_text(&app, FIRST_SONG_LINE + 1),
-        "01  --[--]-- -- -- -- -- --"
-    );
+    assert_eq!(song_text(&app, FIRST_SONG_LINE), "00  -- -- -- --");
+    assert_eq!(song_text(&app, FIRST_SONG_LINE + 1), "01  --[--]-- --");
 }
 
 #[test]
 fn the_cursor_stops_at_the_edges_of_the_song_pane() {
     let mut actions = vec![Action::Move(Direction::Up), Action::Move(Direction::Left)];
     let app = app_after(&actions);
-    assert_eq!(
-        song_text(&app, FIRST_SONG_LINE),
-        "00 [--]-- -- -- -- -- -- --"
-    );
+    assert_eq!(song_text(&app, FIRST_SONG_LINE), "00 [--]-- -- --");
 
     actions.extend([Action::Move(Direction::Right); 20]);
     let app = app_after(&actions);
-    assert_eq!(
-        song_text(&app, FIRST_SONG_LINE),
-        "00  -- -- -- -- -- -- --[--]"
-    );
+    assert_eq!(song_text(&app, FIRST_SONG_LINE), "00  -- -- --[--]");
 }
 
 #[test]
 fn the_song_pane_scrolls_to_keep_the_cursor_visible() {
     let app = app_after(&[Action::Move(Direction::Down); 42]);
-    assert_eq!(
-        song_text(&app, FIRST_SONG_LINE),
-        "15  -- -- -- -- -- -- -- --"
-    );
-    assert_eq!(
-        song_text(&app, FIRST_SONG_LINE + 21),
-        "2A [--]-- -- -- -- -- -- --"
-    );
+    assert_eq!(song_text(&app, FIRST_SONG_LINE), "15  -- -- -- --");
+    assert_eq!(song_text(&app, FIRST_SONG_LINE + 21), "2A [--]-- -- --");
 
     let app = app_after(&[Action::Move(Direction::Down); 300]);
-    assert_eq!(
-        song_text(&app, LAST_PANE_LINE),
-        "FF [--]-- -- -- -- -- -- --"
-    );
+    assert_eq!(song_text(&app, LAST_PANE_LINE), "FF [--]-- -- --");
 }
 
 #[test]
 fn tab_cycles_focus_through_song_chain_phrase_and_the_right_hand_view() {
     let app = app_after(&[Action::FocusNext]);
-    assert_eq!(song_text(&app, 2), "00  -- -- -- -- -- -- -- --");
+    assert_eq!(song_text(&app, 2), "00  -- -- -- --");
     assert_eq!(chain_text(&app, 2), "0[--]---           -");
 
     let app = app_after(&[Action::FocusNext; 2]);
@@ -121,18 +100,20 @@ fn tab_cycles_focus_through_song_chain_phrase_and_the_right_hand_view() {
 
     let app = app_after(&[Action::FocusNext; 3]);
     assert_eq!(phrase_text(&app, 5), "00 ... .. . .");
-    assert_eq!(right_slot_text(&app, 2), "CH0 [--]");
+    assert_eq!(song_text(&app, 2), "00  -- -- -- --");
 
     let app = app_after(&[Action::FocusNext; 4]);
-    assert_eq!(right_slot_text(&app, 2), "CH0  --");
-    assert_eq!(song_text(&app, 2), "00 [--]-- -- -- -- -- -- --");
+    assert_eq!(song_text(&app, 2), "00 [--]-- -- --");
 }
 
 #[test]
 fn focus_previous_goes_back_from_the_song_pane_to_the_right_hand_view() {
     let app = app_after(&[Action::FocusPrevious]);
 
-    assert_eq!(right_slot_text(&app, 2), "CH0 [--]");
+    assert_eq!(song_text(&app, 2), "00  -- -- -- --");
+    assert_eq!(chain_text(&app, 2), "0 -- ---           -");
+    assert_eq!(phrase_text(&app, 5), "00 ... .. . .");
+    assert_eq!(right_slot_text(&app, 0), "SCOPE");
 }
 
 #[test]
@@ -144,7 +125,7 @@ fn arrows_move_the_cursor_inside_the_focused_pane_only() {
     ]);
 
     assert_eq!(chain_text(&app, 3), "1 --[---]          -");
-    assert_eq!(song_text(&app, 2), "00  -- -- -- -- -- -- -- --");
+    assert_eq!(song_text(&app, 2), "00  -- -- -- --");
 
     let app = app_after(&[
         Action::FocusNext,
@@ -156,10 +137,6 @@ fn arrows_move_the_cursor_inside_the_focused_pane_only() {
     ]);
 
     assert_eq!(phrase_text(&app, 6), "01 ... .. .[.]");
-
-    let app = app_after(&[Action::FocusPrevious, Action::Move(Direction::Down)]);
-
-    assert_eq!(right_slot_text(&app, 3), "CH1 [--]");
 }
 
 #[test]
@@ -183,16 +160,6 @@ fn the_cursor_stops_at_the_edges_of_every_pane() {
         .concat(),
     );
     assert_eq!(phrase_text(&app, 36), "1F ... .. .[.]");
-
-    let app = app_after(
-        &[
-            &[Action::FocusPrevious][..],
-            &[Action::Move(Direction::Down); 9],
-            &[Action::Move(Direction::Right); 3],
-        ]
-        .concat(),
-    );
-    assert_eq!(right_slot_text(&app, 5), "CH3 [--]");
 }
 
 #[test]
@@ -203,7 +170,7 @@ fn a_pane_keeps_its_cursor_when_focus_comes_back() {
         Action::FocusPrevious,
     ]);
 
-    assert_eq!(song_text(&app, 3), "01 [--]-- -- -- -- -- -- --");
+    assert_eq!(song_text(&app, 3), "01 [--]-- -- --");
 }
 
 #[test]

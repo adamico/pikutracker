@@ -1,5 +1,5 @@
 use crate::project::{
-    CART_SLOTS, CHAIN_ENTRIES, ChainEntry, ChainId, Claim, CustomInstrument, EXPORT_CHANNELS,
+    CART_SLOTS, CHAIN_ENTRIES, ChainEntry, ChainId, Claim, CustomInstrument,
     FIRST_CUSTOM_INSTRUMENT, Filters, InstrumentSound, MAX_FILTER_LEVEL, MAX_INSTRUMENT_NAME,
     MAX_STEPS, NOTE_NAMES, Phrase, PhraseId, Project, SONG_ROWS, SfxInstrument, Step, TRACKS,
     TargetCart, WAVEFORM_SAMPLES, WaveformInstrument,
@@ -98,7 +98,6 @@ struct ProjectDocument {
     version: u32,
     default_speed: u8,
     song_loop_row: Option<u16>,
-    export_tracks: Vec<Option<u8>>,
     target_cart: Option<TargetCartDocument>,
     song: Vec<SongRowDocument>,
     chains: Vec<ChainDocument>,
@@ -214,7 +213,6 @@ impl ProjectDocument {
             version: FORMAT_VERSION,
             default_speed: project.default_speed(),
             song_loop_row: project.song_loop_row().map(|row| row as u16),
-            export_tracks: project.export_track_numbers().to_vec(),
             target_cart: project.target_cart().map(TargetCartDocument::from_cart),
             song,
             chains,
@@ -236,7 +234,6 @@ impl ProjectDocument {
         }
         project.set_song_loop_row(self.song_loop_row.map(usize::from));
 
-        read_export_tracks(&mut project, &self.export_tracks)?;
         project.set_target_cart(
             self.target_cart
                 .map(TargetCartDocument::into_cart)
@@ -265,27 +262,6 @@ fn require(condition: bool, problem: &str) -> Result<(), String> {
     } else {
         Err(problem.to_owned())
     }
-}
-
-fn read_export_tracks(project: &mut Project, tracks: &[Option<u8>]) -> Result<(), String> {
-    require(
-        tracks.len() == EXPORT_CHANNELS,
-        "EXPORT TRACKS NEED 4 CHANNELS",
-    )?;
-    for (channel, track) in tracks.iter().enumerate() {
-        if let Some(track) = *track {
-            require(
-                (1..=TRACKS as u8).contains(&track),
-                "EXPORT TRACK IS OUT OF RANGE",
-            )?;
-            require(
-                !tracks[..channel].contains(&Some(track)),
-                "A TRACK IS ON TWO CHANNELS",
-            )?;
-        }
-        project.set_export_track(channel, *track);
-    }
-    Ok(())
 }
 
 impl TargetCartDocument {
@@ -349,7 +325,7 @@ impl SongRowDocument {
         let row = usize::from(self.row);
         require(row < SONG_ROWS, "SONG ROW IS OUT OF RANGE")?;
         let cells: Vec<&str> = self.tracks.split(' ').collect();
-        require(cells.len() == TRACKS, "A SONG ROW NEEDS 8 TRACKS")?;
+        require(cells.len() == TRACKS, "A SONG ROW NEEDS 4 TRACKS")?;
         for (track, cell) in cells.into_iter().enumerate() {
             let chain = if cell == EMPTY_CELL {
                 None

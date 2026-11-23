@@ -43,8 +43,8 @@ use panes::file_list::{FileList, Purpose};
 use panes::instrument::InstrumentView;
 use panes::log::LogPane;
 use panes::midi_dialog::MidiDialog;
-use panes::overview::OverviewPane;
 use panes::phrase::{PhrasePane, PhraseView};
+use panes::scope;
 use panes::song::SongPane;
 use panes::song_picker::SONG_PICKER_KEYS;
 use selection::CellPosition;
@@ -84,7 +84,6 @@ pub struct App {
     song: SongPane,
     chain: ChainPane,
     phrase: PhrasePane,
-    overview: OverviewPane,
     played_pane: Focus,
     playing: bool,
     latest_play: u64,
@@ -148,7 +147,6 @@ impl App {
             song: SongPane::default(),
             chain: ChainPane::default(),
             phrase: PhrasePane::default(),
-            overview: OverviewPane::default(),
             played_pane: Focus::default(),
             playing: false,
             latest_play: 0,
@@ -231,7 +229,6 @@ impl App {
             Focus::Song => KeyContext::ReferenceValue,
             Focus::Chain => KeyContext::ReferenceValue,
             Focus::Phrase => self.phrase.key_context(),
-            Focus::RightSlot if !self.log_open => KeyContext::ReferenceValue,
             _ => KeyContext::Navigation,
         }
     }
@@ -381,7 +378,6 @@ impl App {
             song: self.song.cursor_place(),
             chain: self.chain.cursor_place(),
             phrase: self.phrase.cursor_place(),
-            overview_channel: self.overview.channel(),
         }
     }
 
@@ -392,7 +388,6 @@ impl App {
         self.song.return_to(place.song);
         self.chain.return_to(place.chain);
         self.phrase.return_to(place.phrase);
-        self.overview.return_to(place.overview_channel);
     }
 
     fn undo(&mut self) {
@@ -660,9 +655,6 @@ impl App {
             Focus::Song => self.song.type_digit(&mut self.project, digit),
             Focus::Chain => self.edit_chain(|pane, chain| pane.type_digit(chain, digit)),
             Focus::Phrase => self.edit_phrase(|pane, phrase| pane.type_digit(phrase, digit)),
-            Focus::RightSlot if !self.log_open => {
-                self.overview.type_digit(&mut self.project, digit);
-            }
             Focus::RightSlot => {}
         }
     }
@@ -827,7 +819,7 @@ impl App {
             Focus::Phrase if self.selection_would_reach_phrase_header(direction) => {}
             Focus::Phrase => self.phrase.move_cursor(direction),
             Focus::RightSlot if self.log_open => self.log.move_cursor(direction),
-            Focus::RightSlot => self.overview.move_cursor(direction),
+            Focus::RightSlot => {}
         }
     }
 
@@ -910,11 +902,10 @@ impl App {
                 export::needs(&self.project),
             );
         } else {
-            self.overview.draw(
+            scope::draw(
                 &mut grid,
                 layout::RIGHT_SLOT,
                 right_slot_focused,
-                self.project.export_track_numbers(),
                 &self.scope,
             );
         }

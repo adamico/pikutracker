@@ -29,8 +29,8 @@ fn pitch_on(project: &Project, track: usize) -> u8 {
     phrase(project, 0, track, 0).step(0).pitch()
 }
 
-fn nine_note_chord() -> Song {
-    (0..9).fold(Song::new(), |song, voice| {
+fn five_note_chord() -> Song {
+    (0..5).fold(Song::new(), |song, voice| {
         song.note(0, TICKS_PER_STEP, 1, MIDDLE_C + voice, 127)
     })
 }
@@ -166,26 +166,26 @@ fn drum_notes_outside_the_kit_are_dropped_with_a_warning() {
 }
 
 #[test]
-fn voices_past_the_eighth_track_are_dropped_with_a_warning() {
-    let imported = imported(&nine_note_chord());
+fn voices_past_the_fourth_track_are_dropped_with_a_warning() {
+    let imported = imported(&five_note_chord());
 
     assert_eq!(
         imported.warnings[0].text,
-        "9 VOICES, 8 TRACKS: DROPPED PIANO 9."
+        "5 VOICES, 4 TRACKS: DROPPED PIANO 5."
     );
-    assert_eq!(pitch_on(&imported.project, 7), MIDDLE_C_PITCH + 1);
+    assert_eq!(pitch_on(&imported.project, 3), MIDDLE_C_PITCH + 1);
 }
 
 #[test]
 fn unticking_a_voice_makes_room_for_a_dropped_one() {
-    let analysis = analysed(&nine_note_chord());
+    let analysis = analysed(&five_note_chord());
     let mut choices = Choices::defaults_for(&analysis);
     choices.ticked[0] = false;
 
     let imported = midi_import::build(&analysis, &choices);
 
     assert!(imported.warnings.is_empty());
-    assert_eq!(pitch_on(&imported.project, 7), MIDDLE_C_PITCH);
+    assert_eq!(pitch_on(&imported.project, 3), MIDDLE_C_PITCH);
 }
 
 #[test]

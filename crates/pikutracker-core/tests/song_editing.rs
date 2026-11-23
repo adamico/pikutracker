@@ -72,21 +72,18 @@ fn two_hex_digits_place_a_chain_on_a_song_row() {
     let app = app_after(&[&[DOWN, RIGHT][..], &id(0x3A)].concat());
 
     assert_eq!(app.project().song_cell(1, 1), Some(ChainId::new(0x3A)));
-    assert_eq!(
-        song_text(&app, FIRST_ROW_LINE + 1),
-        "01  --[3A]-- -- -- -- -- --"
-    );
+    assert_eq!(song_text(&app, FIRST_ROW_LINE + 1), "01  --[3A]-- --");
 }
 
 #[test]
-fn all_eight_tracks_take_chains() {
+fn all_four_tracks_take_chains() {
     let mut app = App::new();
-    for track in 0..8 {
+    for track in 0..4 {
         apply(&mut app, &id(track as u8));
         app.apply(RIGHT);
     }
 
-    for track in 0..8 {
+    for track in 0..4 {
         assert_eq!(
             app.project().song_cell(0, track),
             Some(ChainId::new(track as u8))
