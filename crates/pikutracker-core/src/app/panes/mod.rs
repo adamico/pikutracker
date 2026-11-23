@@ -7,8 +7,8 @@ pub mod midi_dialog;
 pub mod multitrack;
 pub mod phrase;
 pub mod song;
+mod title_number;
 
-use crate::app::layout::Area;
 use crate::project::{Project, SongRowEnding, SongRowMarks};
 use crate::screen::grid::{Grid, Style};
 use crate::screen::palette::Colour;
@@ -89,21 +89,6 @@ fn title_style(focused: bool) -> Style {
 
 fn draw_title(grid: &mut Grid, column: usize, row: usize, title: &str, focused: bool) {
     grid.put(column, row, title, title_style(focused));
-}
-
-fn draw_numbered_title(
-    grid: &mut Grid,
-    area: Area,
-    name: &str,
-    number: Option<u8>,
-    focused: bool,
-    on_number: bool,
-) {
-    draw_title(grid, area.column, area.row, name, focused);
-    let number_column = area.column + name.len() + 1;
-    let text = id_text(number);
-    let style = title_style(focused);
-    draw_styled_value(grid, number_column, area.row, &text, on_number, style);
 }
 
 fn draw_styled_value(

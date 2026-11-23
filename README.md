@@ -71,7 +71,7 @@ These are the keys of the default PcTracker preset. The M8-style column applies 
 | Action | PcTracker | M8-style |
 | --- | --- | --- |
 | Move the cursor | Arrows | same |
-| Next / previous pane | Tab / Shift+Tab | same, or Shift+Arrows |
+| Next / previous pane (Phrase, Chain, Song, Multitrack) | Tab / Shift+Tab | same, or Shift+Arrows |
 | Jump 16 Song rows, or to the next filled Chain or Phrase | Alt+Arrows | X+Arrows |
 | Open the instrument under the cursor (Phrase pane) | Enter | same |
 | Cancel | Esc | same |

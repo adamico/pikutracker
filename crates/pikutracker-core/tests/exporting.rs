@@ -86,7 +86,7 @@ fn stored_hash(app: &App) -> Option<String> {
 }
 
 fn focus_right_slot(app: &mut App) {
-    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusNext);
 }
 
 fn with_more_song_rows_than_the_claim_holds(app: &App) -> App {

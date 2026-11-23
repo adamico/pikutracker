@@ -51,7 +51,7 @@ use panes::multitrack::{MultitrackPane, MultitrackView};
 use panes::phrase::{PhrasePane, PhraseView};
 use panes::song::SongPane;
 use selection::CellPosition;
-use shown::Shown;
+use shown::{CursorPlaces, Shown};
 use status_line::StatusLine;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -180,27 +180,27 @@ impl App {
         &self.project
     }
 
-    pub fn shown_chain(&self) -> Option<ChainId> {
+    pub fn shown_chain_id(&self) -> Option<ChainId> {
         self.shown.chain()
     }
 
-    pub fn shown_phrase(&self) -> Option<PhraseId> {
+    pub fn shown_phrase_id(&self) -> Option<PhraseId> {
         self.shown.phrase()
     }
 
     fn entry_under_chain_cursor(&self) -> Option<ChainEntry> {
-        let chain = self.shown_chain()?;
+        let chain = self.shown_chain_id()?;
         self.project.chain(chain).entry(self.chain.entry())
     }
 
     fn shown_transpose(&self) -> i8 {
         self.entry_under_chain_cursor()
-            .filter(|entry| Some(entry.phrase()) == self.shown_phrase())
+            .filter(|entry| Some(entry.phrase()) == self.shown_phrase_id())
             .map_or(0, ChainEntry::transpose)
     }
 
-    fn phrase_on_show(&self) -> Phrase {
-        self.shown_phrase()
+    fn shown_phrase(&self) -> Phrase {
+        self.shown_phrase_id()
             .map_or_else(Phrase::default, |id| *self.project.phrase(id))
     }
 
@@ -212,9 +212,12 @@ impl App {
     }
 
     fn show_what_the_cursors_point_at(&mut self) {
-        let song_cursor = (self.song.row(), self.song.track());
-        self.shown
-            .follow_cursors(&self.project, song_cursor, self.chain.entry());
+        let cursors = CursorPlaces {
+            song_row: self.song.row(),
+            track: self.song.track(),
+            chain_entry: self.chain.entry(),
+        };
+        self.shown.follow_cursors(&self.project, cursors);
     }
 
     pub fn key_context(&self) -> KeyContext {
@@ -298,11 +301,11 @@ impl App {
             return None;
         }
         let index = self.phrase.note_step()?;
-        Some((index, self.phrase_on_show().step(index)))
+        Some((index, self.shown_phrase().step(index)))
     }
 
     fn preview_edit(&mut self, action: Action, index: usize, before: Step) {
-        let phrase = self.phrase_on_show();
+        let phrase = self.shown_phrase();
         let step = phrase.step(index);
         let changed = step.pitch() != before.pitch() || step.instrument() != before.instrument();
         let entered = matches!(action, Action::PianoKey(_));
@@ -327,13 +330,13 @@ impl App {
             self.song.follow(row);
             self.chain.follow(k);
         }
-        if let Some((chain, k)) = playhead.chain_alone {
-            self.shown.open_chain(chain);
-            self.chain.follow(k);
+        if let Some(place) = playhead.chain_alone {
+            self.shown.open_chain(place.chain);
+            self.chain.follow(place.entry);
         }
         self.show_what_the_cursors_point_at();
         let step = self
-            .shown_phrase()
+            .shown_phrase_id()
             .and_then(|phrase| playhead.step_in(phrase, self.song.track()));
         if let Some(step) = step {
             self.phrase.follow(step);
@@ -521,7 +524,7 @@ impl App {
                 self.start_selection_unless_started();
                 self.jump(direction);
             }
-            Action::FocusNext => self.focus_next(),
+            Action::FocusNext => self.set_focus(self.focus.next()),
             Action::FocusPrevious => self.set_focus(self.focus.previous()),
             Action::PlayFocusedPane => self.play_or_stop(),
             Action::PlaySongFromCursor => self.play_song(),
@@ -607,8 +610,8 @@ impl App {
     }
 
     fn confirm(&mut self) {
-        if self.focus == Focus::Phrase && self.shown_phrase().is_some() {
-            let shown = self.phrase_on_show();
+        if self.focus == Focus::Phrase && self.shown_phrase_id().is_some() {
+            let shown = self.shown_phrase();
             if let Some(instrument) = self.phrase.instrument_under_cursor(&shown) {
                 self.open_instrument_view(instrument);
             }
@@ -699,33 +702,17 @@ impl App {
                 self.shown.open_chain(self.chain.type_title_digit(digit));
             }
             (Focus::Chain, Action::Nudge { up, coarse }) => {
-                let chain = self.chain.nudged_title(self.shown_chain(), up, coarse);
+                let chain = ChainPane::nudged_title(self.shown_chain_id(), up, coarse);
                 self.shown.open_chain(chain);
             }
             (Focus::Phrase, Action::HexDigit(digit)) => {
                 self.shown.open_phrase(self.phrase.type_title_digit(digit));
             }
             (Focus::Phrase, Action::Nudge { up, coarse }) => {
-                let phrase = self.phrase.nudged_title(self.shown_phrase(), up, coarse);
+                let phrase = PhrasePane::nudged_title(self.shown_phrase_id(), up, coarse);
                 self.shown.open_phrase(phrase);
             }
-            (
-                _,
-                Action::Clear
-                | Action::Copy
-                | Action::Cut
-                | Action::Paste
-                | Action::Clone
-                | Action::DeepClone
-                | Action::NewUnused
-                | Action::InsertRow
-                | Action::DeleteRow
-                | Action::MoveRows { .. }
-                | Action::StartSelection
-                | Action::Select(_)
-                | Action::SelectJump(_)
-                | Action::PianoKey(_),
-            ) => {}
+            (_, action) if action.acts_on_cells() => {}
             _ => return false,
         }
         true
@@ -759,14 +746,14 @@ impl App {
     }
 
     fn goes_past_the_last_instrument(&self) -> bool {
-        self.shown_phrase().is_some_and(|id| {
+        self.shown_phrase_id().is_some_and(|id| {
             self.phrase
                 .is_on_the_last_instrument(self.project.phrase(id))
         })
     }
 
     fn edit_chain(&mut self, edit: impl FnOnce(&mut ChainPane, &mut Chain)) {
-        let Some(id) = self.shown_chain() else {
+        let Some(id) = self.shown_chain_id() else {
             self.remark = Some(NO_CHAIN_HERE);
             return;
         };
@@ -778,7 +765,7 @@ impl App {
     }
 
     fn edit_phrase(&mut self, edit: impl FnOnce(&mut PhrasePane, &mut Phrase)) {
-        match self.shown_phrase() {
+        match self.shown_phrase_id() {
             Some(id) => edit(&mut self.phrase, self.project.phrase_mut(id)),
             None => self.remark = Some(NO_PHRASE_HERE),
         }
@@ -826,7 +813,7 @@ impl App {
     }
 
     fn play_chain(&mut self) {
-        let Some(chain) = self.shown_chain().filter(|_| self.shown_chain_sounds()) else {
+        let Some(chain) = self.shown_chain_id().filter(|_| self.shown_chain_sounds()) else {
             self.remark = Some(NOTHING_TO_PLAY);
             return;
         };
@@ -850,7 +837,7 @@ impl App {
     }
 
     fn shown_chain_sounds(&self) -> bool {
-        self.shown_chain().is_some_and(|id| {
+        self.shown_chain_id().is_some_and(|id| {
             let chain = self.project.chain(id);
             (0..CHAIN_ENTRIES)
                 .filter_map(|index| chain.entry(index))
@@ -860,7 +847,7 @@ impl App {
 
     fn play_phrase(&mut self) {
         let Some(phrase) = self
-            .shown_phrase()
+            .shown_phrase_id()
             .filter(|id| !self.project.phrase(*id).is_silent())
         else {
             self.remark = Some(NOTHING_TO_PLAY);
@@ -898,7 +885,7 @@ impl App {
                 }
             }
             (_, _) => {
-                let Some(chain) = self.shown_chain() else {
+                let Some(chain) = self.shown_chain_id() else {
                     return;
                 };
                 let chain = self.project.chain(chain);
@@ -950,23 +937,15 @@ impl App {
         self.shown.open_phrase(place.phrase);
     }
 
-    fn focus_next(&mut self) {
-        if self.focus == Focus::RightSlot && self.shows_multitrack() {
-            self.set_focus(Focus::Phrase);
-        } else {
-            self.set_focus(self.focus.next());
-        }
-    }
-
     fn shows_multitrack(&self) -> bool {
         self.file_list.is_none() && !self.log_open && self.cart_view.is_none()
     }
 
     fn playing_entry_of_shown_chain(&self) -> Option<usize> {
         let playhead = self.playhead?;
-        let shown = self.shown_chain()?;
-        if let Some((chain, k)) = playhead.chain_alone {
-            return (chain == shown).then_some(k);
+        let shown = self.shown_chain_id()?;
+        if let Some(place) = playhead.chain_alone {
+            return (place.chain == shown).then_some(place.entry);
         }
         let (row, k) = playhead.chain_row?;
         let in_song_row = row == self.song.row() && self.chain_in_song_row_shown();
@@ -974,8 +953,8 @@ impl App {
     }
 
     fn chain_in_song_row_shown(&self) -> bool {
-        self.shown_chain().is_some()
-            && self.shown_chain() == self.project.song_cell(self.song.row(), self.song.track())
+        self.shown_chain_id().is_some()
+            && self.shown_chain_id() == self.project.song_cell(self.song.row(), self.song.track())
     }
 
     fn selection_would_reach_phrase_header(&self, direction: Direction) -> bool {
@@ -1016,18 +995,18 @@ impl App {
             focus == Some(Focus::Chain),
             project,
             ChainView {
-                id: self.shown_chain(),
+                id: self.shown_chain_id(),
                 playing_entry: self.playing_entry_of_shown_chain(),
             },
         );
-        let phrase = self.shown_phrase();
+        let phrase = self.shown_phrase_id();
         self.phrase.draw(
             &mut grid,
             layout::PHRASE,
             focus == Some(Focus::Phrase),
             PhraseView {
                 id: phrase,
-                phrase: &self.phrase_on_show(),
+                phrase: &self.shown_phrase(),
                 transpose: self.shown_transpose(),
                 playing_step: self
                     .playhead

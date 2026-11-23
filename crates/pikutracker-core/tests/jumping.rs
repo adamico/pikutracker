@@ -1,7 +1,7 @@
 use pikutracker_core::app::{Action, App, Direction};
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
 
-const TAB: Action = Action::FocusNext;
+const SHIFT_TAB: Action = Action::FocusPrevious;
 const UP: Action = Action::Jump(Direction::Up);
 const DOWN: Action = Action::Jump(Direction::Down);
 const LEFT: Action = Action::Jump(Direction::Left);
@@ -34,11 +34,11 @@ fn app(actions: &[Action]) -> App {
 }
 
 fn chain_number(app: &App) -> Option<u8> {
-    app.shown_chain().map(|id| id.number())
+    app.shown_chain_id().map(|id| id.number())
 }
 
 fn phrase_number(app: &App) -> Option<u8> {
-    app.shown_phrase().map(|id| id.number())
+    app.shown_phrase_id().map(|id| id.number())
 }
 
 #[test]
@@ -52,8 +52,8 @@ fn in_the_song_pane_up_and_down_jump_16_rows() {
 
 #[test]
 fn in_the_chain_pane_left_and_right_jump_track() {
-    let next = app(&[TAB, RIGHT]);
-    let back = app(&[TAB, RIGHT, LEFT]);
+    let next = app(&[SHIFT_TAB, RIGHT]);
+    let back = app(&[SHIFT_TAB, RIGHT, LEFT]);
 
     assert_eq!(chain_number(&next), Some(2));
     assert_eq!(chain_number(&back), Some(0));
@@ -61,9 +61,9 @@ fn in_the_chain_pane_left_and_right_jump_track() {
 
 #[test]
 fn in_the_chain_pane_up_and_down_jump_to_the_tracks_next_chain() {
-    let next = app(&[TAB, DOWN]);
-    let past_the_last = app(&[TAB, DOWN, DOWN]);
-    let back = app(&[TAB, DOWN, UP]);
+    let next = app(&[SHIFT_TAB, DOWN]);
+    let past_the_last = app(&[SHIFT_TAB, DOWN, DOWN]);
+    let back = app(&[SHIFT_TAB, DOWN, UP]);
 
     assert_eq!(chain_number(&next), Some(1));
     assert_eq!(
@@ -76,8 +76,8 @@ fn in_the_chain_pane_up_and_down_jump_to_the_tracks_next_chain() {
 
 #[test]
 fn in_the_phrase_pane_up_and_down_jump_to_the_chains_next_phrase() {
-    let next = app(&[TAB, TAB, DOWN]);
-    let back = app(&[TAB, TAB, DOWN, UP]);
+    let next = app(&[SHIFT_TAB, SHIFT_TAB, DOWN]);
+    let back = app(&[SHIFT_TAB, SHIFT_TAB, DOWN, UP]);
 
     assert_eq!(phrase_number(&next), Some(2));
     assert_eq!(phrase_number(&back), Some(1));
@@ -85,7 +85,7 @@ fn in_the_phrase_pane_up_and_down_jump_to_the_chains_next_phrase() {
 
 #[test]
 fn in_the_phrase_pane_left_and_right_jump_track() {
-    let next = app(&[TAB, TAB, RIGHT]);
+    let next = app(&[SHIFT_TAB, SHIFT_TAB, RIGHT]);
 
     assert_eq!(phrase_number(&next), Some(3));
     assert!(next.grid().text_dump().contains("PHRASE 03"));
@@ -93,7 +93,7 @@ fn in_the_phrase_pane_left_and_right_jump_track() {
 
 #[test]
 fn in_the_instrument_view_left_and_right_jump_instrument() {
-    let mut app = app(&[TAB, TAB, Action::Move(Direction::Right)]);
+    let mut app = app(&[SHIFT_TAB, SHIFT_TAB, Action::Move(Direction::Right)]);
     app.apply(Action::HexDigit(8));
     app.apply(Action::Confirm);
     assert!(app.grid().text_dump().contains("INSTRUMENT 8"));
@@ -111,7 +111,7 @@ fn in_the_instrument_view_left_and_right_jump_instrument() {
 
 #[test]
 fn a_jump_by_hand_turns_follow_off() {
-    let app = app(&[Action::ToggleFollow, TAB, DOWN]);
+    let app = app(&[Action::ToggleFollow, SHIFT_TAB, DOWN]);
 
     assert!(app.grid().text_dump().contains("FOLLOW OFF"));
 }

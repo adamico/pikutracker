@@ -8,7 +8,7 @@ use support::apply;
 
 const RIGHT: Action = Action::Move(Direction::Right);
 const DOWN: Action = Action::Move(Direction::Down);
-const TAB: Action = Action::FocusNext;
+const SHIFT_TAB: Action = Action::FocusPrevious;
 const SPACE: Action = Action::PlayFocusedPane;
 const A_440: Action = Action::PianoKey(9);
 const NUDGE_UP: Action = Action::Nudge {
@@ -37,7 +37,7 @@ fn phrase_app(transpose: i32) -> App {
     *project.chain_mut(ChainId::new(0)).entry_mut(0) = Some(entry);
     project.set_song_cell(0, 0, Some(ChainId::new(0)));
     let mut app = App::with_project(project);
-    apply(&mut app, &[TAB, TAB]);
+    apply(&mut app, &[SHIFT_TAB, SHIFT_TAB]);
     app
 }
 

@@ -102,9 +102,15 @@ impl TrackMix {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ChainEntryPlace {
+    pub chain: ChainId,
+    pub entry: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Playhead {
     pub chain_row: Option<(usize, usize)>,
-    pub chain_alone: Option<(ChainId, usize)>,
+    pub chain_alone: Option<ChainEntryPlace>,
     pub tracks: [Option<(PhraseId, usize)>; TRACKS],
     pub waiting: [bool; TRACKS],
     pub chain_row_tick: u32,
@@ -204,17 +210,18 @@ struct Playback {
 impl Playback {
     fn next_chain_row(&self) -> Option<(usize, usize)> {
         let project = &self.project;
-        let later_in_row = first_chain_row(project, self.row, self.k + 1);
         match self.route {
             Route::Phrase { .. } => None,
-            Route::Chain { .. } => later_in_row
-                .or_else(|| first_chain_row(project, self.row, 0))
-                .map(|k| (self.row, k)),
-            Route::ChainAlone { chain } => first_entry(project, chain, self.k + 1)
-                .or_else(|| first_entry(project, chain, 0))
-                .map(|k| (self.row, k)),
+            Route::Chain { .. } => {
+                first_from_or_wrapping(self.k + 1, |k| first_chain_row(project, self.row, k))
+                    .map(|k| (self.row, k))
+            }
+            Route::ChainAlone { chain } => {
+                first_from_or_wrapping(self.k + 1, |k| first_entry(project, chain, k))
+                    .map(|k| (self.row, k))
+            }
             Route::Song => {
-                if let Some(k) = later_in_row {
+                if let Some(k) = first_chain_row(project, self.row, self.k + 1) {
                     return Some((self.row, k));
                 }
                 if project.song_row_is_empty(self.row) {
@@ -273,7 +280,10 @@ impl Playback {
             Route::Phrase { .. } | Route::ChainAlone { .. } => None,
         };
         let chain_alone = match self.route {
-            Route::ChainAlone { chain } => Some((chain, self.k)),
+            Route::ChainAlone { chain } => Some(ChainEntryPlace {
+                chain,
+                entry: self.k,
+            }),
             _ => None,
         };
         Playhead {
@@ -306,6 +316,13 @@ impl Playback {
 
 fn first_chain_row(project: &Project, row: usize, from: usize) -> Option<usize> {
     project.played_chain_rows(row).find(|&k| k >= from)
+}
+
+fn first_from_or_wrapping(
+    from: usize,
+    first_from: impl Fn(usize) -> Option<usize>,
+) -> Option<usize> {
+    first_from(from).or_else(|| first_from(0))
 }
 
 fn first_entry(project: &Project, chain: ChainId, from: usize) -> Option<usize> {
@@ -357,8 +374,8 @@ impl Player {
                 track,
                 from_entry,
             } => {
-                let k = first_chain_row(&project, song_row, from_entry)
-                    .or_else(|| first_chain_row(&project, song_row, 0));
+                let k =
+                    first_from_or_wrapping(from_entry, |k| first_chain_row(&project, song_row, k));
                 self.start(project, Route::Chain { track }, song_row, k, 0);
             }
             AudioRequest::PlayChainAlone {
@@ -366,8 +383,7 @@ impl Player {
                 chain,
                 from_entry,
             } => {
-                let k = first_entry(&project, chain, from_entry)
-                    .or_else(|| first_entry(&project, chain, 0));
+                let k = first_from_or_wrapping(from_entry, |k| first_entry(&project, chain, k));
                 self.start(project, Route::ChainAlone { chain }, 0, k, 0);
             }
             AudioRequest::PlaySong { project, from_row } => {

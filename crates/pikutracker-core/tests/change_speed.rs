@@ -7,7 +7,7 @@ use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project, Step};
 use support::{apply, status_line};
 
 const DOWN: Action = Action::Move(Direction::Down);
-const TAB: Action = Action::FocusNext;
+const SHIFT_TAB: Action = Action::FocusPrevious;
 const SELECT: Action = Action::StartSelection;
 const SELECT_DOWN: Action = Action::Select(Direction::Down);
 const SELECT_RIGHT: Action = Action::Select(Direction::Right);
@@ -104,7 +104,7 @@ fn the_question_names_the_whole_song_when_nothing_is_selected() {
 fn the_question_names_the_selection_when_one_is_in_scope() {
     let mut app = App::with_project(two_rows());
 
-    apply(&mut app, &[TAB, SELECT, Action::ScaleSpeed]);
+    apply(&mut app, &[SHIFT_TAB, SELECT, Action::ScaleSpeed]);
 
     assert!(
         status_line(&app).contains("SCALES 1 PHRASE: SELECTION"),
@@ -117,7 +117,10 @@ fn the_question_names_the_selection_when_one_is_in_scope() {
 fn the_question_names_the_whole_song_for_a_selection_of_steps() {
     let mut app = App::with_project(two_rows());
 
-    apply(&mut app, &[TAB, TAB, SELECT_DOWN, Action::ScaleSpeed]);
+    apply(
+        &mut app,
+        &[SHIFT_TAB, SHIFT_TAB, SELECT_DOWN, Action::ScaleSpeed],
+    );
 
     assert!(
         status_line(&app).contains("WHOLE SONG"),
@@ -211,7 +214,7 @@ fn a_song_selection_scales_only_the_phrases_of_its_chains() {
 fn a_chain_selection_scales_only_the_phrases_of_its_entries() {
     let mut app = App::with_project(two_rows());
 
-    apply(&mut app, &[TAB, SELECT]);
+    apply(&mut app, &[SHIFT_TAB, SELECT]);
     scale_speed(&mut app, 0x2, 0x0);
 
     assert_eq!(speed(&app, 0), 32);
@@ -223,7 +226,7 @@ fn a_chain_selection_scales_only_the_phrases_of_its_entries() {
 fn a_selection_of_steps_leaves_the_whole_song_in_scope() {
     let mut app = App::with_project(two_rows());
 
-    apply(&mut app, &[TAB, TAB, SELECT_DOWN]);
+    apply(&mut app, &[SHIFT_TAB, SHIFT_TAB, SELECT_DOWN]);
     scale_speed(&mut app, 0x2, 0x0);
 
     assert_eq!(speed(&app, 2), 40);
@@ -307,7 +310,7 @@ fn an_entry_outside_a_chain_selection_counts_as_used_elsewhere() {
     put_entry(&mut project, 0, 5, 0);
     let mut app = App::with_project(project);
 
-    apply(&mut app, &[TAB, SELECT]);
+    apply(&mut app, &[SHIFT_TAB, SELECT]);
     scale_speed(&mut app, 0x2, 0x0);
 
     assert!(status_line(&app).contains("1 USED ELSEWHERE"));
@@ -513,7 +516,7 @@ fn change_speed_sets_the_typed_speed_on_every_phrase_of_the_song() {
 fn change_speed_sets_only_the_phrases_of_a_chain_selection() {
     let mut app = App::with_project(two_rows());
 
-    apply(&mut app, &[TAB, SELECT]);
+    apply(&mut app, &[SHIFT_TAB, SELECT]);
     change_speed(&mut app, 0x2, 0x0);
 
     assert_eq!(speed(&app, 0), 32);

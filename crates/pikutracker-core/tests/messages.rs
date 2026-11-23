@@ -121,7 +121,7 @@ fn a_result_without_items_leaves_the_right_hand_view_alone() {
 #[test]
 fn ctrl_l_opens_the_log_with_focus_and_closes_it_back_to_the_pane_you_came_from() {
     let mut app = App::new();
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
 
     app.apply(Action::ToggleLog);
     assert_eq!(right_slot(&app, 0), "LOG");
@@ -147,7 +147,7 @@ fn esc_in_the_log_closes_it() {
 fn esc_clears_a_failure_before_it_closes_the_log() {
     let mut app = App::new();
     app.report(Report::failure("EXPORT FAILED").with_items(vec![item("ONE")]));
-    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusNext);
 
     app.apply(Action::Cancel);
     assert_eq!(right_slot(&app, 0), "LOG");
@@ -164,7 +164,7 @@ fn the_log_joins_the_tab_cycle_as_the_visible_right_hand_view() {
     assert_eq!(right_slot(&app, 1), " WRN ONE");
 
     for _ in 0..3 {
-        app.apply(Action::FocusNext);
+        app.apply(Action::FocusPrevious);
     }
     assert_eq!(right_slot(&app, 1), ">WRN ONE");
 
@@ -172,7 +172,7 @@ fn the_log_joins_the_tab_cycle_as_the_visible_right_hand_view() {
     assert_eq!(right_slot(&app, 1), " WRN ONE");
     assert_eq!(right_slot(&app, 2), ">WRN TWO");
 
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
     assert_eq!(right_slot(&app, 0), "LOG");
     assert_eq!(song_line(&app, 2), "00 [--]-- -- --");
 }
@@ -225,7 +225,7 @@ fn the_log_scrolls_to_keep_the_picked_item_visible() {
         ))
     });
     app.report(Report::warning("IMPORTED").with_items(items.collect()));
-    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusNext);
 
     for _ in 0..31 {
         app.apply(DOWN);
@@ -256,12 +256,12 @@ fn enter_on_an_item_jumps_to_its_location_and_the_panes_stay_usable() {
                 .with_hint("ENTER: GO THERE")
                 .at(location),
         ]));
-    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusNext);
 
     app.apply(Action::Confirm);
 
-    assert_eq!(app.shown_chain(), Some(ChainId::new(4)));
-    assert_eq!(app.shown_phrase(), Some(PhraseId::new(7)));
+    assert_eq!(app.shown_chain_id(), Some(ChainId::new(4)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(7)));
     assert!(app.grid().text_dump().contains("05[...]"));
     assert_eq!(right_slot(&app, 0), "LOG");
 
@@ -273,7 +273,7 @@ fn enter_on_an_item_jumps_to_its_location_and_the_panes_stay_usable() {
 fn enter_on_an_item_with_no_location_stays_in_the_log() {
     let mut app = App::new();
     app.report(Report::warning("IMPORTED").with_items(vec![item("ONE"), item("TWO")]));
-    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusNext);
 
     app.apply(Action::Confirm);
 

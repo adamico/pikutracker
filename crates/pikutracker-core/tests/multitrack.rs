@@ -201,8 +201,28 @@ fn the_gutter_numbers_each_song_row_with_its_marks_and_scrolls_on_through_the_so
     let app = App::with_project(project);
 
     assert_eq!(
+        lines(&app, 5),
+        ["00> C-2 2 5 0", "01< C-2 2 5 0", "02", "03  C-2 2 5 0", ""]
+    );
+}
+
+#[test]
+fn an_empty_song_row_gets_a_gutter_line_with_its_mark_that_the_cursor_passes_over() {
+    let mut project = Project::new();
+    let phrase = write(&mut project, 1, 8, &[C2]);
+    place(&mut project, 0, 0, 0, &[ChainEntry::new(phrase)]);
+    project.set_song_cell(2, 0, Some(ChainId::new(0)));
+    let mut marks = SongRowMarks::default();
+    marks.toggle_ending(SongRowEnding::Stop);
+    project.set_song_row_marks(1, marks);
+    let mut app = App::with_project(project);
+    apply(&mut app, &TO_MULTITRACK);
+
+    app.apply(DOWN);
+
+    assert_eq!(
         lines(&app, 4),
-        ["00> C-2 2 5 0", "01< C-2 2 5 0", "03  C-2 2 5 0", ""]
+        ["00  C-2 2 5 0", "01|", "02 [C-2]2 5 0", ""]
     );
 }
 
@@ -272,7 +292,7 @@ fn with_follow_off_it_stays_where_it_is_while_the_song_plays() {
 #[test]
 fn it_scrolls_continuously_through_the_song_and_its_title_shows_the_song_row_in_view() {
     let mut app = App::with_project(long_song());
-    apply(&mut app, &[FOLLOW, TAB, TAB, TAB]);
+    apply(&mut app, &[FOLLOW, TAB]);
 
     app.apply(DOWN);
     assert_eq!(status_line(&app), "FOLLOW OFF");
@@ -294,7 +314,7 @@ fn muted_tracks_are_still_shown() {
 const UP: Action = Action::Move(Direction::Up);
 const LEFT: Action = Action::Move(Direction::Left);
 const RIGHT: Action = Action::Move(Direction::Right);
-const TO_MULTITRACK: [Action; 3] = [TAB, TAB, TAB];
+const TO_MULTITRACK: [Action; 1] = [TAB];
 
 fn fast_beside_slow() -> (Project, PhraseId, PhraseId) {
     let mut project = Project::new();
@@ -357,12 +377,12 @@ fn the_cursor_drives_the_song_row_the_chain_on_that_track_and_the_phrase_and_ste
 
     apply(&mut app, &[RIGHT, DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, DOWN]);
 
-    assert_eq!(app.shown_chain(), Some(ChainId::new(2)));
-    assert_eq!(app.shown_phrase(), Some(slow));
-    app.apply(Action::FocusPrevious);
-    app.apply(Action::FocusPrevious);
+    assert_eq!(app.shown_chain_id(), Some(ChainId::new(2)));
+    assert_eq!(app.shown_phrase_id(), Some(slow));
+    app.apply(Action::FocusNext);
+    app.apply(Action::FocusNext);
     assert_eq!(pane_text(&app, layout::CHAIN, 3), "01[02]    +00");
-    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusNext);
     assert_eq!(pane_text(&app, layout::SONG, 3), "01  --[02]-- --");
 }
 

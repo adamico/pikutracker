@@ -270,8 +270,8 @@ fn follow_and_the_octave_are_remembered_and_config_ron_is_never_written() {
 fn the_whole_pen_is_remembered_and_restored_on_launch() {
     let mut app = launch(None, None);
     for action in [
-        Action::FocusNext,
-        Action::FocusNext,
+        Action::FocusPrevious,
+        Action::FocusPrevious,
         Action::Move(Direction::Up),
         Action::HexDigit(7),
         Action::Move(Direction::Right),
@@ -302,7 +302,7 @@ fn actions_that_change_nothing_remembered_write_nothing() {
     let mut app = launch(None, Some("(version: 1, follow: true, octave: 3)"));
     app.take_file_requests();
 
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
     app.apply(Action::OctaveUp);
     app.apply(Action::OctaveDown);
     app.take_file_requests();
@@ -455,9 +455,9 @@ fn the_m8_style_preset_drives_the_instrument_view() {
         directory: PathBuf::from("/home/user"),
     });
     keys(&mut app, &[(Key::Char('0'), NONE), (Key::Char('0'), NONE)]);
-    keys(&mut app, &[(Key::Right, Modifiers::SHIFT)]);
+    keys(&mut app, &[(Key::Left, Modifiers::SHIFT)]);
     keys(&mut app, &[(Key::Char('0'), NONE), (Key::Char('0'), NONE)]);
-    keys(&mut app, &[(Key::Right, Modifiers::SHIFT)]);
+    keys(&mut app, &[(Key::Left, Modifiers::SHIFT)]);
     keys(&mut app, &[(Key::Char('q'), NONE), (Key::Right, NONE)]);
     keys(&mut app, &[(Key::Char('0'), NONE), (Key::Char('8'), NONE)]);
     keys(&mut app, &[(Key::Enter, NONE)]);

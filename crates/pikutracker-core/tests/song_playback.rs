@@ -11,7 +11,7 @@ use support::status_line;
 const DOWN: Action = Action::Move(Direction::Down);
 const SPACE: Action = Action::PlayFocusedPane;
 const SHIFT_SPACE: Action = Action::PlaySongFromCursor;
-const TAB: Action = Action::FocusNext;
+const SHIFT_TAB: Action = Action::FocusPrevious;
 
 const SPEED: i32 = 8;
 const STEP_SAMPLES: usize = SPEED as usize * SAMPLES_PER_TICK as usize;
@@ -404,7 +404,11 @@ fn space_in_the_song_pane_plays_from_the_cursors_row() {
 
 #[test]
 fn shift_space_plays_the_song_from_the_cursors_row_in_any_pane() {
-    let samples = hear(three_row_song(), &[DOWN, TAB, TAB, SHIFT_SPACE], 2);
+    let samples = hear(
+        three_row_song(),
+        &[DOWN, SHIFT_TAB, SHIFT_TAB, SHIFT_SPACE],
+        2,
+    );
 
     assert_steps(&samples, &[440.0, 880.0]);
 }
@@ -444,7 +448,7 @@ fn moving_the_cursor_during_playback_changes_nothing_that_plays() {
     app.take_audio_requests();
 
     app.apply(DOWN);
-    app.apply(TAB);
+    app.apply(SHIFT_TAB);
 
     assert!(app.take_audio_requests().is_empty());
 }
@@ -461,7 +465,7 @@ fn two_track_chain() -> Project {
 
 #[test]
 fn space_in_the_chain_pane_plays_the_chain_alone_with_chain_row_timing_and_loops() {
-    let samples = hear(two_track_chain(), &[TAB, SPACE], 8);
+    let samples = hear(two_track_chain(), &[SHIFT_TAB, SPACE], 8);
 
     assert_steps(
         &samples,
@@ -471,7 +475,7 @@ fn space_in_the_chain_pane_plays_the_chain_alone_with_chain_row_timing_and_loops
 
 #[test]
 fn the_chain_plays_from_the_cursors_entry_and_loops_to_the_first() {
-    let samples = hear(two_track_chain(), &[TAB, DOWN, SPACE], 4);
+    let samples = hear(two_track_chain(), &[SHIFT_TAB, DOWN, SPACE], 4);
 
     assert_steps(&samples, &[880.0, 880.0, 440.0, 440.0]);
 }
@@ -485,7 +489,7 @@ fn a_phrase_loop_repeats_in_the_chain_pane_as_it_does_in_the_song() {
     place(&mut project, 0, 0, 0, &[plain(riff)]);
     place(&mut project, 0, 1, 1, &[plain(stretch)]);
 
-    let samples = hear(project, &[TAB, SPACE], 4);
+    let samples = hear(project, &[SHIFT_TAB, SPACE], 4);
 
     assert_steps(&samples, &[440.0, 880.0, 440.0, 880.0]);
 }
@@ -498,7 +502,7 @@ fn space_in_the_phrase_pane_plays_the_phrase_alone_with_its_transpose() {
     place(&mut project, 0, 0, 0, &[transposed(riff, 12)]);
     place(&mut project, 0, 1, 1, &[plain(stretch)]);
 
-    let samples = hear(project, &[TAB, TAB, SPACE], 4);
+    let samples = hear(project, &[SHIFT_TAB, SHIFT_TAB, SPACE], 4);
 
     assert_steps(&samples, &[880.0, 440.0, 880.0, 440.0]);
 }
@@ -510,14 +514,14 @@ fn a_phrase_played_alone_repeats_its_phrase_loop_after_the_lead_in() {
     let riff = looping_from(&mut project, riff, 1);
     place(&mut project, 0, 0, 0, &[plain(riff)]);
 
-    let samples = hear(project, &[TAB, TAB, SPACE], 6);
+    let samples = hear(project, &[SHIFT_TAB, SHIFT_TAB, SPACE], 6);
 
     assert_steps(&samples, &[220.0, 440.0, 880.0, 440.0, 880.0, 440.0]);
 }
 
 #[test]
 fn the_right_hand_view_plays_the_last_focused_pane() {
-    let samples = hear(three_row_song(), &[Action::FocusPrevious, SPACE], 2);
+    let samples = hear(three_row_song(), &[Action::FocusNext, SPACE], 2);
 
     assert_steps(&samples, &[220.0, 440.0]);
 }
@@ -541,7 +545,7 @@ fn space_on_a_song_row_with_nothing_on_it_says_so() {
 
 #[test]
 fn space_in_the_chain_pane_with_no_chain_says_so() {
-    assert_nothing_to_play(Project::new(), &[TAB, SPACE]);
+    assert_nothing_to_play(Project::new(), &[SHIFT_TAB, SPACE]);
 }
 
 #[test]
@@ -549,7 +553,7 @@ fn space_on_a_chain_with_no_entries_says_so() {
     let mut project = Project::new();
     project.set_song_cell(0, 0, Some(ChainId::new(0)));
 
-    assert_nothing_to_play(project, &[TAB, SPACE]);
+    assert_nothing_to_play(project, &[SHIFT_TAB, SPACE]);
 }
 
 #[test]
@@ -558,12 +562,12 @@ fn space_on_a_chain_of_silent_phrases_says_so() {
     let silence = write(&mut project, 1, &[REST, REST]);
     place(&mut project, 0, 0, 0, &[plain(silence)]);
 
-    assert_nothing_to_play(project, &[TAB, SPACE]);
+    assert_nothing_to_play(project, &[SHIFT_TAB, SPACE]);
 }
 
 #[test]
 fn space_in_the_phrase_pane_with_no_phrase_says_so() {
-    assert_nothing_to_play(Project::new(), &[TAB, TAB, SPACE]);
+    assert_nothing_to_play(Project::new(), &[SHIFT_TAB, SHIFT_TAB, SPACE]);
 }
 
 #[test]
@@ -572,5 +576,5 @@ fn space_on_a_silent_phrase_says_so() {
     let silence = write(&mut project, 1, &[REST, REST]);
     place(&mut project, 0, 0, 0, &[plain(silence)]);
 
-    assert_nothing_to_play(project, &[TAB, TAB, SPACE]);
+    assert_nothing_to_play(project, &[SHIFT_TAB, SHIFT_TAB, SPACE]);
 }

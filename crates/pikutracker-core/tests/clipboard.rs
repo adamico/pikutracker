@@ -9,8 +9,8 @@ use support::{apply, status_line};
 const UP: Action = Action::Move(Direction::Up);
 const DOWN: Action = Action::Move(Direction::Down);
 const RIGHT: Action = Action::Move(Direction::Right);
+const SHIFT_TAB: Action = Action::FocusPrevious;
 const TAB: Action = Action::FocusNext;
-const BACK: Action = Action::FocusPrevious;
 const SELECT: Action = Action::StartSelection;
 const SELECT_DOWN: Action = Action::Select(Direction::Down);
 const SELECT_RIGHT: Action = Action::Select(Direction::Right);
@@ -182,7 +182,10 @@ fn a_song_paste_past_the_last_track_counts_every_clipped_row() {
 #[test]
 fn chain_entries_paste_with_their_transpose() {
     let mut app = App::with_project(chain_music());
-    apply(&mut app, &[TAB, SELECT_RIGHT, SELECT_RIGHT, Action::Copy]);
+    apply(
+        &mut app,
+        &[SHIFT_TAB, SELECT_RIGHT, SELECT_RIGHT, Action::Copy],
+    );
     apply(&mut app, &moves(DOWN, 4));
 
     app.apply(Action::Paste);
@@ -193,7 +196,7 @@ fn chain_entries_paste_with_their_transpose() {
 #[test]
 fn a_partial_chain_copy_lands_in_its_own_columns() {
     let mut app = App::with_project(chain_music());
-    apply(&mut app, &[TAB, RIGHT, Action::Copy, DOWN]);
+    apply(&mut app, &[SHIFT_TAB, RIGHT, Action::Copy, DOWN]);
     app.apply(Action::Move(Direction::Left));
 
     app.apply(Action::Paste);
@@ -206,7 +209,7 @@ fn a_partial_chain_copy_lands_in_its_own_columns() {
 #[test]
 fn a_chain_paste_past_the_last_entry_reports_the_rows_lost() {
     let mut app = App::with_project(chain_music());
-    apply(&mut app, &[TAB, SELECT_DOWN, Action::Copy]);
+    apply(&mut app, &[SHIFT_TAB, SELECT_DOWN, Action::Copy]);
     apply(&mut app, &moves(DOWN, 14));
 
     app.apply(Action::Paste);
@@ -220,8 +223,8 @@ fn steps_paste_as_values() {
     apply(
         &mut app,
         &[
-            TAB,
-            TAB,
+            SHIFT_TAB,
+            SHIFT_TAB,
             SELECT_DOWN,
             SELECT_RIGHT,
             SELECT_RIGHT,
@@ -242,7 +245,10 @@ fn a_partial_phrase_copy_lands_in_its_own_columns_wherever_the_cursor_is() {
     let mut project = phrase_music();
     *project.phrase_mut(PhraseId::new(0)).step_mut(5) = Step::new(40, 3, 2, 4).unwrap();
     let mut app = App::with_project(project);
-    apply(&mut app, &[TAB, TAB, RIGHT, RIGHT, Action::Copy]);
+    apply(
+        &mut app,
+        &[SHIFT_TAB, SHIFT_TAB, RIGHT, RIGHT, Action::Copy],
+    );
     apply(&mut app, &moves(Action::Move(Direction::Left), 2));
     apply(&mut app, &moves(DOWN, 5));
 
@@ -256,7 +262,7 @@ fn a_silent_step_pasted_over_a_note_silences_it() {
     let mut project = phrase_music();
     *project.phrase_mut(PhraseId::new(0)).step_mut(6) = Step::new(30, 1, 0, 0).unwrap();
     let mut app = App::with_project(project);
-    apply(&mut app, &[TAB, TAB]);
+    apply(&mut app, &[SHIFT_TAB, SHIFT_TAB]);
     apply(&mut app, &moves(DOWN, 6));
     apply(&mut app, &[Action::Copy]);
     apply(&mut app, &moves(UP, 6));
@@ -269,7 +275,7 @@ fn a_silent_step_pasted_over_a_note_silences_it() {
 #[test]
 fn a_phrase_paste_reaches_past_len_stops_at_step_31_and_never_changes_len() {
     let mut app = App::with_project(phrase_music());
-    apply(&mut app, &[TAB, TAB]);
+    apply(&mut app, &[SHIFT_TAB, SHIFT_TAB]);
     apply(&mut app, &moves(SELECT_DOWN, 3));
     app.apply(Action::Copy);
     apply(&mut app, &moves(DOWN, 27));
@@ -287,7 +293,7 @@ fn a_phrase_paste_reaches_past_len_stops_at_step_31_and_never_changes_len() {
 fn paste_into_another_kind_of_pane_is_refused_with_a_message() {
     let start = song_block();
     let mut app = App::with_project(start.clone());
-    apply(&mut app, &[Action::Copy, TAB]);
+    apply(&mut app, &[Action::Copy, SHIFT_TAB]);
 
     app.apply(Action::Paste);
 
@@ -310,7 +316,7 @@ fn paste_with_an_empty_clipboard_says_so() {
 #[test]
 fn the_clipboard_lasts_across_focus_changes_and_undo() {
     let mut app = App::with_project(song_block());
-    apply(&mut app, &[Action::Copy, TAB, BACK, DOWN, DOWN]);
+    apply(&mut app, &[Action::Copy, SHIFT_TAB, TAB, DOWN, DOWN]);
     app.apply(Action::HexDigit(1));
     app.apply(Action::Undo);
 

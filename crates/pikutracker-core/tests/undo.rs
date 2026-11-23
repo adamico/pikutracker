@@ -138,7 +138,7 @@ fn undo_moves_the_cursor_back_to_the_change() {
 #[test]
 fn undo_brings_focus_back_to_the_pane_of_the_change() {
     let mut app = App::with_project(project_with_a_song());
-    apply(&mut app, &[Action::HexDigit(5), Action::FocusNext]);
+    apply(&mut app, &[Action::HexDigit(5), Action::FocusPrevious]);
 
     app.apply(Action::Undo);
     app.apply(Action::HexDigit(6));
@@ -154,9 +154,9 @@ fn edits_in_every_pane_are_undone_in_order() {
         &mut app,
         &[
             Action::ToggleLoopStart,
-            Action::FocusNext,
+            Action::FocusPrevious,
             NUDGE_UP,
-            Action::FocusNext,
+            Action::FocusPrevious,
             Action::PianoKey(0),
             UP,
             UP,
@@ -226,8 +226,8 @@ fn a_cursor_moved_by_follow_ends_a_merge() {
     apply(
         &mut app,
         &[
-            Action::FocusNext,
-            Action::FocusNext,
+            Action::FocusPrevious,
+            Action::FocusPrevious,
             Action::ToggleFollow,
             Action::PlaySongFromCursor,
             NUDGE_UP,
@@ -286,7 +286,7 @@ fn actions_that_change_no_music_are_not_steps() {
         &mut app,
         &[
             DOWN,
-            Action::FocusNext,
+            Action::FocusPrevious,
             Action::OctaveUp,
             Action::Mute { track_number: 1 },
             Action::Solo { track_number: 2 },

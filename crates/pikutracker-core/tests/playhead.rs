@@ -8,7 +8,7 @@ use pikutracker_core::synth::SAMPLES_PER_TICK;
 use support::{pane_text, status_line};
 
 const DOWN: Action = Action::Move(Direction::Down);
-const TAB: Action = Action::FocusNext;
+const SHIFT_TAB: Action = Action::FocusPrevious;
 const SPACE: Action = Action::PlayFocusedPane;
 const PLAY_SONG: Action = Action::PlaySongFromCursor;
 const FOLLOW: Action = Action::ToggleFollow;
@@ -96,7 +96,14 @@ fn the_phrase_pane_marks_the_step_being_played() {
 #[test]
 fn the_marker_is_separate_from_the_cursor() {
     let (app, _) = played(
-        &[DOWN, TAB, TAB, DOWN, Action::Move(Direction::Up), PLAY_SONG],
+        &[
+            DOWN,
+            SHIFT_TAB,
+            SHIFT_TAB,
+            DOWN,
+            Action::Move(Direction::Up),
+            PLAY_SONG,
+        ],
         0,
     );
 
@@ -117,7 +124,7 @@ fn a_pane_showing_something_else_has_no_marker() {
 
 #[test]
 fn the_phrase_pane_marks_a_phrase_playing_alone() {
-    let (app, _) = played(&[TAB, TAB, SPACE], 1);
+    let (app, _) = played(&[SHIFT_TAB, SHIFT_TAB, SPACE], 1);
 
     assert_eq!(label(&app, layout::PHRASE, FIRST_STEP_ROW + 1), ">1");
 }
@@ -148,22 +155,22 @@ fn f10_turns_follow_on_and_off_and_says_so() {
 fn the_panes_stay_put_while_follow_is_off() {
     let (app, _) = played(&[PLAY_SONG], 4);
 
-    assert_eq!(app.shown_chain(), Some(ChainId::new(0)));
+    assert_eq!(app.shown_chain_id(), Some(ChainId::new(0)));
 }
 
 #[test]
 fn follow_moves_the_panes_to_the_playhead() {
     let (app, _) = played(&[FOLLOW, PLAY_SONG], 5);
 
-    assert_eq!(app.shown_chain(), Some(ChainId::new(1)));
-    assert_eq!(app.shown_phrase(), Some(PhraseId::new(3)));
+    assert_eq!(app.shown_chain_id(), Some(ChainId::new(1)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(3)));
 }
 
 #[test]
 fn follow_moves_the_cursor_down_the_chain_and_the_phrase() {
-    let (app, _) = played(&[FOLLOW, TAB, TAB, PLAY_SONG], 3);
+    let (app, _) = played(&[FOLLOW, SHIFT_TAB, SHIFT_TAB, PLAY_SONG], 3);
 
-    assert_eq!(app.shown_phrase(), Some(PhraseId::new(2)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(2)));
     assert!(pane_text(&app, layout::PHRASE, FIRST_STEP_ROW + 1).contains('['));
 }
 
@@ -174,9 +181,9 @@ fn moving_the_cursor_by_hand_turns_follow_off_and_says_so() {
     app.apply(DOWN);
     assert_eq!(status_line(&app), "FOLLOW OFF");
 
-    let row_after_moving = app.shown_chain();
+    let row_after_moving = app.shown_chain_id();
     play_on(&mut app, &mut player, 4);
-    assert_eq!(app.shown_chain(), row_after_moving);
+    assert_eq!(app.shown_chain_id(), row_after_moving);
 }
 
 #[test]
@@ -196,7 +203,7 @@ fn moving_through_the_log_leaves_follow_on() {
     assert!(!status_line(&app).contains("FOLLOW"));
 
     play_on(&mut app, &mut player, 4);
-    assert_eq!(app.shown_chain(), Some(ChainId::new(1)));
+    assert_eq!(app.shown_chain_id(), Some(ChainId::new(1)));
 }
 
 #[test]

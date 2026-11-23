@@ -1,6 +1,7 @@
+use super::title_number::TitleNumber;
 use super::{
-    EMPTY, HEADING, SELECTED, VALUE, draw_numbered_title, draw_out_of_range_flag, draw_row_label,
-    draw_styled_value, nudged_id, stepped, typed_value,
+    EMPTY, HEADING, SELECTED, VALUE, draw_out_of_range_flag, draw_row_label, draw_styled_value,
+    nudged_id, stepped, typed_value,
 };
 use crate::app::Direction;
 use crate::app::layout::Area;
@@ -33,7 +34,7 @@ pub struct ChainView {
 #[derive(Debug, Default)]
 pub struct ChainPane {
     entry: usize,
-    on_title: bool,
+    title: TitleNumber,
     column: usize,
     first_digit: Option<u8>,
     typing_negative: bool,
@@ -50,34 +51,33 @@ impl ChainPane {
     pub fn cursor_place(&self) -> ChainCursorPlace {
         ChainCursorPlace {
             entry: self.entry,
-            on_title: self.on_title,
+            on_title: self.title.has_cursor(),
             column: self.column,
         }
     }
 
     pub fn return_to(&mut self, place: ChainCursorPlace) {
         self.entry = place.entry;
-        self.on_title = place.on_title;
+        self.title.set_cursor(place.on_title);
         self.column = place.column;
     }
 
     pub fn jump_to(&mut self, entry: usize) {
         self.entry = entry.min(CHAIN_ENTRIES - 1);
-        self.on_title = false;
+        self.title.set_cursor(false);
     }
 
     pub fn on_title(&self) -> bool {
-        self.on_title
+        self.title.has_cursor()
     }
 
     pub fn move_cursor(&mut self, direction: Direction) {
         let (columns, rows) = direction.column_and_row_delta();
-        if self.on_title {
-            self.on_title = rows <= 0;
+        if self.title.takes_move(rows) {
             return;
         }
         if rows < 0 && self.entry == 0 {
-            self.on_title = true;
+            self.title.set_cursor(true);
             return;
         }
         self.column = stepped(self.column, columns, ENTRY_CELLS.len());
@@ -98,14 +98,15 @@ impl ChainPane {
 
     pub fn finish_typing(&mut self) {
         self.first_digit = None;
+        self.title.finish_typing();
     }
 
     pub fn type_title_digit(&mut self, digit: u8) -> ChainId {
-        ChainId::new(typed_value(&mut self.first_digit, digit))
+        ChainId::new(self.title.type_digit(digit))
     }
 
-    pub fn nudged_title(&self, shown: Option<ChainId>, up: bool, coarse: bool) -> ChainId {
-        ChainId::new(nudged_id(shown.map(ChainId::number), up, coarse))
+    pub fn nudged_title(shown: Option<ChainId>, up: bool, coarse: bool) -> ChainId {
+        ChainId::new(TitleNumber::nudged(shown.map(ChainId::number), up, coarse))
     }
 
     pub fn type_digit(&mut self, chain: &mut Chain, digit: u8) {
@@ -134,7 +135,7 @@ impl ChainPane {
     }
 
     pub fn position(&self) -> Option<CellPosition> {
-        (!self.on_title).then_some(CellPosition {
+        (!self.on_title()).then_some(CellPosition {
             column: self.column,
             row: self.entry,
         })
@@ -205,8 +206,7 @@ impl ChainPane {
     ) {
         let ChainView { id, playing_entry } = view;
         let number = id.map(ChainId::number);
-        let on_number = focused && self.on_title;
-        draw_numbered_title(grid, area, "CHAIN", number, focused, on_number);
+        self.title.draw(grid, area, "CHAIN", number, focused);
         grid.put(area.column, area.row + 1, "   PHRASE TRANSP", HEADING);
 
         for index in 0..CHAIN_ENTRIES {
@@ -216,7 +216,7 @@ impl ChainPane {
             let entry = id.and_then(|id| project.chain(id).entry(index));
             for (column, (cell, offset, empty)) in ENTRY_CELLS.iter().enumerate() {
                 let is_cursor =
-                    focused && !self.on_title && index == self.entry && column == self.column;
+                    focused && !self.on_title() && index == self.entry && column == self.column;
                 let (text, style) = match entry {
                     Some(entry) => cell_text(*cell, entry),
                     None => ((*empty).to_owned(), EMPTY),

@@ -32,9 +32,9 @@ const DEFAULT_LENGTH: usize = 16;
 const DEFAULT_SPEED: u8 = 16;
 const DEFAULT_PITCH: u8 = 24;
 pub(crate) const MAX_PITCH: i32 = 63;
-pub(crate) const MAX_INSTRUMENT: i32 = LAST_CUSTOM_INSTRUMENT as i32;
-pub(crate) const MAX_VOLUME: i32 = 7;
-pub(crate) const MAX_EFFECT: i32 = 7;
+const MAX_INSTRUMENT: i32 = LAST_CUSTOM_INSTRUMENT as i32;
+const MAX_VOLUME: i32 = 7;
+const MAX_EFFECT: i32 = 7;
 pub const SEMITONES_PER_OCTAVE: i32 = 12;
 const EFFECT_ARPEGGIO_FAST: u8 = 6;
 const EFFECT_ARPEGGIO_SLOW: u8 = 7;
@@ -113,6 +113,11 @@ impl Step {
 
     pub const fn is_silent(self) -> bool {
         self.volume == 0
+    }
+
+    pub fn transposed_pitch(self, transpose: i8) -> Option<u8> {
+        let pitch = i32::from(self.pitch) + i32::from(transpose);
+        (0..=MAX_PITCH).contains(&pitch).then_some(pitch as u8)
     }
 
     pub const fn plays_arpeggio(self) -> bool {
@@ -299,10 +304,9 @@ impl Phrase {
 
     pub fn step_is_out_of_range(&self, index: usize, transpose: i8) -> bool {
         let step = self.steps[index];
-        let pitch = i32::from(step.pitch) + i32::from(transpose);
         let heard =
             (index < self.length() && !step.is_silent()) || self.steps_read_by_arpeggios()[index];
-        heard && !(0..=MAX_PITCH).contains(&pitch)
+        heard && step.transposed_pitch(transpose).is_none()
     }
 
     pub fn out_of_range_steps(&self, transpose: i8) -> impl Iterator<Item = usize> + '_ {

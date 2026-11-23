@@ -8,7 +8,7 @@ use support::{apply, status_line};
 
 const DOWN: Action = Action::Move(Direction::Down);
 const UP: Action = Action::Move(Direction::Up);
-const TAB: Action = Action::FocusNext;
+const SHIFT_TAB: Action = Action::FocusPrevious;
 
 fn song_cell(app: &App, row: usize, track: usize) -> Option<u8> {
     app.project().song_cell(row, track).map(ChainId::number)
@@ -102,7 +102,7 @@ fn the_last_song_row_falls_off_on_insert_and_comes_back_empty_on_delete() {
 fn insert_opens_an_empty_chain_entry_and_the_last_entry_falls_off() {
     let mut app = App::with_project(full_chain());
 
-    apply(&mut app, &[TAB, DOWN, Action::InsertRow]);
+    apply(&mut app, &[SHIFT_TAB, DOWN, Action::InsertRow]);
 
     assert_eq!(entry_phrase(&app, 0), Some(0));
     assert_eq!(entry_phrase(&app, 1), None);
@@ -114,7 +114,7 @@ fn insert_opens_an_empty_chain_entry_and_the_last_entry_falls_off() {
 fn delete_closes_a_chain_entry_and_an_empty_one_appears_at_the_end() {
     let mut app = App::with_project(full_chain());
 
-    apply(&mut app, &[TAB, DOWN, Action::DeleteRow]);
+    apply(&mut app, &[SHIFT_TAB, DOWN, Action::DeleteRow]);
 
     assert_eq!(entry_phrase(&app, 0), Some(0));
     assert_eq!(entry_phrase(&app, 1), Some(2));
@@ -126,7 +126,7 @@ fn delete_closes_a_chain_entry_and_an_empty_one_appears_at_the_end() {
 fn the_chain_pane_needs_a_chain_to_shift() {
     let mut app = App::new();
 
-    apply(&mut app, &[TAB, Action::InsertRow]);
+    apply(&mut app, &[SHIFT_TAB, Action::InsertRow]);
 
     assert!(status_line(&app).contains("NO CHAIN HERE"));
 }
@@ -135,7 +135,7 @@ fn the_chain_pane_needs_a_chain_to_shift() {
 fn insert_shifts_steps_within_len_and_the_last_step_of_len_falls_off() {
     let mut app = App::with_project(short_phrase());
 
-    apply(&mut app, &[TAB, TAB, DOWN, Action::InsertRow]);
+    apply(&mut app, &[SHIFT_TAB, SHIFT_TAB, DOWN, Action::InsertRow]);
 
     let phrase = app.project().phrase(PhraseId::new(0));
     assert_eq!(pitch(&app, 0), 0);
@@ -150,7 +150,7 @@ fn insert_shifts_steps_within_len_and_the_last_step_of_len_falls_off() {
 fn delete_shifts_steps_within_len_and_an_empty_step_appears_at_the_end_of_len() {
     let mut app = App::with_project(short_phrase());
 
-    apply(&mut app, &[TAB, TAB, DOWN, Action::DeleteRow]);
+    apply(&mut app, &[SHIFT_TAB, SHIFT_TAB, DOWN, Action::DeleteRow]);
 
     let phrase = app.project().phrase(PhraseId::new(0));
     assert_eq!(pitch(&app, 1), 2);
@@ -165,7 +165,7 @@ fn the_phrase_header_has_no_step_to_shift() {
     let mut app = App::with_project(short_phrase());
     let before = app.project().clone();
 
-    apply(&mut app, &[TAB, TAB, UP, Action::InsertRow]);
+    apply(&mut app, &[SHIFT_TAB, SHIFT_TAB, UP, Action::InsertRow]);
 
     assert!(app.project() == &before);
     assert!(status_line(&app).contains("NO STEP HERE"));
@@ -175,7 +175,7 @@ fn the_phrase_header_has_no_step_to_shift() {
 fn the_phrase_pane_needs_a_phrase_to_shift() {
     let mut app = App::new();
 
-    apply(&mut app, &[TAB, TAB, Action::DeleteRow]);
+    apply(&mut app, &[SHIFT_TAB, SHIFT_TAB, Action::DeleteRow]);
 
     assert!(status_line(&app).contains("NO PHRASE HERE"));
 }
@@ -184,8 +184,8 @@ fn the_phrase_pane_needs_a_phrase_to_shift() {
 fn each_insert_or_delete_is_one_undo_step_in_every_pane() {
     let cases = [
         (song_rows(), vec![DOWN]),
-        (full_chain(), vec![TAB, DOWN]),
-        (short_phrase(), vec![TAB, TAB, DOWN]),
+        (full_chain(), vec![SHIFT_TAB, DOWN]),
+        (short_phrase(), vec![SHIFT_TAB, SHIFT_TAB, DOWN]),
     ];
     for (project, moves) in cases {
         for action in [Action::InsertRow, Action::DeleteRow] {
