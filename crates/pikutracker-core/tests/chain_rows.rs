@@ -5,7 +5,7 @@ use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project, Step};
 use support::pane_text;
 
 const FIRST_ENTRY_LINE: usize = 2;
-const FIRST_STEP_LINE: usize = 5;
+const FIRST_STEP_LINE: usize = 7;
 
 fn phrase(project: &mut Project, id: u8, length: i32, speed: i32) -> PhraseId {
     let id = PhraseId::new(id);

@@ -3,7 +3,7 @@ use super::{HEADING, VALUE, draw_row_label, draw_styled_value, draw_title, stepp
 use crate::app::{Action, Direction, KeyContext};
 use crate::project::{
     CustomInstrument, Filters, InstrumentSound, MAX_FILTER_LEVEL, MAX_INSTRUMENT_NAME, MAX_STEPS,
-    Project, SfxInstrument, Step, WAVEFORM_SAMPLES, WaveformInstrument,
+    Project, SEMITONES_PER_OCTAVE, SfxInstrument, Step, WAVEFORM_SAMPLES, WaveformInstrument,
 };
 use crate::screen::grid::Grid;
 
@@ -19,7 +19,6 @@ const VALUE_COLUMN: usize = 5;
 const EMPTY_NAME: char = '.';
 
 const MAX_BUILT_IN_INSTRUMENT: i32 = 7;
-const SEMITONES_PER_OCTAVE: i32 = 12;
 const COARSE_SPEED: i32 = 16;
 const COARSE_LENGTH: i32 = 4;
 const COARSE_SAMPLE: i32 = 16;

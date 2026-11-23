@@ -4,6 +4,7 @@ pub mod cart_import;
 pub mod export;
 pub mod keymap;
 pub mod midi_import;
+pub mod pen;
 pub mod player;
 pub mod project;
 pub mod project_file;

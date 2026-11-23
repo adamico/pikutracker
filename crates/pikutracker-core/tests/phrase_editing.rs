@@ -6,7 +6,8 @@ use pikutracker_core::project::{Phrase, Step};
 use pikutracker_core::screen::palette::Colour;
 use support::pane_text;
 
-const FIRST_STEP_LINE: usize = 5;
+const PEN_OCTAVE_LINE: usize = 4;
+const FIRST_STEP_LINE: usize = 7;
 const UP: Action = Action::Move(Direction::Up);
 const DOWN: Action = Action::Move(Direction::Down);
 const LEFT: Action = Action::Move(Direction::Left);
@@ -112,19 +113,12 @@ fn the_octave_keys_change_the_octave_of_later_notes() {
 }
 
 #[test]
-fn the_phrase_title_shows_the_octave() {
-    let app = phrase_app(&[Action::OctaveUp]);
-
-    assert_eq!(phrase_line(&app, 0), "PHRASE 00   OCT 3");
-}
-
-#[test]
 fn the_octave_stops_at_0_and_4() {
     let app = phrase_app(&[Action::OctaveUp; 9]);
-    assert_eq!(phrase_line(&app, 0), "PHRASE 00   OCT 4");
+    assert_eq!(phrase_line(&app, PEN_OCTAVE_LINE), "OCT 4  INS 2 SAW");
 
     let app = phrase_app(&[Action::OctaveDown; 9]);
-    assert_eq!(phrase_line(&app, 0), "PHRASE 00   OCT 0");
+    assert_eq!(phrase_line(&app, PEN_OCTAVE_LINE), "OCT 0  INS 2 SAW");
 }
 
 #[test]
@@ -369,7 +363,9 @@ fn the_pc_tracker_brackets_change_the_octave_and_modified_arrows_nudge() {
 }
 
 const PITCH_OFFSET: usize = 3;
-const LEN_8: [Action; 10] = [
+const LEN_8: [Action; 14] = [
+    UP,
+    UP,
     UP,
     UP,
     UP,
@@ -377,6 +373,8 @@ const LEN_8: [Action; 10] = [
     Action::HexDigit(0),
     Action::HexDigit(8),
     LEFT,
+    DOWN,
+    DOWN,
     DOWN,
     DOWN,
     DOWN,
@@ -423,7 +421,16 @@ fn lengthening_shows_the_steps_in_the_normal_style_with_no_data_change() {
             &[C],
             &[UP; 11],
             &LEN_8,
-            &[UP, UP, UP, RIGHT, Action::HexDigit(1), Action::HexDigit(0)],
+            &[
+                UP,
+                UP,
+                UP,
+                UP,
+                UP,
+                RIGHT,
+                Action::HexDigit(1),
+                Action::HexDigit(0),
+            ],
         ]
         .concat(),
     );

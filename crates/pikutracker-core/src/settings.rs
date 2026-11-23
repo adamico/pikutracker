@@ -1,5 +1,6 @@
 use crate::keymap::Preset;
 use crate::midi_import::{DrumHit, MidiTable};
+use crate::pen::Pen;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -9,8 +10,6 @@ pub const CONFIG_VERSION: u32 = 1;
 pub const STATE_VERSION: u32 = 1;
 
 pub const MAX_RECENT_PROJECTS: usize = 10;
-pub const DEFAULT_OCTAVE: u8 = 2;
-pub const MAX_OCTAVE: u8 = 4;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Config {
@@ -18,23 +17,12 @@ pub struct Config {
     pub keys: BTreeMap<String, String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct AppState {
     recent_projects: Vec<PathBuf>,
     pub follow: bool,
-    pub octave: u8,
+    pub pen: Pen,
     pub midi_table: MidiTable,
-}
-
-impl Default for AppState {
-    fn default() -> Self {
-        Self {
-            recent_projects: Vec::new(),
-            follow: false,
-            octave: DEFAULT_OCTAVE,
-            midi_table: MidiTable::default(),
-        }
-    }
 }
 
 impl AppState {
@@ -89,6 +77,12 @@ struct StateFile {
     follow: bool,
     #[serde(default = "default_octave")]
     octave: u8,
+    #[serde(default = "default_instrument")]
+    instrument: u8,
+    #[serde(default = "default_volume")]
+    volume: u8,
+    #[serde(default)]
+    effect: u8,
     #[serde(default)]
     midi_programs: BTreeMap<u8, u8>,
     #[serde(default)]
@@ -104,8 +98,16 @@ struct DrumHitFile {
     effect: u8,
 }
 
-const fn default_octave() -> u8 {
-    DEFAULT_OCTAVE
+fn default_octave() -> u8 {
+    Pen::default().octave()
+}
+
+fn default_instrument() -> u8 {
+    Pen::default().instrument()
+}
+
+fn default_volume() -> u8 {
+    Pen::default().volume()
 }
 
 #[derive(Deserialize)]
@@ -140,9 +142,7 @@ pub fn read_state(text: &str) -> SettingsRead<AppState> {
 }
 
 fn state_from(file: StateFile) -> Option<AppState> {
-    if file.octave > MAX_OCTAVE {
-        return None;
-    }
+    let pen = Pen::new(file.octave, file.instrument, file.volume, file.effect)?;
     let mut midi_table = MidiTable::default();
     for (program, instrument) in file.midi_programs {
         midi_table.set_program(program, instrument)?;
@@ -153,7 +153,7 @@ fn state_from(file: StateFile) -> Option<AppState> {
     Some(AppState {
         recent_projects: file.recent_projects,
         follow: file.follow,
-        octave: file.octave,
+        pen,
         midi_table,
     })
 }
@@ -186,7 +186,10 @@ pub fn write_state(state: &AppState) -> String {
     let file = StateFile {
         version: STATE_VERSION,
         follow: state.follow,
-        octave: state.octave,
+        octave: state.pen.octave(),
+        instrument: state.pen.instrument(),
+        volume: state.pen.volume(),
+        effect: state.pen.effect(),
         midi_programs,
         drum_kit,
         recent_projects: state.recent_projects.clone(),

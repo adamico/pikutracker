@@ -236,11 +236,11 @@ fn the_phrase_pane_follows_the_chain_cursor() {
     apply(&mut app, &id(9));
 
     assert_eq!(app.phrase_under_cursor(), Some(PhraseId::new(9)));
-    assert_eq!(phrase_text(&app, 0), "PHRASE 09   OCT 2");
+    assert_eq!(phrase_text(&app, 0), "PHRASE 09");
 
     app.apply(UP);
     assert_eq!(app.phrase_under_cursor(), Some(PhraseId::new(7)));
-    assert_eq!(phrase_text(&app, 0), "PHRASE 07   OCT 2");
+    assert_eq!(phrase_text(&app, 0), "PHRASE 07");
 }
 
 #[test]
@@ -249,10 +249,10 @@ fn the_phrase_pane_follows_the_song_cursor_through_the_chain() {
     apply(&mut app, &id(7));
     app.apply(BACK);
     apply(&mut app, &[DOWN]);
-    assert_eq!(phrase_text(&app, 0), "PHRASE --   OCT 2");
+    assert_eq!(phrase_text(&app, 0), "PHRASE --");
 
     app.apply(UP);
-    assert_eq!(phrase_text(&app, 0), "PHRASE 07   OCT 2");
+    assert_eq!(phrase_text(&app, 0), "PHRASE 07");
 }
 
 #[test]
@@ -274,7 +274,7 @@ fn two_entries_sharing_a_phrase_show_the_same_notes() {
     apply(&mut app, &id(7));
     apply(&mut app, &[TAB, Action::PianoKey(0), BACK, UP]);
 
-    assert_eq!(phrase_text(&app, 5), "00 C-2  2    5   0");
+    assert_eq!(phrase_text(&app, 7), "00 C-2  2    5   0");
 }
 
 #[test]
@@ -290,16 +290,21 @@ fn the_phrase_cursor_keeps_its_step_past_the_length_of_a_shorter_phrase_it_follo
             UP,
             UP,
             UP,
+            UP,
+            UP,
             RIGHT,
             Action::HexDigit(0),
             Action::HexDigit(2),
         ],
     );
-    apply(&mut app, &[LEFT, DOWN, DOWN, DOWN, BACK, UP, TAB]);
+    apply(
+        &mut app,
+        &[LEFT, DOWN, DOWN, DOWN, DOWN, DOWN, BACK, UP, TAB],
+    );
     apply(&mut app, &[DOWN; 15]);
     apply(&mut app, &[BACK, DOWN, TAB]);
 
-    assert_eq!(phrase_text(&app, 20), "0F[...] .    .   .");
+    assert_eq!(phrase_text(&app, 22), "0F[...] .    .   .");
 }
 
 #[test]

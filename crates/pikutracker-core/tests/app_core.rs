@@ -105,10 +105,10 @@ fn tab_cycles_focus_through_song_chain_phrase_and_the_right_hand_view() {
 
     let app = app_after(&[Action::FocusNext; 2]);
     assert_eq!(chain_text(&app, 2), "00 --     ---");
-    assert_eq!(phrase_text(&app, 5), "00[...] .    .   .");
+    assert_eq!(phrase_text(&app, 7), "00[...] .    .   .");
 
     let app = app_after(&[Action::FocusNext; 3]);
-    assert_eq!(phrase_text(&app, 5), "00 ...  .    .   .");
+    assert_eq!(phrase_text(&app, 7), "00 ...  .    .   .");
     assert_eq!(song_text(&app, 2), "00  -- -- -- --");
 
     let app = app_after(&[Action::FocusNext; 4]);
@@ -121,7 +121,7 @@ fn focus_previous_goes_back_from_the_song_pane_to_the_right_hand_view() {
 
     assert_eq!(song_text(&app, 2), "00  -- -- -- --");
     assert_eq!(chain_text(&app, 2), "00 --     ---");
-    assert_eq!(phrase_text(&app, 5), "00 ...  .    .   .");
+    assert_eq!(phrase_text(&app, 7), "00 ...  .    .   .");
     assert_eq!(right_slot_text(&app, 0), "");
 }
 
@@ -145,7 +145,7 @@ fn arrows_move_the_cursor_inside_the_focused_pane_only() {
         Action::Move(Direction::Right),
     ]);
 
-    assert_eq!(phrase_text(&app, 6), "01 ...  .    .  [.]");
+    assert_eq!(phrase_text(&app, 8), "01 ...  .    .  [.]");
 }
 
 #[test]
@@ -168,7 +168,7 @@ fn the_cursor_stops_at_the_edges_of_every_pane() {
         ]
         .concat(),
     );
-    assert_eq!(phrase_text(&app, 36), "1F ...  .    .  [.]");
+    assert_eq!(phrase_text(&app, 38), "1F ...  .    .  [.]");
 }
 
 #[test]

@@ -638,7 +638,7 @@ impl App {
                     self.instrument_view = Some(InstrumentView::new(id));
                 }
             }
-            _ => view.apply(action, &mut self.project, self.phrase.octave()),
+            _ => view.apply(action, &mut self.project, self.phrase.pen().octave()),
         }
     }
 
@@ -646,6 +646,7 @@ impl App {
         match self.focus {
             Focus::Song => self.song.type_digit(&mut self.project, digit),
             Focus::Chain => self.edit_chain(|pane, chain| pane.type_digit(chain, digit)),
+            Focus::Phrase if self.phrase.is_on_the_pen() => self.phrase.type_pen_digit(digit),
             Focus::Phrase => self.edit_phrase(|pane, phrase| pane.type_digit(phrase, digit)),
             Focus::RightSlot => {}
         }
@@ -659,6 +660,7 @@ impl App {
         match self.focus {
             Focus::Song => self.song.nudge(&mut self.project, up, coarse),
             Focus::Chain => self.edit_chain(|pane, chain| pane.nudge(chain, up, coarse)),
+            Focus::Phrase if self.phrase.is_on_the_pen() => self.phrase.nudge_pen(up),
             Focus::Phrase if up && self.goes_past_the_last_instrument() => {
                 self.remark = Some(CUSTOM_INSTRUMENTS_END_AT_F);
             }
@@ -884,6 +886,10 @@ impl App {
                     .playhead
                     .zip(phrase)
                     .and_then(|(playhead, phrase)| playhead.step_in(phrase, self.song.track())),
+                pen_instrument_name: panes::instrument_name(
+                    &self.project,
+                    self.phrase.pen().instrument(),
+                ),
             },
         );
         self.draw_selection(&mut grid);

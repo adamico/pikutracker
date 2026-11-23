@@ -2,12 +2,15 @@ mod midi_support;
 mod support;
 
 use midi_support::{Song, TICKS_PER_STEP};
-use pikutracker_core::app::{Action, App, FileRequest, FileResponse, Launch, SettingsContents};
+use pikutracker_core::app::{
+    Action, App, Direction, FileRequest, FileResponse, Launch, SettingsContents, layout,
+};
 use pikutracker_core::keymap::{Key, KeyPress, Modifiers};
-use pikutracker_core::settings::{AppState, SettingsRead, read_state};
+use pikutracker_core::pen::Pen;
+use pikutracker_core::settings::{AppState, SettingsRead, read_state, write_state};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use support::status_line;
+use support::{pane_text, status_line};
 
 const CONFIG_FILE: &str = "/config/pikutracker/config.ron";
 const STATE_FILE: &str = "/state/pikutracker/state.ron";
@@ -250,7 +253,7 @@ fn follow_and_the_octave_are_remembered_and_config_ron_is_never_written() {
     let octave = state_written(&app.take_file_requests()).expect("the octave is saved");
 
     assert!(follow.follow);
-    assert_eq!((octave.follow, octave.octave), (true, 3));
+    assert_eq!((octave.follow, octave.pen.octave()), (true, 3));
     let mut next = launch(
         Some(M8_STYLE),
         Some(&pikutracker_core::settings::write_state(&octave)),
@@ -261,6 +264,30 @@ fn follow_and_the_octave_are_remembered_and_config_ron_is_never_written() {
         "Follow was on"
     );
     never_writes_config(&next.take_file_requests());
+}
+
+#[test]
+fn the_whole_pen_is_remembered_and_restored_on_launch() {
+    let mut app = launch(None, None);
+    for action in [
+        Action::FocusNext,
+        Action::FocusNext,
+        Action::Move(Direction::Up),
+        Action::HexDigit(7),
+        Action::Move(Direction::Right),
+        Action::HexDigit(3),
+        Action::Move(Direction::Up),
+    ] {
+        app.apply(action);
+    }
+    app.take_file_requests();
+    app.apply(Action::HexDigit(9));
+    let state = state_written(&app.take_file_requests()).expect("the Pen is saved");
+
+    assert_eq!(state.pen, Pen::new(2, 9, 7, 3).unwrap());
+    let next = launch(None, Some(&write_state(&state)));
+    assert_eq!(pane_text(&next, layout::PHRASE, 4), "OCT 2  INS 9");
+    assert_eq!(pane_text(&next, layout::PHRASE, 5), "VOL 7  FX  3 DROP");
 }
 
 #[test]
@@ -288,6 +315,9 @@ fn actions_that_change_nothing_remembered_write_nothing() {
 fn a_state_file_with_a_value_out_of_range_is_damaged() {
     for damaged in [
         "(version: 1, octave: 9)",
+        "(version: 1, instrument: 16)",
+        "(version: 1, volume: 8)",
+        "(version: 1, effect: 8)",
         "(version: 1, midi_programs: {0: 8})",
         "(version: 1, midi_programs: {128: 0})",
         "(version: 1, drum_kit: {5: (instrument: 0, note: 0, effect: 0)})",

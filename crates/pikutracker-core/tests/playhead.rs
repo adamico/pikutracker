@@ -18,7 +18,7 @@ const STEP_SAMPLES: usize = SPEED as usize * SAMPLES_PER_TICK as usize;
 
 const FIRST_SONG_ROW: usize = 2;
 const FIRST_CHAIN_ROW: usize = 2;
-const FIRST_STEP_ROW: usize = 5;
+const FIRST_STEP_ROW: usize = 7;
 
 fn write(project: &mut Project, id: u8, steps: usize) -> PhraseId {
     let id = PhraseId::new(id);
