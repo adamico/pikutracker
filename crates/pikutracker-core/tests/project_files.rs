@@ -134,7 +134,7 @@ fn saving_a_new_project_asks_for_a_name_on_the_file_list() {
     });
     assert_eq!(status_line(&app), "SAVED DEMO.PTRK");
     assert!(!app.has_unsaved_changes());
-    assert_eq!(right_slot(&app, 0), "");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
 }
 
 #[test]
@@ -396,7 +396,7 @@ fn opening_a_file_replaces_the_project_and_says_so() {
     );
     assert_eq!(status_line(&app), "OPENED SONG.PTRK");
     assert!(!app.has_unsaved_changes());
-    assert_eq!(right_slot(&app, 0), "");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
 
     place_chain_01_on_the_first_song_row(&mut app);
     app.apply(Action::Save);

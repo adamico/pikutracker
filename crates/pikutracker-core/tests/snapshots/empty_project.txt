@@ -1,5 +1,5 @@
-PHRASE --   OCT 2             │CHAIN --           │
-SPD 10  LOOP 10 00  BPM 113   │   PHRASE TRANSP   │
+PHRASE --   OCT 2             │CHAIN --           │MULTITRACK  ROW 00
+SPD 10  LOOP 10 00  BPM 113   │   PHRASE TRANSP   │    TRACK 1     TRACK 2     TRACK 3     TRACK 4
 NOIZ 0  BUZZ 0                │00 --     ---      │
 DETUNE 0  REVERB 0  DAMPEN 0  │01 --     ---      │
    NOTE INST VOL FX           │02 --     ---      │

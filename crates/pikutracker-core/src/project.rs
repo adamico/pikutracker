@@ -236,6 +236,14 @@ impl Phrase {
         self.phrase_loop().is_some()
     }
 
+    pub fn step_after(&self, step: usize) -> Option<usize> {
+        if step + 1 < self.length() {
+            Some(step + 1)
+        } else {
+            self.phrase_loop().map(|steps| steps.start)
+        }
+    }
+
     pub const fn loop_start(&self) -> u8 {
         self.loop_start
     }

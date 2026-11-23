@@ -101,6 +101,7 @@ pub struct Playhead {
     pub chain_row: Option<(usize, usize)>,
     pub tracks: [Option<(PhraseId, usize)>; TRACKS],
     pub waiting: [bool; TRACKS],
+    pub chain_row_tick: u32,
 }
 
 impl Playhead {
@@ -164,19 +165,15 @@ impl Lane {
         };
         let phrase = project.phrase(entry.phrase());
         self.loops = phrase.loops();
-        let repeat_from = phrase
-            .phrase_loop()
-            .map(|steps| steps.start)
-            .or(repeats.then_some(0));
-        if self.step + 1 < phrase.length() {
-            self.step += 1;
-        } else if let Some(start) = repeat_from {
-            self.step = start;
-            self.played_through = true;
-        } else {
+        let Some(next) = phrase
+            .step_after(self.step)
+            .or_else(|| repeats.then_some(0))
+        else {
             self.state = LaneState::Finished;
             return;
-        }
+        };
+        self.played_through |= next <= self.step;
+        self.step = next;
         self.samples_left = step_samples(phrase);
     }
 }
@@ -193,6 +190,8 @@ struct Playback {
     k: usize,
     lanes: [Lane; TRACKS],
     waiting_for_edit: bool,
+    samples_into_chain_row: u64,
+    chain_row_tick: u32,
 }
 
 impl Playback {
@@ -262,6 +261,7 @@ impl Playback {
             chain_row,
             tracks,
             waiting,
+            chain_row_tick: self.chain_row_tick,
         }
     }
 
@@ -469,11 +469,15 @@ impl Player {
             k,
             lanes: [Lane::default(); TRACKS],
             waiting_for_edit: false,
+            samples_into_chain_row: 0,
+            chain_row_tick: 0,
         };
         self.enter_chain_row(playback, from_step);
     }
 
     fn enter_chain_row(&mut self, mut playback: Playback, from_step: usize) {
+        playback.samples_into_chain_row = 0;
+        playback.chain_row_tick = 0;
         for (track, voice) in self.voices.iter_mut().enumerate() {
             let lane = Lane::starting(playback.entry(track), &playback.project, from_step);
             playback.lanes[track] = lane;
@@ -522,10 +526,13 @@ impl Player {
             if playback.chain_row_is_over() {
                 self.leave_chain_row();
             } else {
+                playback.chain_row_tick =
+                    (playback.samples_into_chain_row / u64::from(SAMPLES_PER_TICK)) as u32;
                 self.start_next_steps(moved);
             }
         }
         if let Some(playback) = self.playback.as_mut() {
+            playback.samples_into_chain_row += 1;
             for lane in &mut playback.lanes {
                 if lane.state == LaneState::Playing {
                     lane.samples_left -= 1;

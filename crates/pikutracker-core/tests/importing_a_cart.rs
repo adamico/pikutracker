@@ -107,7 +107,7 @@ fn selecting_a_p8_cart_opens_it_as_a_new_project() {
     assert!(project.chain_row_entry(1, 1, 0).is_some());
     assert_eq!(project.target_cart().unwrap().path, "demo.p8");
     assert_eq!(status_line(&app), "IMPORTED DEMO.P8");
-    assert_eq!(right_slot(&app, 0), "");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
 }
 
 #[test]
@@ -181,7 +181,7 @@ fn leaving_the_file_list_changes_nothing() {
     answer_listing(&mut app, vec![file("demo.p8")]);
     app.apply(Action::Cancel);
 
-    assert_eq!(right_slot(&app, 0), "");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
     assert_eq!(app.project(), &edited);
 }
 
@@ -264,7 +264,7 @@ fn a_damaged_cart_is_refused_and_the_project_stays() {
         "! CANNOT IMPORT DEMO.P8: NOT A PICO-8 CART"
     );
     assert_eq!(app.project(), &edited);
-    assert_eq!(right_slot(&app, 0), "");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
 }
 
 #[test]
