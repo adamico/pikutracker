@@ -1,6 +1,7 @@
 use super::{
-    DIMMED, EMPTY, HEADING, LOOP_MARK, SELECTED, VALUE, draw_out_of_range_flag, draw_row_label,
-    draw_styled_value, draw_title, id_text, stepped,
+    DIMMED, EMPTY, HEADING, LOOP_MARK, SELECTED, TITLE_NUMBER_WIDTH, VALUE, draw_numbered_title,
+    draw_out_of_range_flag, draw_row_label, draw_styled_value, nudged_id, stepped, title_style,
+    typed_value,
 };
 use crate::app::layout::Area;
 use crate::app::selection::{CellPosition, CellRange};
@@ -12,6 +13,7 @@ use crate::screen::grid::Grid;
 use crate::settings::{DEFAULT_OCTAVE, MAX_OCTAVE};
 use std::ops::RangeInclusive;
 
+const TITLE_NAME: &str = "PHRASE";
 const FIRST_HEADER_ROW: usize = 1;
 const STEP_HEADING_ROW: usize = FIRST_HEADER_ROW + HEADER_CELLS.len();
 const FIRST_STEP_ROW: usize = STEP_HEADING_ROW + 1;
@@ -85,6 +87,7 @@ pub struct PhrasePane {
     step: usize,
     column: usize,
     header_row: Option<usize>,
+    on_title: bool,
     octave: u8,
     instrument: u8,
     volume: u8,
@@ -97,6 +100,7 @@ impl Default for PhrasePane {
             step: 0,
             column: 0,
             header_row: None,
+            on_title: false,
             octave: DEFAULT_OCTAVE,
             instrument: 2,
             volume: 5,
@@ -110,6 +114,7 @@ pub struct PhraseCursorPlace {
     step: usize,
     column: usize,
     header_row: Option<usize>,
+    on_title: bool,
 }
 
 impl PhrasePane {
@@ -118,6 +123,7 @@ impl PhrasePane {
             step: self.step,
             column: self.column,
             header_row: self.header_row,
+            on_title: self.on_title,
         }
     }
 
@@ -125,6 +131,11 @@ impl PhrasePane {
         self.step = place.step;
         self.column = place.column;
         self.header_row = place.header_row;
+        self.on_title = place.on_title;
+    }
+
+    pub fn on_title(&self) -> bool {
+        self.on_title
     }
 
     pub fn step(&self) -> usize {
@@ -142,12 +153,14 @@ impl PhrasePane {
     pub fn jump_to(&mut self, step: usize) {
         self.step = step.min(MAX_STEPS - 1);
         self.header_row = None;
+        self.on_title = false;
     }
 
     pub fn return_to_top(&mut self) {
         self.step = 0;
         self.column = 0;
         self.header_row = None;
+        self.on_title = false;
     }
 
     pub fn key_context(&self) -> KeyContext {
@@ -160,6 +173,10 @@ impl PhrasePane {
 
     pub fn move_cursor(&mut self, direction: Direction) {
         let (columns, rows) = direction.column_and_row_delta();
+        if self.on_title {
+            self.on_title = rows <= 0;
+            return;
+        }
         match self.header_row {
             Some(row) => self.move_in_header(row, columns, rows),
             None if rows < 0 && self.step == 0 => self.enter_header(),
@@ -171,6 +188,10 @@ impl PhrasePane {
     }
 
     fn move_in_header(&mut self, row: usize, columns: isize, rows: isize) {
+        if rows < 0 && row == 0 {
+            self.on_title = true;
+            return;
+        }
         if rows > 0 && row + 1 == HEADER_CELLS.len() {
             self.header_row = None;
             return;
@@ -187,6 +208,9 @@ impl PhrasePane {
     }
 
     fn step_cell(&self) -> Option<StepCell> {
+        if self.on_title {
+            return None;
+        }
         match self.header_row {
             Some(_) => None,
             None => Some(STEP_CELLS[self.column].0),
@@ -194,7 +218,7 @@ impl PhrasePane {
     }
 
     fn header_cell(&self) -> Option<HeaderCell> {
-        let row = self.header_row?;
+        let row = self.header_row.filter(|_| !self.on_title)?;
         Some(HEADER_CELLS[row][self.column].0)
     }
 
@@ -240,6 +264,14 @@ impl PhrasePane {
 
     pub fn finish_typing(&mut self) {
         self.first_digit = None;
+    }
+
+    pub fn type_title_digit(&mut self, digit: u8) -> PhraseId {
+        PhraseId::new(typed_value(&mut self.first_digit, digit))
+    }
+
+    pub fn nudged_title(&self, shown: Option<PhraseId>, up: bool, coarse: bool) -> PhraseId {
+        PhraseId::new(nudged_id(shown.map(PhraseId::number), up, coarse))
     }
 
     pub fn type_digit(&mut self, phrase: &mut Phrase, digit: u8) {
@@ -323,7 +355,7 @@ impl PhrasePane {
     }
 
     pub fn cell(&self) -> Option<CellPosition> {
-        self.header_row.is_none().then_some(CellPosition {
+        self.step_cell().is_some().then_some(CellPosition {
             column: self.column,
             row: self.step,
         })
@@ -396,9 +428,12 @@ impl PhrasePane {
             transpose,
             playing_step,
         } = view;
-        let number = id_text(id.map(PhraseId::number));
-        let title = format!("PHRASE {number}   OCT {}", self.octave);
-        draw_title(grid, area.column, area.row, &title, focused);
+        let number = id.map(PhraseId::number);
+        let on_number = focused && self.on_title;
+        draw_numbered_title(grid, area, TITLE_NAME, number, focused, on_number);
+        let octave = format!("  OCT {}", self.octave);
+        let octave_column = area.column + TITLE_NAME.len() + 1 + TITLE_NUMBER_WIDTH + 1;
+        grid.put(octave_column, area.row, &octave, title_style(focused));
         self.draw_header(grid, area, focused, phrase);
         grid.put(
             area.column,
@@ -420,7 +455,7 @@ impl PhrasePane {
             if loop_start == Some(index) {
                 grid.put(area.column + LOOP_MARK_COLUMN, row, "<", LOOP_MARK);
             }
-            let on_this_step = focused && self.header_row.is_none() && index == self.step;
+            let on_this_step = focused && self.step_cell().is_some() && index == self.step;
             let texts = step_texts(phrase.step(index));
             for (cell, ((_, offset, _), text)) in STEP_CELLS.iter().zip(&texts).enumerate() {
                 let is_cursor = on_this_step && cell == self.column;
@@ -463,7 +498,10 @@ impl PhrasePane {
                     HeaderCell::Reverb => filters.reverb().to_string(),
                     HeaderCell::Dampen => filters.dampen().to_string(),
                 };
-                let is_cursor = focused && self.header_row == Some(row) && self.column == column;
+                let is_cursor = focused
+                    && self.header_cell().is_some()
+                    && self.header_row == Some(row)
+                    && self.column == column;
                 let screen_row = area.row + FIRST_HEADER_ROW + row;
                 draw_styled_value(
                     grid,

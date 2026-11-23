@@ -31,7 +31,7 @@ fn phrase_app(actions: &[Action]) -> App {
 }
 
 fn phrase(app: &App) -> &Phrase {
-    app.project().phrase(app.phrase_under_cursor().unwrap())
+    app.project().phrase(app.shown_phrase().unwrap())
 }
 
 fn step(app: &App, index: usize) -> Step {

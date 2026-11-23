@@ -15,6 +15,7 @@ mod panes;
 mod paths;
 mod restructure;
 mod selection;
+mod shown;
 mod status_line;
 
 pub use action::{Action, Direction, KeyContext};
@@ -29,7 +30,8 @@ use crate::multitrack::Timeline;
 use crate::player::{AudioRequest, PlaybackReport, Playhead, TrackMix};
 use crate::project::{CHAIN_ENTRIES, FIRST_CUSTOM_INSTRUMENT, LAST_CUSTOM_INSTRUMENT, SONG_ROWS};
 use crate::project::{
-    Chain, ChainEntry, ChainId, Phrase, PhraseId, Project, SongRowEnding, SongRowMarks, Step,
+    Chain, ChainEntry, ChainId, Phrase, PhraseId, Project, SongPlace, SongRowEnding, SongRowMarks,
+    Step,
 };
 use crate::screen::grid::Grid;
 use crate::settings::AppState;
@@ -49,6 +51,7 @@ use panes::multitrack::{MultitrackPane, MultitrackView};
 use panes::phrase::{PhrasePane, PhraseView};
 use panes::song::SongPane;
 use selection::CellPosition;
+use shown::Shown;
 use status_line::StatusLine;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -87,6 +90,7 @@ pub struct App {
     chain: ChainPane,
     phrase: PhrasePane,
     multitrack: MultitrackPane,
+    shown: Shown,
     played_pane: Focus,
     playing: bool,
     latest_play: u64,
@@ -124,7 +128,7 @@ impl App {
     }
 
     pub fn with_project(project: Project) -> Self {
-        Self {
+        let mut app = Self {
             saved_project: project.clone(),
             heard_project: Arc::new(project.clone()),
             track_mix: TrackMix::default(),
@@ -148,6 +152,7 @@ impl App {
             chain: ChainPane::default(),
             phrase: PhrasePane::default(),
             multitrack: MultitrackPane::default(),
+            shown: Shown::default(),
             played_pane: Focus::default(),
             playing: false,
             latest_play: 0,
@@ -166,29 +171,50 @@ impl App {
             waiting: None,
             file_requests: Vec::new(),
             audio_requests: Vec::new(),
-        }
+        };
+        app.show_what_the_cursors_point_at();
+        app
     }
 
     pub fn project(&self) -> &Project {
         &self.project
     }
 
-    pub fn chain_under_cursor(&self) -> Option<ChainId> {
-        self.project.song_cell(self.song.row(), self.song.track())
+    pub fn shown_chain(&self) -> Option<ChainId> {
+        self.shown.chain()
     }
 
-    pub fn phrase_under_cursor(&self) -> Option<PhraseId> {
-        self.entry_under_cursor().map(ChainEntry::phrase)
+    pub fn shown_phrase(&self) -> Option<PhraseId> {
+        self.shown.phrase()
     }
 
-    fn entry_under_cursor(&self) -> Option<ChainEntry> {
-        let chain = self.chain_under_cursor()?;
+    fn entry_under_chain_cursor(&self) -> Option<ChainEntry> {
+        let chain = self.shown_chain()?;
         self.project.chain(chain).entry(self.chain.entry())
     }
 
-    fn shown_phrase(&self) -> Phrase {
-        self.phrase_under_cursor()
+    fn shown_transpose(&self) -> i8 {
+        self.entry_under_chain_cursor()
+            .filter(|entry| Some(entry.phrase()) == self.shown_phrase())
+            .map_or(0, ChainEntry::transpose)
+    }
+
+    fn phrase_on_show(&self) -> Phrase {
+        self.shown_phrase()
             .map_or_else(Phrase::default, |id| *self.project.phrase(id))
+    }
+
+    fn show_song_place(&mut self, place: SongPlace) {
+        self.song.jump_to(place.song_row, place.track);
+        self.chain.jump_to(place.chain_row);
+        self.phrase.jump_to(place.step);
+        self.show_what_the_cursors_point_at();
+    }
+
+    fn show_what_the_cursors_point_at(&mut self) {
+        let song_cursor = (self.song.row(), self.song.track());
+        self.shown
+            .follow_cursors(&self.project, song_cursor, self.chain.entry());
     }
 
     pub fn key_context(&self) -> KeyContext {
@@ -272,11 +298,11 @@ impl App {
             return None;
         }
         let index = self.phrase.note_step()?;
-        Some((index, self.shown_phrase().step(index)))
+        Some((index, self.phrase_on_show().step(index)))
     }
 
     fn preview_edit(&mut self, action: Action, index: usize, before: Step) {
-        let phrase = self.shown_phrase();
+        let phrase = self.phrase_on_show();
         let step = phrase.step(index);
         let changed = step.pitch() != before.pitch() || step.instrument() != before.instrument();
         let entered = matches!(action, Action::PianoKey(_));
@@ -289,7 +315,7 @@ impl App {
             project,
             phrase,
             step: index,
-            transpose: self.entry_under_cursor().map_or(0, ChainEntry::transpose),
+            transpose: self.shown_transpose(),
         });
     }
 
@@ -301,8 +327,13 @@ impl App {
             self.song.follow(row);
             self.chain.follow(k);
         }
+        if let Some((chain, k)) = playhead.chain_alone {
+            self.shown.open_chain(chain);
+            self.chain.follow(k);
+        }
+        self.show_what_the_cursors_point_at();
         let step = self
-            .phrase_under_cursor()
+            .shown_phrase()
             .and_then(|phrase| playhead.step_in(phrase, self.song.track()));
         if let Some(step) = step {
             self.phrase.follow(step);
@@ -359,6 +390,7 @@ impl App {
         };
         self.history.begin(&self.project, self.cursor_place());
         self.perform(action);
+        self.show_what_the_cursors_point_at();
         self.history
             .finish(&self.project, self.cursor_place(), merge);
         self.save_changed_state();
@@ -370,6 +402,7 @@ impl App {
             song: self.song.cursor_place(),
             chain: self.chain.cursor_place(),
             phrase: self.phrase.cursor_place(),
+            shown: self.shown,
         }
     }
 
@@ -380,6 +413,7 @@ impl App {
         self.song.return_to(place.song);
         self.chain.return_to(place.chain);
         self.phrase.return_to(place.phrase);
+        self.shown = place.shown;
     }
 
     fn undo(&mut self) {
@@ -440,6 +474,9 @@ impl App {
         }
         if self.cart_view_has_focus() && self.use_cart_view(action) {
             self.settle_after_edit();
+            return;
+        }
+        if self.title_has_cursor() && self.use_title(action) {
             return;
         }
         let before_edit = self.step_before_edit(action);
@@ -570,8 +607,8 @@ impl App {
     }
 
     fn confirm(&mut self) {
-        if self.focus == Focus::Phrase && self.phrase_under_cursor().is_some() {
-            let shown = self.shown_phrase();
+        if self.focus == Focus::Phrase && self.shown_phrase().is_some() {
+            let shown = self.phrase_on_show();
             if let Some(instrument) = self.phrase.instrument_under_cursor(&shown) {
                 self.open_instrument_view(instrument);
             }
@@ -582,9 +619,7 @@ impl App {
         }
         if let Some(location) = self.log.picked_location() {
             self.stop_following();
-            self.song.jump_to(location.song_row, location.track);
-            self.chain.jump_to(location.chain_row);
-            self.phrase.jump_to(location.step);
+            self.show_song_place(location);
             self.set_focus(Focus::Phrase);
         }
     }
@@ -650,6 +685,52 @@ impl App {
         }
     }
 
+    fn title_has_cursor(&self) -> bool {
+        match self.focus {
+            Focus::Chain => self.chain.on_title(),
+            Focus::Phrase => self.phrase.on_title(),
+            Focus::Song | Focus::RightSlot => false,
+        }
+    }
+
+    fn use_title(&mut self, action: Action) -> bool {
+        match (self.focus, action) {
+            (Focus::Chain, Action::HexDigit(digit)) => {
+                self.shown.open_chain(self.chain.type_title_digit(digit));
+            }
+            (Focus::Chain, Action::Nudge { up, coarse }) => {
+                let chain = self.chain.nudged_title(self.shown_chain(), up, coarse);
+                self.shown.open_chain(chain);
+            }
+            (Focus::Phrase, Action::HexDigit(digit)) => {
+                self.shown.open_phrase(self.phrase.type_title_digit(digit));
+            }
+            (Focus::Phrase, Action::Nudge { up, coarse }) => {
+                let phrase = self.phrase.nudged_title(self.shown_phrase(), up, coarse);
+                self.shown.open_phrase(phrase);
+            }
+            (
+                _,
+                Action::Clear
+                | Action::Copy
+                | Action::Cut
+                | Action::Paste
+                | Action::Clone
+                | Action::DeepClone
+                | Action::NewUnused
+                | Action::InsertRow
+                | Action::DeleteRow
+                | Action::MoveRows { .. }
+                | Action::StartSelection
+                | Action::Select(_)
+                | Action::SelectJump(_)
+                | Action::PianoKey(_),
+            ) => {}
+            _ => return false,
+        }
+        true
+    }
+
     fn type_digit(&mut self, digit: u8) {
         match self.focus {
             Focus::Song => self.song.type_digit(&mut self.project, digit),
@@ -676,18 +757,18 @@ impl App {
     }
 
     fn goes_past_the_last_instrument(&self) -> bool {
-        self.phrase_under_cursor().is_some_and(|id| {
+        self.shown_phrase().is_some_and(|id| {
             self.phrase
                 .is_on_the_last_instrument(self.project.phrase(id))
         })
     }
 
     fn edit_chain(&mut self, edit: impl FnOnce(&mut ChainPane, &mut Chain)) {
-        let Some(id) = self.chain_under_cursor() else {
+        let Some(id) = self.shown_chain() else {
             self.remark = Some(NO_CHAIN_HERE);
             return;
         };
-        if self.entry_under_cursor().is_none() && !self.chain.edits_empty_entries() {
+        if self.entry_under_chain_cursor().is_none() && !self.chain.edits_empty_entries() {
             self.remark = Some(NO_PHRASE_HERE);
             return;
         }
@@ -695,7 +776,7 @@ impl App {
     }
 
     fn edit_phrase(&mut self, edit: impl FnOnce(&mut PhrasePane, &mut Phrase)) {
-        match self.phrase_under_cursor() {
+        match self.shown_phrase() {
             Some(id) => edit(&mut self.phrase, self.project.phrase_mut(id)),
             None => self.remark = Some(NO_PHRASE_HERE),
         }
@@ -743,21 +824,31 @@ impl App {
     }
 
     fn play_chain(&mut self) {
-        if !self.chain_under_cursor_sounds() {
+        let Some(chain) = self.shown_chain().filter(|_| self.shown_chain_sounds()) else {
             self.remark = Some(NOTHING_TO_PLAY);
             return;
-        }
+        };
+        let in_song_row = self.chain_in_song_row_shown();
         let project = self.project_for_player();
-        self.start_playing(AudioRequest::PlayChain {
-            project,
-            song_row: self.song.row(),
-            track: self.song.track(),
-            from_entry: self.chain.entry(),
+        let from_entry = self.chain.entry();
+        self.start_playing(if in_song_row {
+            AudioRequest::PlayChain {
+                project,
+                song_row: self.song.row(),
+                track: self.song.track(),
+                from_entry,
+            }
+        } else {
+            AudioRequest::PlayChainAlone {
+                project,
+                chain,
+                from_entry,
+            }
         });
     }
 
-    fn chain_under_cursor_sounds(&self) -> bool {
-        self.chain_under_cursor().is_some_and(|id| {
+    fn shown_chain_sounds(&self) -> bool {
+        self.shown_chain().is_some_and(|id| {
             let chain = self.project.chain(id);
             (0..CHAIN_ENTRIES)
                 .filter_map(|index| chain.entry(index))
@@ -767,7 +858,7 @@ impl App {
 
     fn play_phrase(&mut self) {
         let Some(phrase) = self
-            .phrase_under_cursor()
+            .shown_phrase()
             .filter(|id| !self.project.phrase(*id).is_silent())
         else {
             self.remark = Some(NOTHING_TO_PLAY);
@@ -777,7 +868,7 @@ impl App {
         self.start_playing(AudioRequest::PlayPhrase {
             project,
             phrase,
-            transpose: self.entry_under_cursor().map_or(0, ChainEntry::transpose),
+            transpose: self.shown_transpose(),
             from_step: self.phrase.step(),
         });
     }
@@ -805,7 +896,7 @@ impl App {
                 }
             }
             (_, _) => {
-                let Some(chain) = self.chain_under_cursor() else {
+                let Some(chain) = self.shown_chain() else {
                     return;
                 };
                 let chain = self.project.chain(chain);
@@ -842,6 +933,22 @@ impl App {
         self.file_list.is_none() && !self.log_open && self.cart_view.is_none()
     }
 
+    fn playing_entry_of_shown_chain(&self) -> Option<usize> {
+        let playhead = self.playhead?;
+        let shown = self.shown_chain()?;
+        if let Some((chain, k)) = playhead.chain_alone {
+            return (chain == shown).then_some(k);
+        }
+        let (row, k) = playhead.chain_row?;
+        let in_song_row = row == self.song.row() && self.chain_in_song_row_shown();
+        in_song_row.then_some(k)
+    }
+
+    fn chain_in_song_row_shown(&self) -> bool {
+        self.shown_chain().is_some()
+            && self.shown_chain() == self.project.song_cell(self.song.row(), self.song.track())
+    }
+
     fn selection_would_reach_phrase_header(&self, direction: Direction) -> bool {
         self.selection_start.is_some() && direction == Direction::Up && self.phrase.step() == 0
     }
@@ -863,7 +970,6 @@ impl App {
             status_line::draw(&mut grid, &self.status_line(&project));
             return grid;
         }
-        let chain_row = self.playhead.and_then(|playhead| playhead.chain_row);
         let takes_keys = self.file_list.is_some();
         let focus = (!takes_keys).then_some(self.focus);
         let project = &self.project;
@@ -881,22 +987,19 @@ impl App {
             focus == Some(Focus::Chain),
             project,
             ChainView {
-                song_row: self.song.row(),
-                track: self.song.track(),
-                playing_entry: chain_row
-                    .filter(|(row, _)| *row == self.song.row())
-                    .map(|(_, k)| k),
+                id: self.shown_chain(),
+                playing_entry: self.playing_entry_of_shown_chain(),
             },
         );
-        let phrase = self.phrase_under_cursor();
+        let phrase = self.shown_phrase();
         self.phrase.draw(
             &mut grid,
             layout::PHRASE,
             focus == Some(Focus::Phrase),
             PhraseView {
                 id: phrase,
-                phrase: &self.shown_phrase(),
-                transpose: self.entry_under_cursor().map_or(0, ChainEntry::transpose),
+                phrase: &self.phrase_on_show(),
+                transpose: self.shown_transpose(),
                 playing_step: self
                     .playhead
                     .zip(phrase)

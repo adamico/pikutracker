@@ -38,6 +38,8 @@ The screen has three sections: the Phrase pane on the left, the Chain pane over 
 
 In the screenshot, Song row 00 plays Chain 00 on Track 1 and Chain 02 on Track 2. Chain 00 plays Phrase 00 twice, then Phrase 01. The cursor is on that Phrase 01, so the Phrase pane shows its 8 Steps.
 
+To write bottom-up, move the cursor onto the number in the Chain or Phrase pane's title and type another: the pane shows that Chain or Phrase without placing it anywhere. Moving the cursor in the Song or Chain pane shows what it points at again.
+
 The workflow and the optional M8-style keys come from the Dirtywave M8; its [operation manual](https://dirtywave.com/pages/resources-downloads) explains them further. Some things work differently from the M8:
 
 - The Song, Chain and Phrase panes are all on one screen.

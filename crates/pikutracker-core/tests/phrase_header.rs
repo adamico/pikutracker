@@ -41,7 +41,7 @@ fn phrase_app(actions: &[Action]) -> App {
 }
 
 fn phrase(app: &App) -> &Phrase {
-    app.project().phrase(app.phrase_under_cursor().unwrap())
+    app.project().phrase(app.shown_phrase().unwrap())
 }
 
 fn phrase_line(app: &App, line: usize) -> String {
@@ -100,7 +100,7 @@ fn the_cursor_moves_up_from_the_first_step_into_the_header() {
     let app = phrase_app(&[UP, UP]);
     assert_eq!(phrase_line(&app, NOIZ_LINE), "NOIZ[0] BUZZ 0");
 
-    let app = phrase_app(&[UP, UP, UP, UP]);
+    let app = phrase_app(&[UP, UP, UP]);
     assert_eq!(phrase_line(&app, SPEED_LINE), "SPD[10] LOOP 10 00  BPM 113");
 }
 
@@ -259,7 +259,7 @@ fn shortening_and_lengthening_the_phrase_keeps_the_steps_past_the_end() {
         &[
             &[DOWN; 8][..],
             &[Action::PianoKey(0)],
-            &[UP; 13],
+            &[UP; 12],
             &[RIGHT, Action::HexDigit(0), Action::HexDigit(4)],
             &[Action::HexDigit(1), Action::HexDigit(0)],
         ]

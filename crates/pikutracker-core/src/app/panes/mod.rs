@@ -8,6 +8,7 @@ pub mod multitrack;
 pub mod phrase;
 pub mod song;
 
+use crate::app::layout::Area;
 use crate::project::{SongRowEnding, SongRowMarks};
 use crate::screen::grid::{Grid, Style};
 use crate::screen::palette::Colour;
@@ -31,6 +32,7 @@ const LOOP_MARK: Style = Style::fg(Colour::Pink);
 const OUT_OF_RANGE: Style = Style::fg(Colour::Red);
 const PLAYHEAD: Style = Style::fg(Colour::Green);
 const COARSE_ID: i32 = 16;
+const TITLE_NUMBER_WIDTH: usize = 2;
 const MAX_ID: i32 = 255;
 
 fn typed_value(first_digit: &mut Option<u8>, digit: u8) -> u8 {
@@ -68,9 +70,27 @@ fn draw_row_label(grid: &mut Grid, column: usize, row: usize, label: &str, playi
     }
 }
 
+fn title_style(focused: bool) -> Style {
+    if focused { FOCUSED_TITLE } else { TITLE }
+}
+
 fn draw_title(grid: &mut Grid, column: usize, row: usize, title: &str, focused: bool) {
-    let style = if focused { FOCUSED_TITLE } else { TITLE };
-    grid.put(column, row, title, style);
+    grid.put(column, row, title, title_style(focused));
+}
+
+fn draw_numbered_title(
+    grid: &mut Grid,
+    area: Area,
+    name: &str,
+    number: Option<u8>,
+    focused: bool,
+    on_number: bool,
+) {
+    draw_title(grid, area.column, area.row, name, focused);
+    let number_column = area.column + name.len() + 1;
+    let text = id_text(number);
+    let style = title_style(focused);
+    draw_styled_value(grid, number_column, area.row, &text, on_number, style);
 }
 
 fn draw_styled_value(
