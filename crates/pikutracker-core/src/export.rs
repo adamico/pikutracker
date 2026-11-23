@@ -322,6 +322,7 @@ fn compile_song(
 struct ExportedChainRow {
     entries: [Option<ChainEntry>; TRACKS],
     length_track: usize,
+    length_track_keeps_its_phrase_loop: bool,
 }
 
 impl ExportedChainRow {
@@ -339,9 +340,20 @@ impl ExportedChainRow {
                 })
             })
             .expect("a Chain row that plays has an entry that sets its length");
+        let speed = |entry: &ChainEntry| project.phrase(entry.phrase()).speed();
+        let length_phrase = entries[length_track].map(|entry| project.phrase(entry.phrase()));
+        let length_track_keeps_its_phrase_loop = all_loop
+            && length_phrase.is_some_and(|phrase| {
+                usize::from(phrase.loop_end()) == FULL_LENGTH
+                    && entries
+                        .iter()
+                        .flatten()
+                        .all(|entry| speed(entry) <= phrase.speed())
+            });
         Self {
             entries,
             length_track,
+            length_track_keeps_its_phrase_loop,
         }
     }
 
@@ -351,7 +363,7 @@ impl ExportedChainRow {
         };
         let phrase = project.phrase(entry.phrase());
         let length = phrase.length() as u8;
-        if self.length_track == track {
+        if self.length_track == track && !self.length_track_keeps_its_phrase_loop {
             Ending::Len
         } else if phrase.loops() {
             Ending::Loop {

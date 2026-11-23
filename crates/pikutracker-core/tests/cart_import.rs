@@ -779,3 +779,27 @@ fn an_sfx_that_only_a_loose_phrase_uses_as_an_instrument_is_a_custom_instrument_
     );
     assert_eq!(project.target_cart().unwrap().claim.sfx, [0]);
 }
+
+#[test]
+fn an_sfx_looping_over_all_32_notes_becomes_one_phrase_wherever_it_plays() {
+    let mut whole_loop = TestSfx::with_pitches(8, &(10..42).collect::<Vec<u8>>());
+    whole_loop.loop_end = 32;
+    let mut other_loop = TestSfx::with_pitches(8, &[20, 22, 24, 26]);
+    other_loop.loop_end = 4;
+    let once = TestSfx::with_pitches(8, &[30, 31]);
+    let cart = TestCart {
+        sfx: vec![whole_loop, other_loop, once],
+        patterns: vec![
+            pattern([Some(0), Some(1), None, None]),
+            pattern([Some(0), Some(2), None, None]),
+        ],
+    };
+
+    let (project, warnings) = imported(&cart);
+
+    assert_eq!(warnings, Vec::<String>::new());
+    let first = project.chain_row_entry(0, 0, 0).unwrap().phrase();
+    let second = project.chain_row_entry(1, 0, 0).unwrap().phrase();
+    assert_eq!(first, second);
+    assert_eq!(pikutracker_core::export::needs(&project).sfx, 3);
+}

@@ -370,3 +370,37 @@ fn silent_steps_on_custom_instruments_under_detune_and_reverb_play_the_same_afte
 
     assert_exports_sample_for_sample(&project, 96);
 }
+
+#[test]
+fn a_whole_phrase_loop_that_sets_an_all_looping_chain_row_is_one_sfx_wherever_it_plays() {
+    let mut project = instrumented_project();
+    write_phrase(&mut project, 0, 32, 8, &[0, 3]);
+    write_phrase(&mut project, 1, 8, 6, &[1]);
+    write_phrase(&mut project, 2, 16, 8, &[2]);
+    loop_from(&mut project, 0, 0);
+    loop_from(&mut project, 1, 0);
+    place_song_row(&mut project, 0, &[[plays(0), plays(1), None, None]]);
+    place_song_row(&mut project, 1, &[[plays(0), plays(2), None, None]]);
+    let claim = Claim {
+        sfx: (0..8).chain(10..30).collect(),
+        first_and_last_pattern: Some((FIRST_PATTERN, 30)),
+    };
+    let original = format!("{HEADER}__lua__\nprint(1)\n");
+
+    let exported = export(&project, &claim, original.as_bytes()).unwrap();
+
+    assert_eq!(exported.sfx_count, 3);
+    assert_exports_sample_for_sample(&project, 256 + 128);
+}
+
+#[test]
+fn a_whole_phrase_loop_beside_a_slower_loop_plays_the_same_after_export() {
+    let mut project = instrumented_project();
+    write_phrase(&mut project, 0, 32, 6, &[0, 3]);
+    write_phrase(&mut project, 1, 4, 16, &[1]);
+    loop_from(&mut project, 0, 0);
+    loop_from(&mut project, 1, 0);
+    place_song_row(&mut project, 0, &[[plays(0), plays(1), None, None]]);
+
+    assert_exports_sample_for_sample(&project, 192);
+}

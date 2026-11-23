@@ -209,7 +209,7 @@ fn rebuild_channel(sfx: Sfx<'_>, from: u32, to: u32, sets_length: bool) -> Rebui
     let first = from.div_ceil(speed) as usize;
     let early_ticks = first as u32 * speed - from;
     if let Playback::Loop { start, end } = playback
-        && !sets_length
+        && (!sets_length || end == SFX_NOTES)
         && end <= SFX_NOTES
     {
         return RebuiltChannel {
