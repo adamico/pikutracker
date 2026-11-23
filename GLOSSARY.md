@@ -27,7 +27,7 @@ A mark on a Song row that makes playback return, after that row, to the nearest 
 _Avoid_: Loop end
 
 **Stop**:
-A mark on a Song row: playback stops after that row. It becomes PICO-8's flag of the same name on the last Pattern of that row.
+A mark on a Song row: playback stops after that row, even when the row also has a Loop back. It becomes PICO-8's flag of the same name on the last Pattern of that row.
 
 **Track**:
 One of the Song's 4 vertical lanes, played by one voice. Track 1 plays on PICO-8's first channel, Track 2 on the second, and so on.

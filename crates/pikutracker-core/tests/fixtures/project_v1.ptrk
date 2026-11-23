@@ -12,8 +12,8 @@
     )),
     song: [
         (row: 0, tracks: "00 -- -- 01", loop_start: true),
-        (row: 1, tracks: "-- -- -- --", ending: Some(LoopBack)),
-        (row: 2, tracks: "-- -- -- FF", loop_start: true, ending: Some(Stop)),
+        (row: 1, tracks: "-- -- -- --", loop_back: true),
+        (row: 2, tracks: "-- -- -- FF", loop_start: true, loop_back: true, stop: true),
     ],
     chains: [
         (id: 0, entries: [

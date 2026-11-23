@@ -5,7 +5,7 @@ use pikutracker_core::cart_import::import;
 use pikutracker_core::export::export;
 use pikutracker_core::project::{
     ChainId, CustomInstrument, InstrumentSound, Phrase, PhraseId, Project, SfxInstrument,
-    SongRowEnding, SongRowMarks, Step, WaveformInstrument,
+    SongRowMarks, Step, WaveformInstrument,
 };
 use pikutracker_core::project_file;
 use support::{TestCart, TestPattern, TestSfx, music_samples, render_music, render_song};
@@ -239,7 +239,7 @@ fn every_pattern_from_the_first_non_empty_to_the_last_becomes_one_song_row() {
     assert!(project.song_row_is_empty(2));
     assert_eq!(first_pitch(3), 19);
     assert!(project.song_row_is_empty(4));
-    assert_eq!(project.song_row_marks(1).ending, Some(SongRowEnding::Stop));
+    assert!(project.song_row_marks(1).stop);
     assert_eq!(
         project.target_cart().unwrap().claim.first_and_last_pattern,
         Some((1, 4))
@@ -268,17 +268,15 @@ fn each_patterns_flow_flags_become_the_marks_of_the_same_name_on_its_song_row() 
 
     let (project, _) = imported(&cart);
 
-    let marks = |loop_start, ending| SongRowMarks { loop_start, ending };
-    assert_eq!(
-        project.song_row_marks(0),
-        marks(true, Some(SongRowEnding::Stop))
-    );
-    assert_eq!(
-        project.song_row_marks(1),
-        marks(false, Some(SongRowEnding::LoopBack))
-    );
-    assert_eq!(project.song_row_marks(2), marks(true, None));
-    assert_eq!(project.song_row_marks(3), marks(false, None));
+    let marks = |loop_start, loop_back, stop| SongRowMarks {
+        loop_start,
+        loop_back,
+        stop,
+    };
+    assert_eq!(project.song_row_marks(0), marks(true, false, true));
+    assert_eq!(project.song_row_marks(1), marks(false, true, false));
+    assert_eq!(project.song_row_marks(2), marks(true, false, false));
+    assert_eq!(project.song_row_marks(3), marks(false, false, false));
 }
 
 #[test]
@@ -317,6 +315,13 @@ fn importing_and_exporting_straight_back_keeps_the_claimed_pattern_flags() {
     let mut start_and_stop = pattern([Some(0), None, None, None]);
     start_and_stop.loop_start = true;
     start_and_stop.stop = true;
+    let mut back_and_stop = pattern([Some(1), None, None, None]);
+    back_and_stop.loop_back = true;
+    back_and_stop.stop = true;
+    let mut all_three = pattern([Some(0), None, None, None]);
+    all_three.loop_start = true;
+    all_three.loop_back = true;
+    all_three.stop = true;
     let cart = TestCart {
         sfx: two_sfx(),
         patterns: vec![
@@ -325,6 +330,8 @@ fn importing_and_exporting_straight_back_keeps_the_claimed_pattern_flags() {
             stop,
             pattern([None, None, None, None]),
             start_and_stop,
+            back_and_stop,
+            all_three,
             pattern([Some(0), None, None, None]),
         ],
     };
@@ -342,7 +349,7 @@ fn importing_and_exporting_straight_back_keeps_the_claimed_pattern_flags() {
         let pattern = cart.pattern(slot);
         (pattern.loop_start(), pattern.loop_back(), pattern.stop())
     };
-    for slot in 0..=5 {
+    for slot in 0..=7 {
         assert_eq!(flags(&after, slot), flags(&before, slot), "pattern {slot}");
     }
 }
@@ -389,10 +396,7 @@ fn loop_back_jumps_to_the_nearest_loop_start_before_it() {
     let (project, _) = imported(&cart);
 
     assert!(project.song_row_marks(1).loop_start);
-    assert_eq!(
-        project.song_row_marks(2).ending,
-        Some(SongRowEnding::LoopBack)
-    );
+    assert!(project.song_row_marks(2).loop_back);
 }
 
 #[test]

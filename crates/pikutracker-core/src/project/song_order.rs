@@ -1,15 +1,10 @@
 use super::{CHAIN_ENTRIES, Project, SONG_ROWS};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SongRowEnding {
-    LoopBack,
-    Stop,
-}
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SongRowMarks {
     pub loop_start: bool,
-    pub ending: Option<SongRowEnding>,
+    pub loop_back: bool,
+    pub stop: bool,
 }
 
 impl SongRowMarks {
@@ -17,16 +12,12 @@ impl SongRowMarks {
         self.loop_start = !self.loop_start;
     }
 
-    pub fn toggle_ending(&mut self, ending: SongRowEnding) {
-        self.ending = (self.ending != Some(ending)).then_some(ending);
+    pub fn toggle_loop_back(&mut self) {
+        self.loop_back = !self.loop_back;
     }
 
-    pub fn loops_back(self) -> bool {
-        self.ending == Some(SongRowEnding::LoopBack)
-    }
-
-    pub fn stops(self) -> bool {
-        self.ending == Some(SongRowEnding::Stop)
+    pub fn toggle_stop(&mut self) {
+        self.stop = !self.stop;
     }
 }
 
@@ -45,9 +36,9 @@ impl Project {
 
     pub fn song_row_after(&self, row: usize) -> Option<usize> {
         let marks = self.song_row_marks(row);
-        let next = if marks.stops() {
+        let next = if marks.stop {
             None
-        } else if marks.loops_back() {
+        } else if marks.loop_back {
             Some(self.loop_start_at_or_before(row).unwrap_or(0))
         } else {
             Some(row + 1).filter(|&next| next < SONG_ROWS)

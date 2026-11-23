@@ -4,7 +4,7 @@ use pikutracker_core::cart::Cart;
 use pikutracker_core::export::export;
 use pikutracker_core::project::{
     Chain, ChainEntry, ChainId, Claim, CustomInstrument, InstrumentSound, PhraseId, Project,
-    SfxInstrument, SongRowEnding, SongRowMarks, Step, TRACKS, WaveformInstrument,
+    SfxInstrument, SongRowMarks, Step, TRACKS, WaveformInstrument,
 };
 use pikutracker_core::synth::SAMPLES_PER_TICK;
 use support::{HEADER, assert_same_samples, render_music, render_song};
@@ -263,15 +263,20 @@ fn a_looping_song_plays_the_same_after_export() {
             [plays(2), plays(0), None, None],
         ],
     );
-    mark(&mut project, 1, true, Some(SongRowEnding::LoopBack));
+    mark(&mut project, 1, true, true, false);
 
     let song_row_0_ticks = 96;
     let song_row_1_ticks = 96 + 48;
     assert_exports_sample_for_sample(&project, song_row_0_ticks + 3 * song_row_1_ticks);
 }
 
-fn mark(project: &mut Project, row: usize, loop_start: bool, ending: Option<SongRowEnding>) {
-    project.set_song_row_marks(row, SongRowMarks { loop_start, ending });
+fn mark(project: &mut Project, row: usize, loop_start: bool, loop_back: bool, stop: bool) {
+    let marks = SongRowMarks {
+        loop_start,
+        loop_back,
+        stop,
+    };
+    project.set_song_row_marks(row, marks);
 }
 
 fn three_row_song() -> Project {
@@ -298,8 +303,8 @@ const THREE_ROW_TICKS: [usize; 3] = [96, 96 + 48, 48];
 #[test]
 fn a_loop_back_to_a_loop_start_plays_the_same_after_export() {
     let mut project = three_row_song();
-    mark(&mut project, 1, true, None);
-    mark(&mut project, 2, false, Some(SongRowEnding::LoopBack));
+    mark(&mut project, 1, true, false, false);
+    mark(&mut project, 2, false, true, false);
 
     let [row_0, row_1, row_2] = THREE_ROW_TICKS;
     assert_exports_sample_for_sample(&project, row_0 + 3 * (row_1 + row_2));
@@ -308,7 +313,7 @@ fn a_loop_back_to_a_loop_start_plays_the_same_after_export() {
 #[test]
 fn a_loop_back_with_no_loop_start_plays_the_same_after_export_from_pattern_0() {
     let mut project = three_row_song();
-    mark(&mut project, 1, false, Some(SongRowEnding::LoopBack));
+    mark(&mut project, 1, false, true, false);
 
     let [row_0, row_1, _] = THREE_ROW_TICKS;
     assert_exports_sample_for_sample_from(&project, 0, 3 * (row_0 + row_1));
@@ -317,8 +322,8 @@ fn a_loop_back_with_no_loop_start_plays_the_same_after_export_from_pattern_0() {
 #[test]
 fn a_stop_plays_the_same_after_export() {
     let mut project = three_row_song();
-    mark(&mut project, 1, true, Some(SongRowEnding::Stop));
-    mark(&mut project, 2, false, Some(SongRowEnding::LoopBack));
+    mark(&mut project, 1, true, false, true);
+    mark(&mut project, 2, false, true, false);
 
     let [row_0, row_1, _] = THREE_ROW_TICKS;
     assert_exports_sample_for_sample(&project, row_0 + row_1);

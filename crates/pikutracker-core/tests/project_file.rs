@@ -1,6 +1,6 @@
 use pikutracker_core::project::{
     ChainEntry, ChainId, Claim, CustomInstrument, Filters, InstrumentSound, PhraseId, Project,
-    SfxInstrument, SongRowEnding, SongRowMarks, Step, TargetCart, WaveformInstrument,
+    SfxInstrument, SongRowMarks, Step, TargetCart, WaveformInstrument,
 };
 use pikutracker_core::project_file::{self, FORMAT_VERSION, Migration, ProjectFileError};
 
@@ -17,21 +17,24 @@ fn fixture_project() -> Project {
         0,
         SongRowMarks {
             loop_start: true,
-            ending: None,
+            loop_back: false,
+            stop: false,
         },
     );
     project.set_song_row_marks(
         1,
         SongRowMarks {
             loop_start: false,
-            ending: Some(SongRowEnding::LoopBack),
+            loop_back: true,
+            stop: false,
         },
     );
     project.set_song_row_marks(
         2,
         SongRowMarks {
             loop_start: true,
-            ending: Some(SongRowEnding::Stop),
+            loop_back: true,
+            stop: true,
         },
     );
     project.set_target_cart(Some(TargetCart {
@@ -237,14 +240,10 @@ fn random_project(random: &mut SeededRandom) -> Project {
     let mut project = Project::new();
     project.set_default_speed(i32::from(random.below(255)) + 1);
     for _ in 0..4 {
-        let ending = [
-            None,
-            Some(SongRowEnding::LoopBack),
-            Some(SongRowEnding::Stop),
-        ];
         let marks = SongRowMarks {
             loop_start: random.flip(),
-            ending: ending[usize::from(random.below(3))],
+            loop_back: random.flip(),
+            stop: random.flip(),
         };
         project.set_song_row_marks(usize::from(random.below(256)), marks);
     }

@@ -3,7 +3,7 @@ mod song_order;
 mod usage;
 
 pub(crate) use change::ProjectChange;
-pub use song_order::{SongRowEnding, SongRowMarks};
+pub use song_order::SongRowMarks;
 pub use usage::UnusedItems;
 
 use std::collections::BTreeMap;

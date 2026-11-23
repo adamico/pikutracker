@@ -4,7 +4,7 @@ mod rebuild;
 use crate::cart::{Cart, Pattern, SLOTS};
 use crate::project::{
     Chain, ChainEntry, ChainId, ChainRowPlace, Claim, Phrase, PhraseId, Project, SongPlace,
-    SongRowEnding, SongRowMarks, TRACKS, TargetCart, custom_instrument_of_slot,
+    SongRowMarks, TRACKS, TargetCart, custom_instrument_of_slot,
 };
 use crate::wording::counted;
 use instruments::imported_instrument;
@@ -204,16 +204,10 @@ fn pattern_name(slot: u8) -> String {
 }
 
 fn marks_of(pattern: Pattern) -> SongRowMarks {
-    let ending = if pattern.stop() {
-        Some(SongRowEnding::Stop)
-    } else if pattern.loop_back() {
-        Some(SongRowEnding::LoopBack)
-    } else {
-        None
-    };
     SongRowMarks {
         loop_start: pattern.loop_start(),
-        ending,
+        loop_back: pattern.loop_back(),
+        stop: pattern.stop(),
     }
 }
 

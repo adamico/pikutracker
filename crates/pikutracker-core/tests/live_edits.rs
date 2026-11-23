@@ -2,9 +2,7 @@ mod support;
 
 use pikutracker_core::app::{Action, App, Direction};
 use pikutracker_core::player::Player;
-use pikutracker_core::project::{
-    ChainEntry, ChainId, PhraseId, Project, SongRowEnding, SongRowMarks,
-};
+use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project, SongRowMarks};
 use pikutracker_core::synth::{SAMPLE_RATE, SAMPLES_PER_TICK};
 use support::apply;
 
@@ -151,7 +149,8 @@ fn an_edit_to_a_step_already_passed_waits_for_the_next_time_round() {
         0,
         SongRowMarks {
             loop_start: false,
-            ending: Some(SongRowEnding::LoopBack),
+            loop_back: true,
+            stop: false,
         },
     );
     let mut app = playing_in_phrase_pane(project);

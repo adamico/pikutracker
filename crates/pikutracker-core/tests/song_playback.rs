@@ -2,9 +2,7 @@ mod support;
 
 use pikutracker_core::app::{Action, App, Direction};
 use pikutracker_core::player::{AudioRequest, Player};
-use pikutracker_core::project::{
-    ChainEntry, ChainId, PhraseId, Project, SongRowEnding, SongRowMarks,
-};
+use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project, SongRowMarks};
 use pikutracker_core::synth::{SAMPLE_RATE, SAMPLES_PER_TICK};
 use support::status_line;
 
@@ -279,16 +277,22 @@ fn marked(
     mut project: Project,
     row: usize,
     loop_start: bool,
-    ending: Option<SongRowEnding>,
+    loop_back: bool,
+    stop: bool,
 ) -> Project {
-    project.set_song_row_marks(row, SongRowMarks { loop_start, ending });
+    let marks = SongRowMarks {
+        loop_start,
+        loop_back,
+        stop,
+    };
+    project.set_song_row_marks(row, marks);
     project
 }
 
 #[test]
 fn after_a_loop_back_row_the_song_returns_to_the_loop_start() {
-    let project = marked(three_row_song(), 1, true, None);
-    let project = marked(project, 2, false, Some(SongRowEnding::LoopBack));
+    let project = marked(three_row_song(), 1, true, false, false);
+    let project = marked(project, 2, false, true, false);
 
     let samples = hear(project, &[SPACE], 6);
 
@@ -297,8 +301,8 @@ fn after_a_loop_back_row_the_song_returns_to_the_loop_start() {
 
 #[test]
 fn loop_back_returns_to_the_nearest_loop_start_at_or_before_it() {
-    let project = marked(three_row_song(), 0, true, None);
-    let project = marked(project, 1, true, Some(SongRowEnding::LoopBack));
+    let project = marked(three_row_song(), 0, true, false, false);
+    let project = marked(project, 1, true, true, false);
 
     let samples = hear(project, &[SPACE], 4);
 
@@ -307,7 +311,7 @@ fn loop_back_returns_to_the_nearest_loop_start_at_or_before_it() {
 
 #[test]
 fn loop_back_without_a_loop_start_returns_to_song_row_00() {
-    let project = marked(three_row_song(), 2, false, Some(SongRowEnding::LoopBack));
+    let project = marked(three_row_song(), 2, false, true, false);
 
     let samples = hear(project, &[DOWN, SPACE], 4);
 
@@ -316,8 +320,8 @@ fn loop_back_without_a_loop_start_returns_to_song_row_00() {
 
 #[test]
 fn playing_from_below_a_loop_start_still_loops_back_to_it() {
-    let project = marked(three_row_song(), 1, true, None);
-    let project = marked(project, 2, false, Some(SongRowEnding::LoopBack));
+    let project = marked(three_row_song(), 1, true, false, false);
+    let project = marked(project, 2, false, true, false);
 
     let samples = hear(project, &[DOWN, DOWN, SPACE], 3);
 
@@ -326,7 +330,17 @@ fn playing_from_below_a_loop_start_still_loops_back_to_it() {
 
 #[test]
 fn playback_ends_after_a_stop_row() {
-    let project = marked(three_row_song(), 1, false, Some(SongRowEnding::Stop));
+    let project = marked(three_row_song(), 1, false, false, true);
+
+    let samples = hear(project, &[SPACE], 4);
+
+    assert_steps(&samples, &[220.0, 440.0, 0.0, 0.0]);
+}
+
+#[test]
+fn a_row_with_loop_back_and_stop_ends_playback_as_pico8_does() {
+    let project = marked(three_row_song(), 0, true, false, false);
+    let project = marked(project, 1, false, true, true);
 
     let samples = hear(project, &[SPACE], 4);
 
@@ -352,7 +366,7 @@ fn playback_ends_after_the_last_row() {
 
 #[test]
 fn a_loop_back_to_an_empty_row_ends_playback() {
-    let mut project = marked(three_row_song(), 2, false, Some(SongRowEnding::LoopBack));
+    let mut project = marked(three_row_song(), 2, false, true, false);
     project.set_song_cell(0, 0, None);
 
     let samples = hear(project, &[DOWN, SPACE], 4);
