@@ -140,12 +140,16 @@ _Avoid_: Output track, exported channel
 The one Cart a Project Exports into, if any. A Project can have no Target Cart, for example after a MIDI Import.
 _Avoid_: Linked cart, output cart
 
+**New Cart**:
+A `.p8` Cart the tracker made itself to be a Project's Target Cart, rather than one the user picked. Once made, it is an ordinary Target Cart.
+_Avoid_: Blank cart, empty cart
+
 **Claim**:
 The SFX slots and the range of Patterns in the Project's Target Cart that the Project owns. The SFX part is any set of slots; the Pattern part is one contiguous range. Export writes only inside the Claim.
 _Avoid_: Reservation, allocation
 
 **Claimed-bytes hash**:
-A fingerprint of the Target Cart's bytes inside the Claim, taken at Cart Import and after each Export. When the Cart no longer matches it, those bytes were changed outside the tracker.
+A fingerprint of the Target Cart's bytes inside the Claim, taken at Cart Import, when a New Cart is made, and after each Export. When the Cart no longer matches it, those bytes were changed outside the tracker.
 _Avoid_: Checksum
 
 **Import**:

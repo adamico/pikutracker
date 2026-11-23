@@ -9,4 +9,5 @@ The Cart codec touches only the bytes it understands and writes them back in PIC
 - **Claimed-bytes hash.** One FNV-1a checksum per claimed slot, written `S03=xxxxxxxx` or `P18=xxxxxxxx`, so a later comparison can say which SFX and Patterns changed.
 - **LOOP START.** Export always sets the LOOP START flag on the loop target, even at Pattern 0, because without it PICO-8 loops back to Pattern 0 while the Claim may start elsewhere. Stale flags in claimed Patterns are cleared.
 - **Blank Steps.** Export blanks Steps past LEN, apart from pitches an arpeggio reads (ADR 0008), so that more SFX can share a slot.
+- **New Cart.** A New Cart holds only PICO-8's header line, the version line of the PICO-8 release the reference set was recorded with (ADR 0013), and an empty `__lua__` section. It gets no playback stub, because code outside the Claim would go stale.
 - **Suggested Claim.** It takes the lowest free SFX, to leave the most room in 00–07 for Custom Instruments, and the lowest run of free Patterns long enough for the Song.
