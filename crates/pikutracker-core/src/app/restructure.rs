@@ -28,7 +28,7 @@ impl App {
         match self.focus {
             Focus::Song => self.clone_chains(cells, deep),
             Focus::Chain => self.clone_phrases(cells),
-            Focus::Phrase => self.remark = Some(NEEDS_A_REFERENCE),
+            Focus::Phrase => self.remark = Some(NEEDS_A_REFERENCE.into()),
             Focus::RightSlot => {}
         }
     }
@@ -36,7 +36,7 @@ impl App {
     fn clone_chains(&mut self, cells: CellRange, deep: bool) {
         let chains = self.chains_in(cells);
         if chains.is_empty() {
-            self.remark = Some(NO_CHAIN_HERE);
+            self.remark = Some(NO_CHAIN_HERE.into());
             return;
         }
         let phrases = if deep {
@@ -79,7 +79,7 @@ impl App {
 
     fn clone_phrases(&mut self, cells: CellRange) {
         let Some(chain) = self.shown_chain_id() else {
-            self.remark = Some(NO_CHAIN_HERE);
+            self.remark = Some(NO_CHAIN_HERE.into());
             return;
         };
         let mut phrases = Vec::new();
@@ -91,7 +91,7 @@ impl App {
             }
         }
         if phrases.is_empty() {
-            self.remark = Some(NO_PHRASE_HERE);
+            self.remark = Some(NO_PHRASE_HERE.into());
             return;
         }
         let Some(new_phrases) = self.free_phrase_slots(phrases.len()) else {
@@ -189,18 +189,18 @@ impl App {
             Focus::Song => shift_song(&mut self.project, self.song.row()),
             Focus::Chain => {
                 let Some(chain) = self.shown_chain_id() else {
-                    self.remark = Some(NO_CHAIN_HERE);
+                    self.remark = Some(NO_CHAIN_HERE.into());
                     return;
                 };
                 shift_chain(self.project.chain_mut(chain), self.chain.entry());
             }
             Focus::Phrase => {
                 let Some(phrase) = self.shown_phrase_id() else {
-                    self.remark = Some(NO_PHRASE_HERE);
+                    self.remark = Some(NO_PHRASE_HERE.into());
                     return;
                 };
                 let Some(cell) = self.phrase.cell() else {
-                    self.remark = Some(NO_STEP_HERE);
+                    self.remark = Some(NO_STEP_HERE.into());
                     return;
                 };
                 shift_phrase(self.project.phrase_mut(phrase), cell.row);
@@ -213,7 +213,7 @@ impl App {
     pub(super) fn ask_to_purge(&mut self) {
         let unused = self.project.unused_items();
         if unused.is_empty() {
-            self.remark = Some(NOTHING_TO_PURGE);
+            self.remark = Some(NOTHING_TO_PURGE.into());
             return;
         }
         let loose = match unused.loose_phrases {
@@ -242,14 +242,14 @@ impl App {
                 }
             }
             Focus::Chain => self.new_unused_phrase(),
-            Focus::Phrase => self.remark = Some(NEEDS_A_REFERENCE),
+            Focus::Phrase => self.remark = Some(NEEDS_A_REFERENCE.into()),
             Focus::RightSlot => {}
         }
     }
 
     fn new_unused_phrase(&mut self) {
         let Some(chain) = self.shown_chain_id() else {
-            self.remark = Some(NO_CHAIN_HERE);
+            self.remark = Some(NO_CHAIN_HERE.into());
             return;
         };
         let Some(slots) = self.free_phrase_slots(1) else {

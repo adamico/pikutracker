@@ -17,14 +17,6 @@ impl TitleNumber {
         self.has_cursor = has_cursor;
     }
 
-    pub fn takes_move(&mut self, rows: isize) -> bool {
-        let had_cursor = self.has_cursor;
-        if had_cursor {
-            self.has_cursor = rows <= 0;
-        }
-        had_cursor
-    }
-
     pub fn finish_typing(&mut self) {
         self.first_digit = None;
     }
@@ -33,7 +25,7 @@ impl TitleNumber {
         typed_value(&mut self.first_digit, digit)
     }
 
-    pub fn nudged(shown: Option<u8>, up: bool, coarse: bool) -> u8 {
+    pub fn nudged(self, shown: Option<u8>, up: bool, coarse: bool) -> u8 {
         nudged_id(shown, up, coarse)
     }
 

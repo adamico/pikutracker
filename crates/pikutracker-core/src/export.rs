@@ -3,8 +3,8 @@ use crate::cart::{
     SLOTS, SPEED_BYTE, WAVEFORM_INSTRUMENT_BIT, note_word,
 };
 use crate::project::{
-    ChainEntry, Claim, CustomInstrument, Filters, InstrumentSound, MAX_PITCH, MAX_STEPS, Phrase,
-    Project, SongRowEnding, SongRowMarks, TRACKS, custom_instrument_of_slot,
+    ChainEntry, ChainRowPlace, Claim, CustomInstrument, Filters, InstrumentSound, MAX_PITCH,
+    MAX_STEPS, Phrase, Project, SongRowEnding, SongRowMarks, TRACKS, custom_instrument_of_slot,
     slot_of_custom_instrument,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -112,7 +112,6 @@ struct CompiledSong {
     sfx: Vec<[u8; SFX_BYTES]>,
     patterns: Vec<CompiledPattern>,
     marks: Vec<SongRowMarks>,
-    loops_back_to_its_start: bool,
 }
 
 impl CompiledSong {
@@ -232,8 +231,7 @@ pub fn needs(project: &Project) -> ExportNeeds {
 
 #[derive(Clone, Copy)]
 struct SongPattern {
-    song_row: usize,
-    chain_row: Option<usize>,
+    chain_row: Option<ChainRowPlace>,
     marks: SongRowMarks,
 }
 
@@ -247,8 +245,10 @@ fn song_patterns(project: &Project) -> Vec<SongPattern> {
 }
 
 fn song_row_patterns(project: &Project, song_row: usize) -> Vec<SongPattern> {
-    let mut chain_rows: Vec<Option<usize>> =
-        project.played_chain_rows(song_row).map(Some).collect();
+    let mut chain_rows: Vec<Option<ChainRowPlace>> = project
+        .played_chain_rows(song_row)
+        .map(|entry| Some(ChainRowPlace { song_row, entry }))
+        .collect();
     if chain_rows.is_empty() {
         chain_rows.push(None);
     }
@@ -258,7 +258,6 @@ fn song_row_patterns(project: &Project, song_row: usize) -> Vec<SongPattern> {
         .into_iter()
         .enumerate()
         .map(|(index, chain_row)| SongPattern {
-            song_row,
             chain_row,
             marks: SongRowMarks {
                 loop_start: marks.loop_start && index == 0,
@@ -275,16 +274,13 @@ fn compile_song(
 ) -> CompiledSong {
     let rows: Vec<Option<ExportedChainRow>> = song_patterns
         .iter()
-        .map(|place| {
-            let chain_row = place.chain_row?;
-            Some(ExportedChainRow::of(project, place.song_row, chain_row))
-        })
+        .map(|place| Some(ExportedChainRow::of(project, place.chain_row?)))
         .collect();
     let mut song = CompiledSong {
         instruments: rows
             .iter()
             .flatten()
-            .flat_map(|row| row.channels.iter().flatten())
+            .flat_map(|row| row.entries.iter().flatten())
             .flat_map(|entry| custom_instrument_slots_played(project.phrase(entry.phrase())))
             .map(|slot| {
                 let instrument = project.custom_instrument(custom_instrument_of_slot(slot));
@@ -300,8 +296,7 @@ fn compile_song(
             song.patterns.push(pattern);
             continue;
         };
-        let song_row = place.song_row;
-        for (track, played) in row.channels.iter().enumerate() {
+        for (track, played) in row.entries.iter().enumerate() {
             let Some(entry) = *played else {
                 continue;
             };
@@ -311,8 +306,8 @@ fn compile_song(
                     phrase: entry.phrase().number(),
                     step,
                     track,
-                    song_row,
-                    chain_row,
+                    song_row: chain_row.song_row,
+                    chain_row: chain_row.entry,
                 });
             }
             let ending = row.ending(project, track);
@@ -321,25 +316,22 @@ fn compile_song(
         }
         song.patterns.push(pattern);
     }
-    song.loops_back_to_its_start = song_patterns.iter().any(|place| {
-        place.marks.loops_back() && project.loop_start_at_or_before(place.song_row).is_none()
-    });
     song
 }
 
 struct ExportedChainRow {
-    channels: [Option<ChainEntry>; TRACKS],
-    length_channel: usize,
+    entries: [Option<ChainEntry>; TRACKS],
+    length_track: usize,
 }
 
 impl ExportedChainRow {
-    fn of(project: &Project, song_row: usize, chain_row: usize) -> Self {
-        let channels =
-            std::array::from_fn(|track| project.chain_row_entry(song_row, track, chain_row));
-        let ticks = project.chain_row_ticks(song_row, chain_row);
+    fn of(project: &Project, place: ChainRowPlace) -> Self {
+        let ChainRowPlace { song_row, entry } = place;
+        let entries = std::array::from_fn(|track| project.chain_row_entry(song_row, track, entry));
+        let ticks = project.chain_row_ticks(song_row, entry);
         let loops = |entry: &ChainEntry| project.phrase(entry.phrase()).loops();
-        let all_loop = channels.iter().flatten().all(loops);
-        let length_channel = channels
+        let all_loop = entries.iter().flatten().all(loops);
+        let length_track = entries
             .iter()
             .position(|played| {
                 played.is_some_and(|entry| {
@@ -348,25 +340,25 @@ impl ExportedChainRow {
             })
             .expect("a Chain row that plays has an entry that sets its length");
         Self {
-            channels,
-            length_channel,
+            entries,
+            length_track,
         }
     }
 
-    fn ending(&self, project: &Project, channel: usize) -> Ending {
-        let Some(entry) = self.channels[channel] else {
+    fn ending(&self, project: &Project, track: usize) -> Ending {
+        let Some(entry) = self.entries[track] else {
             return Ending::Len;
         };
         let phrase = project.phrase(entry.phrase());
         let length = phrase.length() as u8;
-        if self.length_channel == channel {
+        if self.length_track == track {
             Ending::Len
         } else if phrase.loops() {
             Ending::Loop {
                 start: phrase.loop_start(),
                 end: phrase.loop_end(),
             }
-        } else if channel < self.length_channel {
+        } else if track < self.length_track {
             Ending::Loop {
                 start: length,
                 end: length + 1,
@@ -523,7 +515,7 @@ fn place_song(song: &CompiledSong, slots: &ClaimedSlots, cart: &mut Cart) {
     for (index, &slot) in slots.patterns.iter().enumerate() {
         let bytes = song.patterns.get(index).map_or_else(
             || blank.pattern_bytes(slot),
-            |pattern| pattern_bytes(song, index, slot, pattern, &phrase_slots),
+            |pattern| pattern_bytes(song, index, pattern, &phrase_slots),
         );
         cart.set_pattern_bytes(slot, bytes);
     }
@@ -532,7 +524,6 @@ fn place_song(song: &CompiledSong, slots: &ClaimedSlots, cart: &mut Cart) {
 fn pattern_bytes(
     song: &CompiledSong,
     index: usize,
-    slot: u8,
     pattern: &CompiledPattern,
     sfx_slots: &[u8],
 ) -> [u8; TRACKS] {
@@ -541,8 +532,7 @@ fn pattern_bytes(
         *byte = pattern[channel].map_or(disabled_channel_byte(channel), |sfx| sfx_slots[sfx]);
     }
     let marks = song.marks[index];
-    let starts_the_song_off_pattern_0 = index == 0 && slot != 0 && song.loops_back_to_its_start;
-    if marks.loop_start || starts_the_song_off_pattern_0 {
+    if marks.loop_start {
         bytes[LOOP_START_CHANNEL] |= FLAG;
     }
     match marks.ending {

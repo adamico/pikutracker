@@ -195,7 +195,7 @@ impl SongPane {
     ) {
         let playing_row = playhead
             .and_then(|playhead| playhead.chain_row)
-            .map(|(row, _)| row);
+            .map(|place| place.song_row);
         draw_title(grid, area.column, area.row, "SONG", focused);
         for track in 0..TRACKS {
             let column = area.column + FIRST_TRACK_COLUMN + track * TRACK_WIDTH;

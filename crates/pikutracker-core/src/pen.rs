@@ -2,31 +2,42 @@ use crate::project::{SEMITONES_PER_OCTAVE, Step};
 
 const DEFAULT_OCTAVE: u8 = 2;
 const MAX_OCTAVE: u8 = 4;
-const DEFAULT_INSTRUMENT: i32 = 2;
-const DEFAULT_VOLUME: i32 = 5;
+const DEFAULT_INSTRUMENT: u8 = 2;
+const DEFAULT_VOLUME: u8 = 5;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PenField {
+    Octave,
+    Instrument,
+    Volume,
+    Effect,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Pen {
     octave: u8,
-    note: Step,
+    written_step: Step,
 }
 
 impl Default for Pen {
     fn default() -> Self {
-        let mut note = Step::default();
-        note.set_instrument(DEFAULT_INSTRUMENT);
-        note.set_volume(DEFAULT_VOLUME);
-        Self {
+        let mut pen = Self {
             octave: DEFAULT_OCTAVE,
-            note,
-        }
+            written_step: Step::default(),
+        };
+        pen.set(PenField::Instrument, DEFAULT_INSTRUMENT);
+        pen.set(PenField::Volume, DEFAULT_VOLUME);
+        pen
     }
 }
 
 impl Pen {
     pub fn new(octave: u8, instrument: u8, volume: u8, effect: u8) -> Option<Self> {
-        let note = Step::new(0, instrument, volume, effect)?;
-        (octave <= MAX_OCTAVE).then_some(Self { octave, note })
+        let written_step = Step::new(0, instrument, volume, effect)?;
+        (octave <= MAX_OCTAVE).then_some(Self {
+            octave,
+            written_step,
+        })
     }
 
     pub const fn octave(self) -> u8 {
@@ -34,40 +45,49 @@ impl Pen {
     }
 
     pub const fn instrument(self) -> u8 {
-        self.note.instrument()
+        self.written_step.instrument()
     }
 
     pub const fn volume(self) -> u8 {
-        self.note.volume()
+        self.written_step.volume()
     }
 
     pub const fn effect(self) -> u8 {
-        self.note.effect()
+        self.written_step.effect()
     }
 
-    pub fn set_octave(&mut self, octave: i32) {
-        self.octave = octave.clamp(0, i32::from(MAX_OCTAVE)) as u8;
+    pub const fn value(self, field: PenField) -> u8 {
+        match field {
+            PenField::Octave => self.octave(),
+            PenField::Instrument => self.instrument(),
+            PenField::Volume => self.volume(),
+            PenField::Effect => self.effect(),
+        }
     }
 
-    pub fn change_octave(&mut self, delta: i32) {
-        self.set_octave(i32::from(self.octave) + delta);
+    pub fn set(&mut self, field: PenField, value: u8) {
+        let value = i32::from(value);
+        match field {
+            PenField::Octave => self.octave = value.min(i32::from(MAX_OCTAVE)) as u8,
+            PenField::Instrument => self.written_step.set_instrument(value),
+            PenField::Volume => self.written_step.set_volume(value),
+            PenField::Effect => self.written_step.set_effect(value),
+        }
     }
 
-    pub fn set_instrument(&mut self, instrument: i32) {
-        self.note.set_instrument(instrument);
-    }
-
-    pub fn set_volume(&mut self, volume: i32) {
-        self.note.set_volume(volume);
-    }
-
-    pub fn set_effect(&mut self, effect: i32) {
-        self.note.set_effect(effect);
+    pub fn nudge(&mut self, field: PenField, up: bool) {
+        let value = self.value(field);
+        let nudged = if up {
+            value.saturating_add(1)
+        } else {
+            value.saturating_sub(1)
+        };
+        self.set(field, nudged);
     }
 
     pub fn write_note(self, step: &mut Step, piano_key: u8) {
         let pitch = i32::from(self.octave) * SEMITONES_PER_OCTAVE + i32::from(piano_key);
-        *step = self.note;
+        *step = self.written_step;
         step.set_pitch(pitch);
     }
 }

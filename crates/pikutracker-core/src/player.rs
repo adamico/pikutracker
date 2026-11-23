@@ -1,6 +1,7 @@
 use crate::project::{
-    CHAIN_ENTRIES, ChainEntry, ChainId, FIRST_CUSTOM_INSTRUMENT, Filters, InstrumentSound,
-    MAX_STEPS, Phrase, PhraseId, Project, SfxInstrument, Step, TRACKS, WaveformInstrument,
+    CHAIN_ENTRIES, ChainEntry, ChainId, ChainRowPlace, FIRST_CUSTOM_INSTRUMENT, Filters,
+    InstrumentSound, MAX_STEPS, Phrase, PhraseId, Project, SfxInstrument, Step, TRACKS,
+    WaveformInstrument,
 };
 use crate::synth::{
     Instrument, Instruments, Note, SAMPLE_RATE, SAMPLES_PER_TICK, Sound, Voice, Waveform,
@@ -109,7 +110,7 @@ pub struct ChainEntryPlace {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Playhead {
-    pub chain_row: Option<(usize, usize)>,
+    pub chain_row: Option<ChainRowPlace>,
     pub chain_alone: Option<ChainEntryPlace>,
     pub tracks: [Option<(PhraseId, usize)>; TRACKS],
     pub waiting: [bool; TRACKS],
@@ -276,7 +277,10 @@ impl Playback {
             }
         }
         let chain_row = match self.route {
-            Route::Song | Route::Chain { .. } => Some((self.row, self.k)),
+            Route::Song | Route::Chain { .. } => Some(ChainRowPlace {
+                song_row: self.row,
+                entry: self.k,
+            }),
             Route::Phrase { .. } | Route::ChainAlone { .. } => None,
         };
         let chain_alone = match self.route {

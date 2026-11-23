@@ -142,10 +142,10 @@ fn assert_project_is_sound(imported: &ImportedCart) {
     }
     for warning in &imported.warnings {
         let Some(place) = warning.place else { continue };
-        assert!(place.song_row < SONG_ROWS_CHECKED, "{warning:?}");
+        assert!(place.chain_row.song_row < SONG_ROWS_CHECKED, "{warning:?}");
         assert!(place.track < 4, "{warning:?}");
-        assert!(place.chain_row < CHAIN_ENTRIES, "{warning:?}");
-        assert!(place.step < MAX_STEPS, "{warning:?}");
+        assert!(place.chain_row.entry < CHAIN_ENTRIES, "{warning:?}");
+        assert!(place.step_index < MAX_STEPS, "{warning:?}");
     }
 }
 

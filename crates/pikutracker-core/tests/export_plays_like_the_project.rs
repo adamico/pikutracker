@@ -100,9 +100,13 @@ fn instrumented_project() -> Project {
 }
 
 fn assert_exports_sample_for_sample(project: &Project, song_ticks: usize) {
+    assert_exports_sample_for_sample_from(project, FIRST_PATTERN, song_ticks);
+}
+
+fn assert_exports_sample_for_sample_from(project: &Project, first_pattern: u8, song_ticks: usize) {
     let claim = Claim {
         sfx: (0..8).chain(10..30).collect(),
-        first_and_last_pattern: Some((FIRST_PATTERN, 30)),
+        first_and_last_pattern: Some((first_pattern, 30)),
     };
     let original = format!("{HEADER}__lua__\nprint(1)\n");
 
@@ -111,7 +115,7 @@ fn assert_exports_sample_for_sample(project: &Project, song_ticks: usize) {
     let cart = Cart::read(&exported.cart_bytes).unwrap();
     let samples = (song_ticks + TAIL_TICKS) * SAMPLES_PER_TICK as usize;
     assert_same_samples(
-        &render_music(&cart, FIRST_PATTERN, samples),
+        &render_music(&cart, first_pattern, samples),
         &render_song(project.clone(), samples),
     );
 }
@@ -302,12 +306,12 @@ fn a_loop_back_to_a_loop_start_plays_the_same_after_export() {
 }
 
 #[test]
-fn a_loop_back_with_no_loop_start_plays_the_same_after_export() {
+fn a_loop_back_with_no_loop_start_plays_the_same_after_export_from_pattern_0() {
     let mut project = three_row_song();
     mark(&mut project, 1, false, Some(SongRowEnding::LoopBack));
 
     let [row_0, row_1, _] = THREE_ROW_TICKS;
-    assert_exports_sample_for_sample(&project, 3 * (row_0 + row_1));
+    assert_exports_sample_for_sample_from(&project, 0, 3 * (row_0 + row_1));
 }
 
 #[test]

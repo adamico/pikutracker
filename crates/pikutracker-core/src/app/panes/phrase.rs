@@ -6,7 +6,7 @@ use super::{
 use crate::app::layout::Area;
 use crate::app::selection::{CellPosition, CellRange};
 use crate::app::{Direction, KeyContext};
-use crate::pen::Pen;
+use crate::pen::{Pen, PenField};
 use crate::project::{
     FIRST_CUSTOM_INSTRUMENT, LAST_CUSTOM_INSTRUMENT, MAX_STEPS, NOTE_NAMES, Phrase, PhraseId,
     SEMITONES_PER_OCTAVE, Step,
@@ -54,15 +54,7 @@ enum HeaderCell {
     Detune,
     Reverb,
     Dampen,
-    Pen(PenCell),
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum PenCell {
-    Octave,
-    Instrument,
-    Volume,
-    Effect,
+    Pen(PenField),
 }
 
 const HEADER_CELLS: [&[(HeaderCell, usize)]; 5] = [
@@ -78,12 +70,12 @@ const HEADER_CELLS: [&[(HeaderCell, usize)]; 5] = [
         (HeaderCell::Dampen, 27),
     ],
     &[
-        (HeaderCell::Pen(PenCell::Octave), 4),
-        (HeaderCell::Pen(PenCell::Instrument), 11),
+        (HeaderCell::Pen(PenField::Octave), 4),
+        (HeaderCell::Pen(PenField::Instrument), 11),
     ],
     &[
-        (HeaderCell::Pen(PenCell::Volume), 4),
-        (HeaderCell::Pen(PenCell::Effect), 11),
+        (HeaderCell::Pen(PenField::Volume), 4),
+        (HeaderCell::Pen(PenField::Effect), 11),
     ],
 ];
 
@@ -178,7 +170,8 @@ impl PhrasePane {
 
     pub fn move_cursor(&mut self, direction: Direction) {
         let (columns, rows) = direction.column_and_row_delta();
-        if self.title.takes_move(rows) {
+        if self.title.has_cursor() {
+            self.title.set_cursor(rows <= 0);
             return;
         }
         match self.header_row {
@@ -246,8 +239,15 @@ impl PhrasePane {
     }
 
     pub fn is_on_the_last_instrument(&self, phrase: &Phrase) -> bool {
-        self.step_cell() == Some(StepCell::Instrument)
-            && phrase.step(self.step).instrument() == LAST_CUSTOM_INSTRUMENT
+        self.edited_instrument(phrase) == Some(LAST_CUSTOM_INSTRUMENT)
+    }
+
+    pub fn edited_instrument(&self, phrase: &Phrase) -> Option<u8> {
+        if self.pen_field() == Some(PenField::Instrument) {
+            return Some(self.pen.instrument());
+        }
+        (self.step_cell() == Some(StepCell::Instrument))
+            .then(|| phrase.step(self.step).instrument())
     }
 
     pub fn pen(&self) -> Pen {
@@ -258,43 +258,30 @@ impl PhrasePane {
         self.pen = pen;
     }
 
-    pub fn change_octave(&mut self, delta: i32) {
-        self.pen.change_octave(delta);
+    pub fn nudge_octave(&mut self, up: bool) {
+        self.pen.nudge(PenField::Octave, up);
     }
 
     pub fn is_on_the_pen(&self) -> bool {
-        self.pen_cell().is_some()
+        self.pen_field().is_some()
     }
 
-    fn pen_cell(&self) -> Option<PenCell> {
+    fn pen_field(&self) -> Option<PenField> {
         match self.header_cell()? {
-            HeaderCell::Pen(cell) => Some(cell),
+            HeaderCell::Pen(field) => Some(field),
             _ => None,
         }
     }
 
     pub fn type_pen_digit(&mut self, digit: u8) {
-        self.set_pen_cell(i32::from(digit));
+        if let Some(field) = self.pen_field() {
+            self.pen.set(field, digit);
+        }
     }
 
     pub fn nudge_pen(&mut self, up: bool) {
-        let value = match self.pen_cell() {
-            Some(PenCell::Octave) => self.pen.octave(),
-            Some(PenCell::Instrument) => self.pen.instrument(),
-            Some(PenCell::Volume) => self.pen.volume(),
-            Some(PenCell::Effect) => self.pen.effect(),
-            None => return,
-        };
-        self.set_pen_cell(i32::from(value) + if up { 1 } else { -1 });
-    }
-
-    fn set_pen_cell(&mut self, value: i32) {
-        match self.pen_cell() {
-            Some(PenCell::Octave) => self.pen.set_octave(value),
-            Some(PenCell::Instrument) => self.pen.set_instrument(value),
-            Some(PenCell::Volume) => self.pen.set_volume(value),
-            Some(PenCell::Effect) => self.pen.set_effect(value),
-            None => {}
+        if let Some(field) = self.pen_field() {
+            self.pen.nudge(field, up);
         }
     }
 
@@ -303,12 +290,8 @@ impl PhrasePane {
         self.title.finish_typing();
     }
 
-    pub fn type_title_digit(&mut self, digit: u8) -> PhraseId {
-        PhraseId::new(self.title.type_digit(digit))
-    }
-
-    pub fn nudged_title(shown: Option<PhraseId>, up: bool, coarse: bool) -> PhraseId {
-        PhraseId::new(TitleNumber::nudged(shown.map(PhraseId::number), up, coarse))
+    pub fn title_mut(&mut self) -> &mut TitleNumber {
+        &mut self.title
     }
 
     pub fn type_digit(&mut self, phrase: &mut Phrase, digit: u8) {
@@ -381,15 +364,15 @@ impl PhrasePane {
             StepCell::Pitch => step.set_pitch(value),
             StepCell::Instrument => {
                 step.set_instrument(value);
-                self.pen.set_instrument(i32::from(step.instrument()));
+                self.pen.set(PenField::Instrument, step.instrument());
             }
             StepCell::Volume => {
                 step.set_volume(value);
-                self.pen.set_volume(i32::from(step.volume()));
+                self.pen.set(PenField::Volume, step.volume());
             }
             StepCell::Effect => {
                 step.set_effect(value);
-                self.pen.set_effect(i32::from(step.effect()));
+                self.pen.set(PenField::Effect, step.effect());
             }
         }
     }
@@ -541,10 +524,7 @@ impl PhrasePane {
                     HeaderCell::Detune => filters.detune().to_string(),
                     HeaderCell::Reverb => filters.reverb().to_string(),
                     HeaderCell::Dampen => filters.dampen().to_string(),
-                    HeaderCell::Pen(PenCell::Octave) => self.pen.octave().to_string(),
-                    HeaderCell::Pen(PenCell::Instrument) => format!("{:X}", self.pen.instrument()),
-                    HeaderCell::Pen(PenCell::Volume) => self.pen.volume().to_string(),
-                    HeaderCell::Pen(PenCell::Effect) => self.pen.effect().to_string(),
+                    HeaderCell::Pen(field) => format!("{:X}", self.pen.value(*field)),
                 };
                 let is_cursor = focused
                     && self.header_cell().is_some()

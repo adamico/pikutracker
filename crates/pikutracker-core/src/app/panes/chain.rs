@@ -73,7 +73,8 @@ impl ChainPane {
 
     pub fn move_cursor(&mut self, direction: Direction) {
         let (columns, rows) = direction.column_and_row_delta();
-        if self.title.takes_move(rows) {
+        if self.title.has_cursor() {
+            self.title.set_cursor(rows <= 0);
             return;
         }
         if rows < 0 && self.entry == 0 {
@@ -101,12 +102,8 @@ impl ChainPane {
         self.title.finish_typing();
     }
 
-    pub fn type_title_digit(&mut self, digit: u8) -> ChainId {
-        ChainId::new(self.title.type_digit(digit))
-    }
-
-    pub fn nudged_title(shown: Option<ChainId>, up: bool, coarse: bool) -> ChainId {
-        ChainId::new(TitleNumber::nudged(shown.map(ChainId::number), up, coarse))
+    pub fn title_mut(&mut self) -> &mut TitleNumber {
+        &mut self.title
     }
 
     pub fn type_digit(&mut self, chain: &mut Chain, digit: u8) {

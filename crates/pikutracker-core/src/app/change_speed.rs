@@ -151,7 +151,7 @@ fn whole_song() -> CellRange {
 impl App {
     pub(super) fn ask_for_speed(&mut self, change: SpeedChange) {
         let Some(shown) = self.shown_phrase_id() else {
-            self.remark = Some(NO_PHRASE_HERE);
+            self.remark = Some(NO_PHRASE_HERE.into());
             return;
         };
         let shown_speed = self.project.phrase(shown).speed();

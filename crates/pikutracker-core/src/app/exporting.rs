@@ -4,7 +4,7 @@ use super::files::{Accepted, OVERWRITE_ANSWERS, Waiting, shown_name};
 use super::messages::{LogItem, Report, Severity};
 use crate::cart::{Cart, Slots};
 use crate::export::{self, ExportFailure, Exported};
-use crate::project::{Claim, SongPlace};
+use crate::project::{ChainRowPlace, Claim, SongPlace};
 use crate::wording::counted;
 use std::path::{Path, PathBuf};
 
@@ -26,10 +26,12 @@ fn failure_location(failure: ExportFailure) -> Option<SongPlace> {
             chain_row,
             ..
         } => Some(SongPlace {
-            song_row,
+            chain_row: ChainRowPlace {
+                song_row,
+                entry: chain_row,
+            },
             track,
-            chain_row,
-            step,
+            step_index: step,
         }),
         _ => None,
     }

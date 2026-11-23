@@ -31,7 +31,7 @@ use crate::player::{AudioRequest, PlaybackReport, Playhead, TrackMix};
 use crate::project::{CHAIN_ENTRIES, FIRST_CUSTOM_INSTRUMENT, LAST_CUSTOM_INSTRUMENT, SONG_ROWS};
 use crate::project::{
     Chain, ChainEntry, ChainId, Phrase, PhraseId, Project, SongPlace, SongRowEnding, SongRowMarks,
-    Step,
+    Step, Track,
 };
 use crate::screen::grid::Grid;
 use crate::settings::AppState;
@@ -53,6 +53,7 @@ use panes::song::SongPane;
 use selection::CellPosition;
 use shown::{CursorPlaces, Shown};
 use status_line::StatusLine;
+use std::borrow::Cow;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -99,7 +100,7 @@ pub struct App {
     playhead: Option<Playhead>,
     follow: bool,
     previewing: bool,
-    remark: Option<&'static str>,
+    remark: Option<Cow<'static, str>>,
     notice: Option<Notice>,
     question: Option<Question>,
     speed_entry: Option<SpeedEntry>,
@@ -205,16 +206,16 @@ impl App {
     }
 
     fn show_song_place(&mut self, place: SongPlace) {
-        self.song.jump_to(place.song_row, place.track);
-        self.chain.jump_to(place.chain_row);
-        self.phrase.jump_to(place.step);
+        self.song.jump_to(place.chain_row.song_row, place.track);
+        self.chain.jump_to(place.chain_row.entry);
+        self.phrase.jump_to(place.step_index);
         self.show_what_the_cursors_point_at();
     }
 
     fn show_what_the_cursors_point_at(&mut self) {
         let cursors = CursorPlaces {
             song_row: self.song.row(),
-            track: self.song.track(),
+            track: Track::from_index(self.song.track()),
             chain_entry: self.chain.entry(),
         };
         self.shown.follow_cursors(&self.project, cursors);
@@ -326,9 +327,9 @@ impl App {
         let Some(playhead) = self.playhead else {
             return;
         };
-        if let Some((row, k)) = playhead.chain_row {
-            self.song.follow(row);
-            self.chain.follow(k);
+        if let Some(place) = playhead.chain_row {
+            self.song.follow(place.song_row);
+            self.chain.follow(place.entry);
         }
         if let Some(place) = playhead.chain_alone {
             self.shown.open_chain(place.chain);
@@ -349,13 +350,13 @@ impl App {
 
     fn toggle_follow(&mut self) {
         self.follow = !self.follow;
-        self.remark = Some(if self.follow { FOLLOW_ON } else { FOLLOW_OFF });
+        self.remark = Some(if self.follow { FOLLOW_ON } else { FOLLOW_OFF }.into());
     }
 
     fn stop_following(&mut self) {
         if self.follow {
             self.follow = false;
-            self.remark = Some(FOLLOW_OFF);
+            self.remark = Some(FOLLOW_OFF.into());
         }
     }
 
@@ -422,7 +423,7 @@ impl App {
     fn undo(&mut self) {
         match self.history.undo(&mut self.project) {
             Some(place) => self.return_to(place),
-            None => self.remark = Some(NOTHING_TO_UNDO),
+            None => self.remark = Some(NOTHING_TO_UNDO.into()),
         }
         self.show_claim_in_cart_view();
     }
@@ -430,7 +431,7 @@ impl App {
     fn redo(&mut self) {
         match self.history.redo(&mut self.project) {
             Some(place) => self.return_to(place),
-            None => self.remark = Some(NOTHING_TO_REDO),
+            None => self.remark = Some(NOTHING_TO_REDO.into()),
         }
         self.show_claim_in_cart_view();
     }
@@ -479,7 +480,7 @@ impl App {
             self.settle_after_edit();
             return;
         }
-        if self.title_has_cursor() && self.use_title(action) {
+        if self.use_title(action) {
             return;
         }
         let before_edit = self.step_before_edit(action);
@@ -538,8 +539,8 @@ impl App {
             Action::ClearMutesAndSolos => {
                 self.change_track_mix(|mix| *mix = TrackMix::default());
             }
-            Action::OctaveUp => self.phrase.change_octave(1),
-            Action::OctaveDown => self.phrase.change_octave(-1),
+            Action::OctaveUp => self.phrase.nudge_octave(true),
+            Action::OctaveDown => self.phrase.nudge_octave(false),
             Action::ToggleLoopStart => {
                 self.song
                     .change_marks(&mut self.project, SongRowMarks::toggle_loop_start);
@@ -639,7 +640,7 @@ impl App {
 
     fn open_instrument_view(&mut self, instrument: u8) {
         if instrument < FIRST_CUSTOM_INSTRUMENT {
-            self.remark = Some(BUILT_IN_INSTRUMENT);
+            self.remark = Some(BUILT_IN_INSTRUMENT.into());
             return;
         }
         self.selection_start = None;
@@ -669,10 +670,10 @@ impl App {
             Action::Undo => self.undo(),
             Action::Redo => self.redo(),
             Action::Save => self.save(),
-            Action::OctaveUp => self.phrase.change_octave(1),
-            Action::OctaveDown => self.phrase.change_octave(-1),
+            Action::OctaveUp => self.phrase.nudge_octave(true),
+            Action::OctaveDown => self.phrase.nudge_octave(false),
             Action::Jump(Direction::Right) if view.id() == LAST_CUSTOM_INSTRUMENT => {
-                self.remark = Some(CUSTOM_INSTRUMENTS_END_AT_F);
+                self.remark = Some(CUSTOM_INSTRUMENTS_END_AT_F.into());
             }
             Action::Jump(direction) => {
                 let id = match direction {
@@ -688,33 +689,29 @@ impl App {
         }
     }
 
-    fn title_has_cursor(&self) -> bool {
-        match self.focus {
-            Focus::Chain => self.chain.on_title(),
-            Focus::Phrase => self.phrase.on_title(),
-            Focus::Song | Focus::RightSlot => false,
-        }
-    }
-
     fn use_title(&mut self, action: Action) -> bool {
-        match (self.focus, action) {
-            (Focus::Chain, Action::HexDigit(digit)) => {
-                self.shown.open_chain(self.chain.type_title_digit(digit));
-            }
-            (Focus::Chain, Action::Nudge { up, coarse }) => {
-                let chain = ChainPane::nudged_title(self.shown_chain_id(), up, coarse);
-                self.shown.open_chain(chain);
-            }
-            (Focus::Phrase, Action::HexDigit(digit)) => {
-                self.shown.open_phrase(self.phrase.type_title_digit(digit));
-            }
-            (Focus::Phrase, Action::Nudge { up, coarse }) => {
-                let phrase = PhrasePane::nudged_title(self.shown_phrase_id(), up, coarse);
-                self.shown.open_phrase(phrase);
-            }
-            (_, action) if action.acts_on_cells() => {}
-            _ => return false,
+        let (title, shown, open): (_, _, fn(&mut Shown, u8)) = match self.focus {
+            Focus::Chain => (
+                self.chain.title_mut(),
+                self.shown.chain().map(ChainId::number),
+                |shown, number| shown.open_chain(ChainId::new(number)),
+            ),
+            Focus::Phrase => (
+                self.phrase.title_mut(),
+                self.shown.phrase().map(PhraseId::number),
+                |shown, number| shown.open_phrase(PhraseId::new(number)),
+            ),
+            Focus::Song | Focus::RightSlot => return false,
+        };
+        if !title.has_cursor() {
+            return false;
         }
+        let number = match action {
+            Action::HexDigit(digit) => title.type_digit(digit),
+            Action::Nudge { up, coarse } => title.nudged(shown, up, coarse),
+            _ => return action.acts_on_cells(),
+        };
+        open(&mut self.shown, number);
         true
     }
 
@@ -722,9 +719,26 @@ impl App {
         match self.focus {
             Focus::Song => self.song.type_digit(&mut self.project, digit),
             Focus::Chain => self.edit_chain(|pane, chain| pane.type_digit(chain, digit)),
-            Focus::Phrase if self.phrase.is_on_the_pen() => self.phrase.type_pen_digit(digit),
-            Focus::Phrase => self.edit_phrase(|pane, phrase| pane.type_digit(phrase, digit)),
+            Focus::Phrase if self.phrase.is_on_the_pen() => {
+                self.phrase.type_pen_digit(digit);
+                self.remark_an_undefined_instrument();
+            }
+            Focus::Phrase => {
+                self.edit_phrase(|pane, phrase| pane.type_digit(phrase, digit));
+                self.remark_an_undefined_instrument();
+            }
             Focus::RightSlot => {}
+        }
+    }
+
+    fn remark_an_undefined_instrument(&mut self) {
+        let Some(instrument) = self.phrase.edited_instrument(&self.shown_phrase()) else {
+            return;
+        };
+        let undefined = instrument >= FIRST_CUSTOM_INSTRUMENT
+            && self.project.custom_instrument(instrument).is_none();
+        if undefined {
+            self.remark = Some(format!("CUSTOM INSTRUMENT {instrument:X} IS NOT DEFINED").into());
         }
     }
 
@@ -736,29 +750,32 @@ impl App {
         match self.focus {
             Focus::Song => self.song.nudge(&mut self.project, up, coarse),
             Focus::Chain => self.edit_chain(|pane, chain| pane.nudge(chain, up, coarse)),
-            Focus::Phrase if self.phrase.is_on_the_pen() => self.phrase.nudge_pen(up),
             Focus::Phrase if up && self.goes_past_the_last_instrument() => {
-                self.remark = Some(CUSTOM_INSTRUMENTS_END_AT_F);
+                self.remark = Some(CUSTOM_INSTRUMENTS_END_AT_F.into());
             }
-            Focus::Phrase => self.edit_phrase(|pane, phrase| pane.nudge(phrase, up, coarse)),
+            Focus::Phrase if self.phrase.is_on_the_pen() => {
+                self.phrase.nudge_pen(up);
+                self.remark_an_undefined_instrument();
+            }
+            Focus::Phrase => {
+                self.edit_phrase(|pane, phrase| pane.nudge(phrase, up, coarse));
+                self.remark_an_undefined_instrument();
+            }
             Focus::RightSlot => {}
         }
     }
 
     fn goes_past_the_last_instrument(&self) -> bool {
-        self.shown_phrase_id().is_some_and(|id| {
-            self.phrase
-                .is_on_the_last_instrument(self.project.phrase(id))
-        })
+        self.phrase.is_on_the_last_instrument(&self.shown_phrase())
     }
 
     fn edit_chain(&mut self, edit: impl FnOnce(&mut ChainPane, &mut Chain)) {
         let Some(id) = self.shown_chain_id() else {
-            self.remark = Some(NO_CHAIN_HERE);
+            self.remark = Some(NO_CHAIN_HERE.into());
             return;
         };
         if self.entry_under_chain_cursor().is_none() && !self.chain.edits_empty_entries() {
-            self.remark = Some(NO_PHRASE_HERE);
+            self.remark = Some(NO_PHRASE_HERE.into());
             return;
         }
         edit(&mut self.chain, self.project.chain_mut(id));
@@ -767,7 +784,7 @@ impl App {
     fn edit_phrase(&mut self, edit: impl FnOnce(&mut PhrasePane, &mut Phrase)) {
         match self.shown_phrase_id() {
             Some(id) => edit(&mut self.phrase, self.project.phrase_mut(id)),
-            None => self.remark = Some(NO_PHRASE_HERE),
+            None => self.remark = Some(NO_PHRASE_HERE.into()),
         }
     }
 
@@ -805,7 +822,7 @@ impl App {
     fn play_song(&mut self) {
         let from_row = self.song.row();
         if self.project.song_row_is_empty(from_row) {
-            self.remark = Some(NOTHING_TO_PLAY);
+            self.remark = Some(NOTHING_TO_PLAY.into());
             return;
         }
         let project = self.project_for_player();
@@ -814,7 +831,7 @@ impl App {
 
     fn play_chain(&mut self) {
         let Some(chain) = self.shown_chain_id().filter(|_| self.shown_chain_sounds()) else {
-            self.remark = Some(NOTHING_TO_PLAY);
+            self.remark = Some(NOTHING_TO_PLAY.into());
             return;
         };
         let in_song_row = self.chain_in_song_row_shown();
@@ -850,7 +867,7 @@ impl App {
             .shown_phrase_id()
             .filter(|id| !self.project.phrase(*id).is_silent())
         else {
-            self.remark = Some(NOTHING_TO_PLAY);
+            self.remark = Some(NOTHING_TO_PLAY.into());
             return;
         };
         let project = self.project_for_player();
@@ -920,21 +937,18 @@ impl App {
     }
 
     fn show_what_the_multitrack_cursor_points_at(&mut self, timeline: &Timeline) {
-        let track = self.multitrack.track();
         let Some(step) = self.multitrack.step(timeline) else {
             return;
         };
         let place = step.place;
-        self.show_song_place(SongPlace {
-            song_row: place.song_row,
-            track,
-            chain_row: place.chain_row,
-            step: place.step,
-        });
-        if let Some(chain) = self.project.song_cell(place.song_row, track) {
+        self.show_song_place(place);
+        if let Some(chain) = self
+            .project
+            .song_cell(place.chain_row.song_row, place.track)
+        {
             self.shown.open_chain(chain);
         }
-        self.shown.open_phrase(place.phrase);
+        self.shown.open_phrase(step.phrase);
     }
 
     fn shows_multitrack(&self) -> bool {
@@ -947,9 +961,9 @@ impl App {
         if let Some(place) = playhead.chain_alone {
             return (place.chain == shown).then_some(place.entry);
         }
-        let (row, k) = playhead.chain_row?;
-        let in_song_row = row == self.song.row() && self.chain_in_song_row_shown();
-        in_song_row.then_some(k)
+        let place = playhead.chain_row?;
+        let in_song_row = place.song_row == self.song.row() && self.chain_in_song_row_shown();
+        in_song_row.then_some(place.entry)
     }
 
     fn chain_in_song_row_shown(&self) -> bool {
@@ -1065,7 +1079,7 @@ impl App {
         if let Some(notice) = notice.filter(|notice| notice.is_persistent()) {
             return StatusLine::Notice(notice);
         }
-        if let Some(remark) = self.remark {
+        if let Some(remark) = &self.remark {
             return StatusLine::Remark(remark);
         }
         if let Some(notice) = notice {
@@ -1085,8 +1099,7 @@ impl App {
 }
 
 fn playhead_tick(timeline: &Timeline, playhead: &Playhead) -> Option<u32> {
-    let (song_row, chain_row) = playhead.chain_row?;
-    timeline.tick_of(song_row, chain_row, playhead.chain_row_tick)
+    timeline.tick_of(playhead.chain_row?, playhead.chain_row_tick)
 }
 
 fn next_held_index(

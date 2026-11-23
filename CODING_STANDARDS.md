@@ -56,7 +56,7 @@ A change to an area carries that area's proof. Flag a change that has none.
 | Cart reading and writing | Carts saved by real PICO-8 with expected bytes, plus read-write round trips |
 | Cart Import | Expected `.ptrk` snapshots and warning lists. An Import with no warnings renders the same samples as the original Cart through our synth |
 | MIDI Import | Small MIDI files built in test code, with expected Projects |
-| Export | The Exported Cart renders the same samples as the Project's Export Tracks through our synth. A property test keeps every byte outside the Claim unchanged |
+| Export | The Exported Cart renders the same samples as the Project's 4 Tracks through our synth, Track n on channel n − 1. A property test keeps every byte outside the Claim unchanged |
 | Playback | Comparison with stored measurements of real PICO-8, plus exact snapshots of our synth's output |
 | Keyboard UI | Actions drive the headless App core. Tests assert on the Project and the grid's text, plus one pixel snapshot of the font and palette |
 | `.ptrk` files | One fixture per released format version loads to the expected Project, and saving and reloading gives an identical Project |
