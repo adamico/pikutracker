@@ -699,14 +699,14 @@ impl App {
                 self.shown.open_chain(self.chain.type_title_digit(digit));
             }
             (Focus::Chain, Action::Nudge { up, coarse }) => {
-                let chain = self.chain.nudged_title(self.shown_chain(), up, coarse);
+                let chain = ChainPane::nudged_title(self.shown_chain(), up, coarse);
                 self.shown.open_chain(chain);
             }
             (Focus::Phrase, Action::HexDigit(digit)) => {
                 self.shown.open_phrase(self.phrase.type_title_digit(digit));
             }
             (Focus::Phrase, Action::Nudge { up, coarse }) => {
-                let phrase = self.phrase.nudged_title(self.shown_phrase(), up, coarse);
+                let phrase = PhrasePane::nudged_title(self.shown_phrase(), up, coarse);
                 self.shown.open_phrase(phrase);
             }
             (

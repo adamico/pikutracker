@@ -1,7 +1,7 @@
+use super::title_number::TitleNumber;
 use super::{
     DIMMED, EFFECT_NAMES, EMPTY, HEADING, LOOP_MARK, PEN_LABEL, SELECTED, VALUE,
-    draw_numbered_title, draw_out_of_range_flag, draw_row_label, draw_styled_value, nudged_id,
-    stepped, typed_value,
+    draw_out_of_range_flag, draw_row_label, draw_styled_value, stepped,
 };
 use crate::app::layout::Area;
 use crate::app::selection::{CellPosition, CellRange};
@@ -109,7 +109,7 @@ pub struct PhrasePane {
     step: usize,
     column: usize,
     header_row: Option<usize>,
-    on_title: bool,
+    title: TitleNumber,
     pen: Pen,
     first_digit: Option<u8>,
 }
@@ -128,7 +128,7 @@ impl PhrasePane {
             step: self.step,
             column: self.column,
             header_row: self.header_row,
-            on_title: self.on_title,
+            on_title: self.title.has_cursor(),
         }
     }
 
@@ -136,11 +136,11 @@ impl PhrasePane {
         self.step = place.step;
         self.column = place.column;
         self.header_row = place.header_row;
-        self.on_title = place.on_title;
+        self.title.set_cursor(place.on_title);
     }
 
     pub fn on_title(&self) -> bool {
-        self.on_title
+        self.title.has_cursor()
     }
 
     pub fn step(&self) -> usize {
@@ -158,14 +158,14 @@ impl PhrasePane {
     pub fn jump_to(&mut self, step: usize) {
         self.step = step.min(MAX_STEPS - 1);
         self.header_row = None;
-        self.on_title = false;
+        self.title.set_cursor(false);
     }
 
     pub fn return_to_top(&mut self) {
         self.step = 0;
         self.column = 0;
         self.header_row = None;
-        self.on_title = false;
+        self.title.set_cursor(false);
     }
 
     pub fn key_context(&self) -> KeyContext {
@@ -178,8 +178,7 @@ impl PhrasePane {
 
     pub fn move_cursor(&mut self, direction: Direction) {
         let (columns, rows) = direction.column_and_row_delta();
-        if self.on_title {
-            self.on_title = rows <= 0;
+        if self.title.takes_move(rows) {
             return;
         }
         match self.header_row {
@@ -194,7 +193,7 @@ impl PhrasePane {
 
     fn move_in_header(&mut self, row: usize, columns: isize, rows: isize) {
         if rows < 0 && row == 0 {
-            self.on_title = true;
+            self.title.set_cursor(true);
             return;
         }
         if rows > 0 && row + 1 == HEADER_CELLS.len() {
@@ -213,7 +212,7 @@ impl PhrasePane {
     }
 
     fn step_cell(&self) -> Option<StepCell> {
-        if self.on_title {
+        if self.on_title() {
             return None;
         }
         match self.header_row {
@@ -223,7 +222,7 @@ impl PhrasePane {
     }
 
     fn header_cell(&self) -> Option<HeaderCell> {
-        let row = self.header_row.filter(|_| !self.on_title)?;
+        let row = self.header_row.filter(|_| !self.on_title())?;
         Some(HEADER_CELLS[row][self.column].0)
     }
 
@@ -301,14 +300,15 @@ impl PhrasePane {
 
     pub fn finish_typing(&mut self) {
         self.first_digit = None;
+        self.title.finish_typing();
     }
 
     pub fn type_title_digit(&mut self, digit: u8) -> PhraseId {
-        PhraseId::new(typed_value(&mut self.first_digit, digit))
+        PhraseId::new(self.title.type_digit(digit))
     }
 
-    pub fn nudged_title(&self, shown: Option<PhraseId>, up: bool, coarse: bool) -> PhraseId {
-        PhraseId::new(nudged_id(shown.map(PhraseId::number), up, coarse))
+    pub fn nudged_title(shown: Option<PhraseId>, up: bool, coarse: bool) -> PhraseId {
+        PhraseId::new(TitleNumber::nudged(shown.map(PhraseId::number), up, coarse))
     }
 
     pub fn type_digit(&mut self, phrase: &mut Phrase, digit: u8) {
@@ -470,8 +470,7 @@ impl PhrasePane {
             pen_instrument_name,
         } = view;
         let number = id.map(PhraseId::number);
-        let on_number = focused && self.on_title;
-        draw_numbered_title(grid, area, TITLE_NAME, number, focused, on_number);
+        self.title.draw(grid, area, TITLE_NAME, number, focused);
         self.draw_header(grid, area, focused, phrase);
         self.draw_pen_names(grid, area, pen_instrument_name);
         grid.put(
