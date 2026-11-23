@@ -13,7 +13,6 @@ pub(super) struct CursorPlace {
     pub(super) song: SongCursorPlace,
     pub(super) chain: ChainCursorPlace,
     pub(super) phrase: PhraseCursorPlace,
-    pub(super) overview_channel: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

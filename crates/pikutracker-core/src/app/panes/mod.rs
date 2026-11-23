@@ -4,8 +4,8 @@ pub mod file_list;
 pub mod instrument;
 pub mod log;
 pub mod midi_dialog;
-pub mod overview;
 pub mod phrase;
+pub mod scope;
 pub mod song;
 pub mod song_picker;
 

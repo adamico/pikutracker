@@ -149,7 +149,6 @@ impl App {
                     self.edit_phrase(|pane, phrase| pane.clear_cells(phrase, cells));
                 }
             }
-            (Focus::RightSlot, _) if !self.log_open => self.overview.clear(&mut self.project),
             (Focus::RightSlot, _) => {}
         }
     }

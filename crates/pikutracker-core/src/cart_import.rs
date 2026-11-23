@@ -3,8 +3,7 @@ mod rebuild;
 
 use crate::cart::{Cart, SLOTS};
 use crate::project::{
-    Chain, ChainEntry, ChainId, Claim, EXPORT_CHANNELS, Phrase, PhraseId, Project, SongPlace,
-    TargetCart,
+    Chain, ChainEntry, ChainId, Claim, Phrase, PhraseId, Project, SongPlace, TRACKS, TargetCart,
 };
 use crate::wording::counted;
 use instruments::imported_instrument;
@@ -134,9 +133,6 @@ pub fn import(cart: &Cart, cart_path: &str) -> ImportedCart {
 
 pub fn import_song(cart: &Cart, cart_path: &str, song: Option<CartSong>) -> ImportedCart {
     let mut project = Project::new();
-    for channel in 0..EXPORT_CHANNELS {
-        project.set_export_track(channel, Some(channel as u8 + 1));
-    }
     project.set_song_loop_row(None);
 
     let mut warnings = Vec::new();
@@ -313,7 +309,7 @@ impl<'a> SongBuilder<'a> {
         let rebuilt = rebuild_pattern(self.cart, pattern);
         self.chain_rows += rebuilt.chain_rows.len();
         if rebuilt.only_bit_7 {
-            let track = (0..EXPORT_CHANNELS).find(|&track| pattern.channel(track).is_some());
+            let track = (0..TRACKS).find(|&track| pattern.channel(track).is_some());
             self.warnings.push(ImportWarning {
                 text: format!(
                     "{} HOLDS ONLY BIT 7 SFX: THE CART STALLS HERE, THE EXPORTED SONG PLAYS \
@@ -328,7 +324,7 @@ impl<'a> SongBuilder<'a> {
                 }),
             });
         }
-        for track in 0..EXPORT_CHANNELS {
+        for track in 0..TRACKS {
             let mut chain = Chain::default();
             if let Some(played) = pattern.channel(track) {
                 self.played.insert(played);
