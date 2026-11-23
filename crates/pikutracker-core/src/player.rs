@@ -102,9 +102,15 @@ impl TrackMix {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ChainEntryPlace {
+    pub chain: ChainId,
+    pub entry: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Playhead {
     pub chain_row: Option<(usize, usize)>,
-    pub chain_alone: Option<(ChainId, usize)>,
+    pub chain_alone: Option<ChainEntryPlace>,
     pub tracks: [Option<(PhraseId, usize)>; TRACKS],
     pub waiting: [bool; TRACKS],
     pub chain_row_tick: u32,
@@ -274,7 +280,10 @@ impl Playback {
             Route::Phrase { .. } | Route::ChainAlone { .. } => None,
         };
         let chain_alone = match self.route {
-            Route::ChainAlone { chain } => Some((chain, self.k)),
+            Route::ChainAlone { chain } => Some(ChainEntryPlace {
+                chain,
+                entry: self.k,
+            }),
             _ => None,
         };
         Playhead {

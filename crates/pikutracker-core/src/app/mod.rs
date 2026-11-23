@@ -330,9 +330,9 @@ impl App {
             self.song.follow(row);
             self.chain.follow(k);
         }
-        if let Some((chain, k)) = playhead.chain_alone {
-            self.shown.open_chain(chain);
-            self.chain.follow(k);
+        if let Some(place) = playhead.chain_alone {
+            self.shown.open_chain(place.chain);
+            self.chain.follow(place.entry);
         }
         self.show_what_the_cursors_point_at();
         let step = self
@@ -960,8 +960,8 @@ impl App {
     fn playing_entry_of_shown_chain(&self) -> Option<usize> {
         let playhead = self.playhead?;
         let shown = self.shown_chain_id()?;
-        if let Some((chain, k)) = playhead.chain_alone {
-            return (chain == shown).then_some(k);
+        if let Some(place) = playhead.chain_alone {
+            return (place.chain == shown).then_some(place.entry);
         }
         let (row, k) = playhead.chain_row?;
         let in_song_row = row == self.song.row() && self.chain_in_song_row_shown();
