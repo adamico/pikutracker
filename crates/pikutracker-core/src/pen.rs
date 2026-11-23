@@ -1,42 +1,32 @@
-use crate::project::{MAX_EFFECT, MAX_INSTRUMENT, MAX_VOLUME, SEMITONES_PER_OCTAVE, Step};
+use crate::project::{SEMITONES_PER_OCTAVE, Step};
 
 const DEFAULT_OCTAVE: u8 = 2;
 const MAX_OCTAVE: u8 = 4;
-const DEFAULT_INSTRUMENT: u8 = 2;
-const DEFAULT_VOLUME: u8 = 5;
+const DEFAULT_INSTRUMENT: i32 = 2;
+const DEFAULT_VOLUME: i32 = 5;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Pen {
     octave: u8,
-    instrument: u8,
-    volume: u8,
-    effect: u8,
+    note: Step,
 }
 
 impl Default for Pen {
     fn default() -> Self {
+        let mut note = Step::default();
+        note.set_instrument(DEFAULT_INSTRUMENT);
+        note.set_volume(DEFAULT_VOLUME);
         Self {
             octave: DEFAULT_OCTAVE,
-            instrument: DEFAULT_INSTRUMENT,
-            volume: DEFAULT_VOLUME,
-            effect: 0,
+            note,
         }
     }
 }
 
 impl Pen {
     pub fn new(octave: u8, instrument: u8, volume: u8, effect: u8) -> Option<Self> {
-        let fits = |value: u8, max: i32| i32::from(value) <= max;
-        (fits(octave, i32::from(MAX_OCTAVE))
-            && fits(instrument, MAX_INSTRUMENT)
-            && fits(volume, MAX_VOLUME)
-            && fits(effect, MAX_EFFECT))
-        .then_some(Self {
-            octave,
-            instrument,
-            volume,
-            effect,
-        })
+        let note = Step::new(0, instrument, volume, effect)?;
+        (octave <= MAX_OCTAVE).then_some(Self { octave, note })
     }
 
     pub const fn octave(self) -> u8 {
@@ -44,15 +34,15 @@ impl Pen {
     }
 
     pub const fn instrument(self) -> u8 {
-        self.instrument
+        self.note.instrument()
     }
 
     pub const fn volume(self) -> u8 {
-        self.volume
+        self.note.volume()
     }
 
     pub const fn effect(self) -> u8 {
-        self.effect
+        self.note.effect()
     }
 
     pub fn set_octave(&mut self, octave: i32) {
@@ -64,21 +54,20 @@ impl Pen {
     }
 
     pub fn set_instrument(&mut self, instrument: i32) {
-        self.instrument = instrument.clamp(0, MAX_INSTRUMENT) as u8;
+        self.note.set_instrument(instrument);
     }
 
     pub fn set_volume(&mut self, volume: i32) {
-        self.volume = volume.clamp(0, MAX_VOLUME) as u8;
+        self.note.set_volume(volume);
     }
 
     pub fn set_effect(&mut self, effect: i32) {
-        self.effect = effect.clamp(0, MAX_EFFECT) as u8;
+        self.note.set_effect(effect);
     }
 
     pub fn write_note(self, step: &mut Step, piano_key: u8) {
-        step.set_pitch(i32::from(self.octave) * SEMITONES_PER_OCTAVE + i32::from(piano_key));
-        step.set_instrument(i32::from(self.instrument));
-        step.set_volume(i32::from(self.volume));
-        step.set_effect(i32::from(self.effect));
+        let pitch = i32::from(self.octave) * SEMITONES_PER_OCTAVE + i32::from(piano_key);
+        *step = self.note;
+        step.set_pitch(pitch);
     }
 }

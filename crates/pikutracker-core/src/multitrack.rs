@@ -1,4 +1,4 @@
-use crate::project::{ChainEntry, MAX_PITCH, PhraseId, Project, Step, TRACKS};
+use crate::project::{ChainEntry, PhraseId, Project, Step, TRACKS};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StepPlace {
@@ -27,8 +27,7 @@ impl TimedStep {
     }
 
     pub fn pitch(&self) -> Option<u8> {
-        let pitch = i32::from(self.step.pitch()) + i32::from(self.transpose);
-        (0..=MAX_PITCH).contains(&pitch).then_some(pitch as u8)
+        self.step.transposed_pitch(self.transpose)
     }
 }
 
