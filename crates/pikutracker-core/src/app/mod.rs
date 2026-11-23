@@ -538,8 +538,8 @@ impl App {
             Action::ClearMutesAndSolos => {
                 self.change_track_mix(|mix| *mix = TrackMix::default());
             }
-            Action::OctaveUp => self.phrase.change_octave(1),
-            Action::OctaveDown => self.phrase.change_octave(-1),
+            Action::OctaveUp => self.phrase.nudge_octave(true),
+            Action::OctaveDown => self.phrase.nudge_octave(false),
             Action::ToggleLoopStart => {
                 self.song
                     .change_marks(&mut self.project, SongRowMarks::toggle_loop_start);
@@ -669,8 +669,8 @@ impl App {
             Action::Undo => self.undo(),
             Action::Redo => self.redo(),
             Action::Save => self.save(),
-            Action::OctaveUp => self.phrase.change_octave(1),
-            Action::OctaveDown => self.phrase.change_octave(-1),
+            Action::OctaveUp => self.phrase.nudge_octave(true),
+            Action::OctaveDown => self.phrase.nudge_octave(false),
             Action::Jump(Direction::Right) if view.id() == LAST_CUSTOM_INSTRUMENT => {
                 self.remark = Some(CUSTOM_INSTRUMENTS_END_AT_F);
             }
