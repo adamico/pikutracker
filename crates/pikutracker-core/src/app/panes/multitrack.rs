@@ -5,7 +5,7 @@ use super::{
 };
 use crate::app::Direction;
 use crate::app::layout::Area;
-use crate::multitrack::{TimedStep, Timeline};
+use crate::multitrack::{Line, TimedStep, Timeline};
 use crate::project::{Project, Step, TRACKS};
 use crate::screen::grid::{Grid, Style};
 
@@ -78,9 +78,9 @@ impl MultitrackPane {
             .map_or(tick, |step| step.start);
     }
 
-    fn line(&self, starts: &[u32]) -> usize {
-        starts
-            .partition_point(|&start| start <= self.tick)
+    fn line(&self, lines: &[Line]) -> usize {
+        lines
+            .partition_point(|line| line.tick <= self.tick)
             .saturating_sub(1)
     }
 
@@ -90,11 +90,11 @@ impl MultitrackPane {
     }
 
     pub fn draw(&self, grid: &mut Grid, area: Area, focused: bool, view: &MultitrackView) {
-        let starts = view.timeline.line_starts();
-        let line = self.line(&starts);
-        let song_row = starts
+        let lines = view.timeline.lines();
+        let line = self.line(&lines);
+        let song_row = lines
             .get(line)
-            .and_then(|&tick| view.timeline.chain_row_at(tick))
+            .and_then(|line| view.timeline.chain_row_at(line.tick))
             .map_or(0, |span| span.song_row);
         let title = format!("MULTITRACK  ROW {song_row:02X}");
         draw_title(grid, area.column, area.row, &title, focused);
@@ -109,20 +109,21 @@ impl MultitrackPane {
         }
 
         let visible = area.rows - HEADER_ROWS;
-        let top = Self::top_line(line, visible, starts.len());
-        for (offset, &tick) in starts.iter().skip(top).take(visible).enumerate() {
+        let top = Self::top_line(line, visible, lines.len());
+        for (offset, line) in lines.iter().skip(top).take(visible).enumerate() {
             let row = area.row + HEADER_ROWS + offset;
-            let starting_song_row = view
-                .timeline
-                .song_row_starts()
-                .find(|&(_, start)| start == tick)
-                .map(|(song_row, _)| song_row);
-            let label = starting_song_row.map_or_else(String::new, |row| format!("{row:02X}"));
-            let playing = view.playhead_tick == Some(tick);
+            let tick = line.tick;
+            let label = line
+                .song_row
+                .map_or_else(String::new, |row| format!("{row:02X}"));
+            let playing = line.holds_steps && view.playhead_tick == Some(tick);
             draw_row_label(grid, area.column, row, &label, playing);
-            if let Some(song_row) = starting_song_row {
+            if let Some(song_row) = line.song_row {
                 let mark = mark_text(view.project.song_row_marks(song_row));
                 grid.put(area.column + MARK_COLUMN, row, mark, LOOP_MARK);
+            }
+            if !line.holds_steps {
+                continue;
             }
             for track in 0..TRACKS {
                 let column = area.column + FIRST_TRACK_COLUMN + track * TRACK_WIDTH;

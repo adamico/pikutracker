@@ -201,8 +201,28 @@ fn the_gutter_numbers_each_song_row_with_its_marks_and_scrolls_on_through_the_so
     let app = App::with_project(project);
 
     assert_eq!(
+        lines(&app, 5),
+        ["00> C-2 2 5 0", "01< C-2 2 5 0", "02", "03  C-2 2 5 0", ""]
+    );
+}
+
+#[test]
+fn an_empty_song_row_gets_a_gutter_line_with_its_mark_that_the_cursor_passes_over() {
+    let mut project = Project::new();
+    let phrase = write(&mut project, 1, 8, &[C2]);
+    place(&mut project, 0, 0, 0, &[ChainEntry::new(phrase)]);
+    project.set_song_cell(2, 0, Some(ChainId::new(0)));
+    let mut marks = SongRowMarks::default();
+    marks.toggle_ending(SongRowEnding::Stop);
+    project.set_song_row_marks(1, marks);
+    let mut app = App::with_project(project);
+    apply(&mut app, &TO_MULTITRACK);
+
+    app.apply(DOWN);
+
+    assert_eq!(
         lines(&app, 4),
-        ["00> C-2 2 5 0", "01< C-2 2 5 0", "03  C-2 2 5 0", ""]
+        ["00  C-2 2 5 0", "01|", "02 [C-2]2 5 0", ""]
     );
 }
 

@@ -12,5 +12,5 @@ A Project has one Song, and it holds all of a Cart's music the way PICO-8 does: 
 - When a Loop back has no Loop start at or before it and the Song's first Pattern is not Pattern 0, Export also puts the Loop start flag on that first Pattern. PICO-8 would otherwise return to Pattern 0, outside the Song.
 - The tracker neither reads nor writes `music(n)` calls. When an Export moves Patterns, the user updates the game's code.
 - Play starts at the cursor's Song row and follows the marks as PICO-8 would.
-- The Multitrack lays out the Song rows from 00 to the last one that plays, in row order as Export does, and shows the marks in its gutter rather than following them. An empty Song row lasts no Ticks, so it takes no rows there.
+- The Multitrack lays out the Song rows from 00 to the last one that plays, in row order as Export does, and shows the marks in its gutter rather than following them. An empty Song row lasts no Ticks, so it gets one gutter line with its row number and marks and nothing else; the cursor never lands on it.
 - Insert row and Delete row shift the marks with the rows, and moving rows leaves them where they are, as [ADR 0021](0021-moving-rows-leaves-the-song-loop-row.md) decided for the Song loop row, which they replace.

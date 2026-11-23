@@ -40,9 +40,17 @@ pub struct ChainRowSpan {
     pub ticks: u32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Line {
+    pub tick: u32,
+    pub song_row: Option<usize>,
+    pub holds_steps: bool,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Timeline {
     chain_rows: Vec<ChainRowSpan>,
+    empty_song_rows: Vec<(usize, u32)>,
     tracks: [Vec<TimedStep>; TRACKS],
 }
 
@@ -54,6 +62,9 @@ impl Timeline {
         };
         let mut start = 0;
         for song_row in 0..=last_row {
+            if project.song_row_is_empty(song_row) {
+                timeline.empty_song_rows.push((song_row, start));
+            }
             for chain_row in project.played_chain_rows(song_row) {
                 let span = ChainRowSpan {
                     song_row,
@@ -114,7 +125,7 @@ impl Timeline {
             .map(|(_, span)| (span.song_row, span.start))
     }
 
-    pub fn line_starts(&self) -> Vec<u32> {
+    pub fn lines(&self) -> Vec<Line> {
         let mut starts: Vec<u32> = self
             .tracks
             .iter()
@@ -124,7 +135,22 @@ impl Timeline {
             .collect();
         starts.sort_unstable();
         starts.dedup();
-        starts
+        let lines_with_steps = starts.into_iter().map(|tick| Line {
+            tick,
+            song_row: self
+                .song_row_starts()
+                .find(|&(_, start)| start == tick)
+                .map(|(song_row, _)| song_row),
+            holds_steps: true,
+        });
+        let empty_lines = self.empty_song_rows.iter().map(|&(song_row, tick)| Line {
+            tick,
+            song_row: Some(song_row),
+            holds_steps: false,
+        });
+        let mut lines: Vec<Line> = empty_lines.chain(lines_with_steps).collect();
+        lines.sort_by_key(|line| (line.tick, line.holds_steps, line.song_row));
+        lines
     }
 }
 
