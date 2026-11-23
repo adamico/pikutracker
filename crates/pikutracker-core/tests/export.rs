@@ -285,14 +285,14 @@ fn an_empty_song_row_between_played_rows_becomes_an_empty_pattern_with_its_marks
 }
 
 #[test]
-fn a_loop_back_to_song_row_00_flags_loop_start_on_a_first_pattern_past_pattern_0() {
+fn a_loop_back_with_no_loop_start_adds_no_loop_start_flag_on_a_first_pattern_past_pattern_0() {
     let mut project = one_row_project();
     place(&mut project, 1, 0, 0, 0);
     mark(&mut project, 1, false, Some(SongRowEnding::LoopBack));
 
     let cart = exported_cart(&project, &claim(&[8], (2, 3)));
 
-    assert_eq!(cart.pattern_bytes(2), [8 | 0x80, 0x42, 0x43, 0x44]);
+    assert_eq!(cart.pattern_bytes(2), [8, 0x42, 0x43, 0x44]);
     assert_eq!(cart.pattern_bytes(3), [8, 0x42 | 0x80, 0x43, 0x44]);
 }
 

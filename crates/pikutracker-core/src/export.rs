@@ -112,7 +112,6 @@ struct CompiledSong {
     sfx: Vec<[u8; SFX_BYTES]>,
     patterns: Vec<CompiledPattern>,
     marks: Vec<SongRowMarks>,
-    loops_back_to_its_start: bool,
 }
 
 impl CompiledSong {
@@ -232,7 +231,6 @@ pub fn needs(project: &Project) -> ExportNeeds {
 
 #[derive(Clone, Copy)]
 struct SongPattern {
-    song_row: usize,
     chain_row: Option<ChainRowPlace>,
     marks: SongRowMarks,
 }
@@ -260,7 +258,6 @@ fn song_row_patterns(project: &Project, song_row: usize) -> Vec<SongPattern> {
         .into_iter()
         .enumerate()
         .map(|(index, chain_row)| SongPattern {
-            song_row,
             chain_row,
             marks: SongRowMarks {
                 loop_start: marks.loop_start && index == 0,
@@ -319,9 +316,6 @@ fn compile_song(
         }
         song.patterns.push(pattern);
     }
-    song.loops_back_to_its_start = song_patterns.iter().any(|place| {
-        place.marks.loops_back() && project.loop_start_at_or_before(place.song_row).is_none()
-    });
     song
 }
 
@@ -521,7 +515,7 @@ fn place_song(song: &CompiledSong, slots: &ClaimedSlots, cart: &mut Cart) {
     for (index, &slot) in slots.patterns.iter().enumerate() {
         let bytes = song.patterns.get(index).map_or_else(
             || blank.pattern_bytes(slot),
-            |pattern| pattern_bytes(song, index, slot, pattern, &phrase_slots),
+            |pattern| pattern_bytes(song, index, pattern, &phrase_slots),
         );
         cart.set_pattern_bytes(slot, bytes);
     }
@@ -530,7 +524,6 @@ fn place_song(song: &CompiledSong, slots: &ClaimedSlots, cart: &mut Cart) {
 fn pattern_bytes(
     song: &CompiledSong,
     index: usize,
-    slot: u8,
     pattern: &CompiledPattern,
     sfx_slots: &[u8],
 ) -> [u8; TRACKS] {
@@ -539,8 +532,7 @@ fn pattern_bytes(
         *byte = pattern[channel].map_or(disabled_channel_byte(channel), |sfx| sfx_slots[sfx]);
     }
     let marks = song.marks[index];
-    let starts_the_song_off_pattern_0 = index == 0 && slot != 0 && song.loops_back_to_its_start;
-    if marks.loop_start || starts_the_song_off_pattern_0 {
+    if marks.loop_start {
         bytes[LOOP_START_CHANNEL] |= FLAG;
     }
     match marks.ending {

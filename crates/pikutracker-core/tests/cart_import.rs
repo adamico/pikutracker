@@ -348,6 +348,34 @@ fn importing_and_exporting_straight_back_keeps_the_claimed_pattern_flags() {
 }
 
 #[test]
+fn a_loop_back_with_no_loop_start_keeps_the_carts_flags_through_a_round_trip() {
+    let mut back = pattern([Some(1), None, None, None]);
+    back.loop_back = true;
+    let cart = TestCart {
+        sfx: two_sfx(),
+        patterns: vec![
+            pattern([None, None, None, None]),
+            pattern([None, None, None, None]),
+            pattern([Some(0), None, None, None]),
+            back,
+        ],
+    };
+    let original = cart.p8();
+    let (project, _) = imported(&cart);
+    let claim = project.target_cart().unwrap().claim.clone();
+
+    let exported = export(&project, &claim, &original).unwrap();
+
+    let after = Cart::read(&exported.cart_bytes).unwrap();
+    let flags = |slot| {
+        let pattern = after.pattern(slot);
+        (pattern.loop_start(), pattern.loop_back(), pattern.stop())
+    };
+    assert_eq!(flags(2), (false, false, false));
+    assert_eq!(flags(3), (false, true, false));
+}
+
+#[test]
 fn loop_back_jumps_to_the_nearest_loop_start_before_it() {
     let mut start = pattern([Some(1), None, None, None]);
     start.loop_start = true;
