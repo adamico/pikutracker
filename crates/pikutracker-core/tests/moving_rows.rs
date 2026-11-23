@@ -10,7 +10,7 @@ use support::apply;
 const UP: Action = Action::Move(Direction::Up);
 const DOWN: Action = Action::Move(Direction::Down);
 const RIGHT: Action = Action::Move(Direction::Right);
-const TAB: Action = Action::FocusNext;
+const SHIFT_TAB: Action = Action::FocusPrevious;
 const SELECT: Action = Action::StartSelection;
 const SELECT_DOWN: Action = Action::Select(Direction::Down);
 const ROWS_UP: Action = Action::MoveRows { up: true };
@@ -122,7 +122,7 @@ fn in_the_song_pane_only_the_selected_tracks_cells_move() {
 fn selected_chain_entries_move_up_and_down() {
     let mut app = App::with_project(chain());
 
-    apply(&mut app, &[TAB, DOWN, DOWN, SELECT_DOWN, ROWS_UP]);
+    apply(&mut app, &[SHIFT_TAB, DOWN, DOWN, SELECT_DOWN, ROWS_UP]);
     assert_eq!(
         entry_phrases(&app),
         [Some(0), Some(2), Some(3), Some(1), Some(4)]
@@ -139,7 +139,7 @@ fn selected_chain_entries_move_up_and_down() {
 fn selected_steps_move_up_and_down_within_len() {
     let mut app = App::with_project(phrase_of_length_4());
 
-    apply(&mut app, &[TAB, TAB, DOWN, SELECT, ROWS_UP]);
+    apply(&mut app, &[SHIFT_TAB, SHIFT_TAB, DOWN, SELECT, ROWS_UP]);
     assert_eq!(pitches(&app), [11, 10, 12, 13, 14, 15]);
 
     apply(&mut app, &[ROWS_DOWN, ROWS_DOWN, ROWS_DOWN]);
@@ -155,16 +155,20 @@ fn at_either_edge_a_press_changes_nothing_adds_no_undo_entry_and_shows_no_remark
             [[DOWN; SONG_ROWS - 1].as_slice(), &[SELECT]].concat(),
             ROWS_DOWN,
         ),
-        (chain(), vec![TAB, SELECT], ROWS_UP),
+        (chain(), vec![SHIFT_TAB, SELECT], ROWS_UP),
         (
             chain(),
-            [[TAB].as_slice(), &[DOWN; 15], &[SELECT]].concat(),
+            [[SHIFT_TAB].as_slice(), &[DOWN; 15], &[SELECT]].concat(),
             ROWS_DOWN,
         ),
-        (phrase_of_length_4(), vec![TAB, TAB, SELECT], ROWS_UP),
         (
             phrase_of_length_4(),
-            vec![TAB, TAB, DOWN, DOWN, DOWN, SELECT],
+            vec![SHIFT_TAB, SHIFT_TAB, SELECT],
+            ROWS_UP,
+        ),
+        (
+            phrase_of_length_4(),
+            vec![SHIFT_TAB, SHIFT_TAB, DOWN, DOWN, DOWN, SELECT],
             ROWS_DOWN,
         ),
     ];
@@ -186,8 +190,11 @@ fn at_either_edge_a_press_changes_nothing_adds_no_undo_entry_and_shows_no_remark
 fn each_press_is_one_undo_entry_in_every_pane() {
     let cases = [
         (song(), vec![DOWN, SELECT_DOWN]),
-        (chain(), vec![TAB, DOWN, SELECT_DOWN]),
-        (phrase_of_length_4(), vec![TAB, TAB, DOWN, SELECT]),
+        (chain(), vec![SHIFT_TAB, DOWN, SELECT_DOWN]),
+        (
+            phrase_of_length_4(),
+            vec![SHIFT_TAB, SHIFT_TAB, DOWN, SELECT],
+        ),
     ];
     for (project, moves) in cases {
         let mut app = App::with_project(project.clone());
@@ -314,15 +321,4 @@ fn without_a_selection_x_up_and_down_still_jump_in_the_m8_style_preset() {
         [Some(0x10), Some(0x11), Some(0x12), None, None]
     );
     assert!(app.grid().text_dump().contains("10 [--]"));
-}
-
-#[test]
-fn moving_song_rows_leaves_the_song_loop_row_where_it_is() {
-    let mut project = song();
-    project.set_song_loop_row(Some(1));
-    let mut app = App::with_project(project);
-
-    apply(&mut app, &[DOWN, SELECT, ROWS_DOWN]);
-
-    assert_eq!(app.project().song_loop_row(), Some(1));
 }

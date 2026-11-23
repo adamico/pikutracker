@@ -150,8 +150,8 @@ fn whole_song() -> CellRange {
 
 impl App {
     pub(super) fn ask_for_speed(&mut self, change: SpeedChange) {
-        let Some(shown) = self.phrase_under_cursor() else {
-            self.remark = Some(NO_PHRASE_HERE);
+        let Some(shown) = self.shown_phrase_id() else {
+            self.remark = Some(NO_PHRASE_HERE.into());
             return;
         };
         let shown_speed = self.project.phrase(shown).speed();
@@ -197,7 +197,7 @@ impl App {
     }
 
     fn chain_scope(&self, cells: CellRange) -> (Vec<PhraseId>, usize) {
-        let Some(id) = self.chain_under_cursor() else {
+        let Some(id) = self.shown_chain_id() else {
             return (Vec::new(), 0);
         };
         let chain = self.project.chain(id);

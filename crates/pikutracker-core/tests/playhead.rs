@@ -1,13 +1,14 @@
 mod support;
 
+use pikutracker_core::app::layout::{self, Area};
 use pikutracker_core::app::{Action, App, Direction};
 use pikutracker_core::player::Player;
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
 use pikutracker_core::synth::SAMPLES_PER_TICK;
-use support::status_line;
+use support::{pane_text, status_line};
 
 const DOWN: Action = Action::Move(Direction::Down);
-const TAB: Action = Action::FocusNext;
+const SHIFT_TAB: Action = Action::FocusPrevious;
 const SPACE: Action = Action::PlayFocusedPane;
 const PLAY_SONG: Action = Action::PlaySongFromCursor;
 const FOLLOW: Action = Action::ToggleFollow;
@@ -17,9 +18,7 @@ const STEP_SAMPLES: usize = SPEED as usize * SAMPLES_PER_TICK as usize;
 
 const FIRST_SONG_ROW: usize = 2;
 const FIRST_CHAIN_ROW: usize = 2;
-const FIRST_STEP_ROW: usize = 5;
-const CHAIN_COLUMN: usize = 29;
-const PHRASE_COLUMN: usize = 63;
+const FIRST_STEP_ROW: usize = 7;
 
 fn write(project: &mut Project, id: u8, steps: usize) -> PhraseId {
     let id = PhraseId::new(id);
@@ -66,63 +65,68 @@ fn play_on(app: &mut App, player: &mut Player, steps: usize) {
     app.show_playback(&player.report());
 }
 
-fn line(app: &App, row: usize) -> String {
-    app.grid().text_dump().lines().nth(row).unwrap().to_owned()
-}
-
-fn pane_text(app: &App, column: usize, row: usize) -> String {
-    let text: String = line(app, row).chars().skip(column).take(2).collect();
-    text.trim_end().to_owned()
+fn label(app: &App, area: Area, row: usize) -> String {
+    pane_text(app, area, row).chars().take(2).collect()
 }
 
 #[test]
 fn the_song_pane_marks_the_row_being_played() {
     let (app, _) = played(&[PLAY_SONG], 4);
 
-    assert_eq!(pane_text(&app, 0, FIRST_SONG_ROW), "00");
-    assert_eq!(pane_text(&app, 0, FIRST_SONG_ROW + 1), ">1");
+    assert_eq!(label(&app, layout::SONG, FIRST_SONG_ROW), "00");
+    assert_eq!(label(&app, layout::SONG, FIRST_SONG_ROW + 1), ">1");
 }
 
 #[test]
 fn the_chain_pane_marks_the_entry_being_played() {
     let (app, _) = played(&[PLAY_SONG], 2);
 
-    assert_eq!(pane_text(&app, CHAIN_COLUMN, FIRST_CHAIN_ROW), "0");
-    assert_eq!(pane_text(&app, CHAIN_COLUMN, FIRST_CHAIN_ROW + 1), ">");
+    assert_eq!(label(&app, layout::CHAIN, FIRST_CHAIN_ROW), "00");
+    assert_eq!(label(&app, layout::CHAIN, FIRST_CHAIN_ROW + 1), ">1");
 }
 
 #[test]
 fn the_phrase_pane_marks_the_step_being_played() {
     let (app, _) = played(&[PLAY_SONG], 1);
 
-    assert_eq!(pane_text(&app, PHRASE_COLUMN, FIRST_STEP_ROW), "00");
-    assert_eq!(pane_text(&app, PHRASE_COLUMN, FIRST_STEP_ROW + 1), ">1");
+    assert_eq!(label(&app, layout::PHRASE, FIRST_STEP_ROW), "00");
+    assert_eq!(label(&app, layout::PHRASE, FIRST_STEP_ROW + 1), ">1");
 }
 
 #[test]
 fn the_marker_is_separate_from_the_cursor() {
     let (app, _) = played(
-        &[DOWN, TAB, TAB, DOWN, Action::Move(Direction::Up), PLAY_SONG],
+        &[
+            DOWN,
+            SHIFT_TAB,
+            SHIFT_TAB,
+            DOWN,
+            Action::Move(Direction::Up),
+            PLAY_SONG,
+        ],
         0,
     );
 
-    assert_eq!(pane_text(&app, 0, FIRST_SONG_ROW + 1), ">1");
-    assert!(line(&app, FIRST_STEP_ROW).contains('['), "cursor stays put");
+    assert_eq!(label(&app, layout::SONG, FIRST_SONG_ROW + 1), ">1");
+    assert!(
+        pane_text(&app, layout::PHRASE, FIRST_STEP_ROW).contains('['),
+        "cursor stays put"
+    );
 }
 
 #[test]
 fn a_pane_showing_something_else_has_no_marker() {
     let (app, _) = played(&[PLAY_SONG, DOWN], 1);
 
-    assert_eq!(pane_text(&app, CHAIN_COLUMN, FIRST_CHAIN_ROW), "0");
-    assert_eq!(pane_text(&app, PHRASE_COLUMN, FIRST_STEP_ROW + 1), "01");
+    assert_eq!(label(&app, layout::CHAIN, FIRST_CHAIN_ROW), "00");
+    assert_eq!(label(&app, layout::PHRASE, FIRST_STEP_ROW + 1), "01");
 }
 
 #[test]
 fn the_phrase_pane_marks_a_phrase_playing_alone() {
-    let (app, _) = played(&[TAB, TAB, SPACE], 1);
+    let (app, _) = played(&[SHIFT_TAB, SHIFT_TAB, SPACE], 1);
 
-    assert_eq!(pane_text(&app, PHRASE_COLUMN, FIRST_STEP_ROW + 1), ">1");
+    assert_eq!(label(&app, layout::PHRASE, FIRST_STEP_ROW + 1), ">1");
 }
 
 #[test]
@@ -132,8 +136,8 @@ fn the_marker_goes_away_when_playback_stops() {
     app.apply(SPACE);
     play_on(&mut app, &mut player, 0);
 
-    assert_eq!(pane_text(&app, 0, FIRST_SONG_ROW), "00");
-    assert_eq!(pane_text(&app, PHRASE_COLUMN, FIRST_STEP_ROW + 1), "01");
+    assert_eq!(label(&app, layout::SONG, FIRST_SONG_ROW), "00");
+    assert_eq!(label(&app, layout::PHRASE, FIRST_STEP_ROW + 1), "01");
 }
 
 #[test]
@@ -148,26 +152,28 @@ fn f10_turns_follow_on_and_off_and_says_so() {
 }
 
 #[test]
-fn the_panes_stay_put_while_follow_is_off() {
-    let (app, _) = played(&[PLAY_SONG], 4);
+fn while_follow_is_off_the_song_cursor_tracks_the_playhead_and_the_chain_and_phrase_stay_put() {
+    let (app, _) = played(&[PLAY_SONG], 5);
 
-    assert_eq!(app.chain_under_cursor(), Some(ChainId::new(0)));
+    assert!(pane_text(&app, layout::SONG, FIRST_SONG_ROW + 1).contains('['));
+    assert_eq!(app.shown_chain_id(), Some(ChainId::new(0)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(1)));
 }
 
 #[test]
 fn follow_moves_the_panes_to_the_playhead() {
     let (app, _) = played(&[FOLLOW, PLAY_SONG], 5);
 
-    assert_eq!(app.chain_under_cursor(), Some(ChainId::new(1)));
-    assert_eq!(app.phrase_under_cursor(), Some(PhraseId::new(3)));
+    assert_eq!(app.shown_chain_id(), Some(ChainId::new(1)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(3)));
 }
 
 #[test]
 fn follow_moves_the_cursor_down_the_chain_and_the_phrase() {
-    let (app, _) = played(&[FOLLOW, TAB, TAB, PLAY_SONG], 3);
+    let (app, _) = played(&[FOLLOW, SHIFT_TAB, SHIFT_TAB, PLAY_SONG], 3);
 
-    assert_eq!(app.phrase_under_cursor(), Some(PhraseId::new(2)));
-    assert!(line(&app, FIRST_STEP_ROW + 1).contains('['));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(2)));
+    assert!(pane_text(&app, layout::PHRASE, FIRST_STEP_ROW + 1).contains('['));
 }
 
 #[test]
@@ -177,9 +183,9 @@ fn moving_the_cursor_by_hand_turns_follow_off_and_says_so() {
     app.apply(DOWN);
     assert_eq!(status_line(&app), "FOLLOW OFF");
 
-    let row_after_moving = app.chain_under_cursor();
+    let row_after_moving = app.shown_chain_id();
     play_on(&mut app, &mut player, 4);
-    assert_eq!(app.chain_under_cursor(), row_after_moving);
+    assert_eq!(app.shown_chain_id(), row_after_moving);
 }
 
 #[test]
@@ -199,7 +205,7 @@ fn moving_through_the_log_leaves_follow_on() {
     assert!(!status_line(&app).contains("FOLLOW"));
 
     play_on(&mut app, &mut player, 4);
-    assert_eq!(app.chain_under_cursor(), Some(ChainId::new(1)));
+    assert_eq!(app.shown_chain_id(), Some(ChainId::new(1)));
 }
 
 #[test]
@@ -211,9 +217,7 @@ fn a_report_says_whether_the_screen_needs_drawing_again() {
 
 #[test]
 fn a_finished_play_is_reported_to_the_app() {
-    let mut project = song();
-    project.set_song_loop_row(None);
-    let mut app = App::with_project(project);
+    let mut app = App::with_project(song());
     let mut player = Player::new();
     app.apply(PLAY_SONG);
     play_on(&mut app, &mut player, 9);

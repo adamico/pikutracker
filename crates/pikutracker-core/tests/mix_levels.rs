@@ -4,15 +4,12 @@ use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
 use pikutracker_core::synth::SAMPLES_PER_TICK;
 
 const PLAY_SONG: Action = Action::PlaySongFromCursor;
-const SPACE: Action = Action::PlayFocusedPane;
 
 const SPEED: i32 = 8;
 const STEP_SAMPLES: usize = SPEED as usize * SAMPLES_PER_TICK as usize;
 const CROSSFADE_SAMPLES: usize = 300;
 const TRIANGLE: i32 = 0;
 const SQUARE: i32 = 3;
-const OVERVIEW_COLUMN: usize = 83;
-const FIRST_SCOPE_ROW: usize = 8;
 
 fn write(project: &mut Project, id: u8, instrument: i32, volume: i32, steps: usize) -> PhraseId {
     let id = PhraseId::new(id);
@@ -29,7 +26,7 @@ fn write(project: &mut Project, id: u8, instrument: i32, volume: i32, steps: usi
 }
 
 fn place(project: &mut Project, row: usize, track: usize, phrase: PhraseId) {
-    let id = ChainId::new((row * 8 + track) as u8);
+    let id = ChainId::new((row * 4 + track) as u8);
     *project.chain_mut(id).entry_mut(0) = Some(ChainEntry::new(phrase));
     project.set_song_cell(row, track, Some(id));
 }
@@ -70,15 +67,15 @@ fn a_mix_below_the_knee_plays_as_a_plain_sum() {
 }
 
 #[test]
-fn a_loud_eight_track_mix_never_leaves_the_range() {
-    let samples = hear(unison(TRIANGLE, 7, 8, 8), STEP_SAMPLES * 4);
+fn a_loud_four_track_mix_never_leaves_the_range() {
+    let samples = hear(unison(TRIANGLE, 7, 4, 8), STEP_SAMPLES * 4);
 
     assert!(peak(&samples) <= 1.0);
 }
 
 #[test]
 fn the_level_comes_back_after_a_loud_passage() {
-    let mut project = unison(TRIANGLE, 7, 8, 4);
+    let mut project = unison(TRIANGLE, 7, 4, 4);
     let quiet = write(&mut project, 2, TRIANGLE, 5, 8);
     place(&mut project, 1, 0, quiet);
 
@@ -91,70 +88,4 @@ fn the_level_comes_back_after_a_loud_passage() {
         "{}",
         peak(last_step)
     );
-}
-
-fn scope_marks(app: &App) -> usize {
-    app.grid()
-        .text_dump()
-        .lines()
-        .skip(FIRST_SCOPE_ROW)
-        .take(36)
-        .map(|line| {
-            line.chars()
-                .skip(OVERVIEW_COLUMN)
-                .filter(|ch| *ch == '*')
-                .count()
-        })
-        .sum()
-}
-
-fn play_and_report(app: &mut App, player: &mut Player, samples: usize) {
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    player.render(samples);
-    app.show_playback(&player.report());
-}
-
-#[test]
-fn the_scope_is_blank_while_stopped() {
-    let app = App::with_project(unison(SQUARE, 5, 1, 8));
-
-    assert_eq!(scope_marks(&app), 0);
-}
-
-#[test]
-fn the_scope_draws_the_mix_being_heard() {
-    let mut app = App::with_project(unison(SQUARE, 5, 1, 8));
-    let mut player = Player::new();
-
-    app.apply(PLAY_SONG);
-    play_and_report(&mut app, &mut player, STEP_SAMPLES);
-
-    assert_eq!(scope_marks(&app), 23, "one mark in every column");
-}
-
-#[test]
-fn a_muted_track_does_not_reach_the_scope() {
-    let mut app = App::with_project(unison(SQUARE, 5, 1, 8));
-    let mut player = Player::new();
-
-    app.apply(Action::Mute { track_number: 1 });
-    app.apply(PLAY_SONG);
-    play_and_report(&mut app, &mut player, STEP_SAMPLES);
-
-    assert_eq!(scope_marks(&app), 0);
-}
-
-#[test]
-fn the_scope_clears_when_playback_stops() {
-    let mut app = App::with_project(unison(SQUARE, 5, 1, 8));
-    let mut player = Player::new();
-    app.apply(PLAY_SONG);
-    play_and_report(&mut app, &mut player, STEP_SAMPLES);
-
-    app.apply(SPACE);
-    play_and_report(&mut app, &mut player, 1);
-
-    assert_eq!(scope_marks(&app), 0);
 }

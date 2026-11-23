@@ -1,6 +1,6 @@
 # The user edits config.ron and the app writes only state.ron
 
-App settings live in two RON files with an integer format version. `config.ron`, under `$XDG_CONFIG_HOME/pikutracker/`, holds the active key preset and only the keys the user changed. The user edits it by hand, and the app reads it at launch and never writes it. `state.ron`, under `$XDG_STATE_HOME/pikutracker/`, holds everything the app writes: Follow, the octave, changed MIDI table rows and the recent Projects. We first put Follow, the octave and the MIDI tables in `config.ron` too. We moved them so that the app never writes the file users edit, and the user's comments and edits survive while the app runs.
+App settings live in two RON files with an integer format version. `config.ron`, under `$XDG_CONFIG_HOME/pikutracker/`, holds the active key preset and only the keys the user changed. The user edits it by hand, and the app reads it at launch and never writes it. `state.ron`, under `$XDG_STATE_HOME/pikutracker/`, holds everything the app writes: Follow, the Pen, changed MIDI table rows and the recent Projects. We first put Follow, the octave and the MIDI tables in `config.ron` too. We moved them so that the app never writes the file users edit, and the user's comments and edits survive while the app runs.
 
 ## Consequences
 

@@ -1,5 +1,6 @@
 mod support;
 
+use pikutracker_core::app::layout;
 use pikutracker_core::app::{
     Action, App, Direction, DirectoryEntry, FileRequest, FileResponse, KeyContext,
 };
@@ -9,23 +10,14 @@ use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project, Step};
 use pikutracker_core::project_file;
 use pikutracker_core::screen::palette::Colour;
 use std::path::{Path, PathBuf};
-use support::status_line;
+use support::{pane_text, status_line};
 
 const STATUS_ROW: usize = 44;
 const DOWN: Action = Action::Move(Direction::Down);
 const UNSAVED_QUESTION: &str = "UNSAVED CHANGES WILL BE LOST  ENTER DISCARD  ESC CANCEL";
 
 fn right_slot(app: &App, line: usize) -> String {
-    let text: String = app
-        .grid()
-        .text_dump()
-        .lines()
-        .nth(line)
-        .unwrap()
-        .chars()
-        .skip(83)
-        .collect();
-    text.trim_end().to_owned()
+    pane_text(app, layout::RIGHT_SLOT, line)
 }
 
 fn file(name: &str) -> DirectoryEntry {
@@ -142,7 +134,7 @@ fn saving_a_new_project_asks_for_a_name_on_the_file_list() {
     });
     assert_eq!(status_line(&app), "SAVED DEMO.PTRK");
     assert!(!app.has_unsaved_changes());
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
 }
 
 #[test]
@@ -404,7 +396,7 @@ fn opening_a_file_replaces_the_project_and_says_so() {
     );
     assert_eq!(status_line(&app), "OPENED SONG.PTRK");
     assert!(!app.has_unsaved_changes());
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
 
     place_chain_01_on_the_first_song_row(&mut app);
     app.apply(Action::Save);
@@ -418,18 +410,14 @@ fn each_project_opens_at_the_top_of_the_song_with_the_song_pane_focused() {
         app.apply(DOWN);
     }
     app.apply(Action::Move(Direction::Right));
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
     app.apply(DOWN);
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
 
     open_file(&mut app, "song.ptrk", &other_project_text());
 
-    let dump = app.grid().text_dump();
-    assert_eq!(
-        dump.lines().nth(2).unwrap()[..28].trim_end(),
-        "00 [--]-- -- -- -- -- -- --"
-    );
-    assert!(dump.lines().nth(2).unwrap().contains("0 -- ---  "));
+    assert_eq!(pane_text(&app, layout::SONG, 2), "00 [--]-- -- --");
+    assert_eq!(pane_text(&app, layout::CHAIN, 2), "00 --     ---");
 }
 
 #[test]
@@ -496,11 +484,11 @@ fn moving_the_cursor_never_marks_a_project_as_unsaved() {
     for action in [
         DOWN,
         Action::Move(Direction::Right),
-        Action::FocusNext,
+        Action::FocusPrevious,
         DOWN,
-        Action::FocusNext,
+        Action::FocusPrevious,
         DOWN,
-        Action::FocusNext,
+        Action::FocusPrevious,
         Action::ToggleLog,
     ] {
         app.apply(action);
@@ -588,9 +576,9 @@ fn other_keys_wait_while_a_question_is_asked() {
 fn playing_app() -> App {
     let mut app = App::new();
     app.apply(Action::HexDigit(0));
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
     app.apply(Action::HexDigit(0));
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
     app.apply(Action::PianoKey(0));
     app.apply(Action::PlayFocusedPane);
     app.take_audio_requests();

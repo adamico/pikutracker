@@ -1,8 +1,8 @@
 use crate::project::{
-    CART_SLOTS, CHAIN_ENTRIES, ChainEntry, ChainId, Claim, CustomInstrument, EXPORT_CHANNELS,
-    FIRST_CUSTOM_INSTRUMENT, Filters, InstrumentSound, MAX_FILTER_LEVEL, MAX_INSTRUMENT_NAME,
-    MAX_STEPS, NOTE_NAMES, Phrase, PhraseId, Project, SONG_ROWS, SfxInstrument, Step, TRACKS,
-    TargetCart, WAVEFORM_SAMPLES, WaveformInstrument,
+    CART_SLOTS, CHAIN_ENTRIES, ChainEntry, ChainId, Claim, CustomInstrument, Filters,
+    InstrumentSound, MAX_FILTER_LEVEL, MAX_INSTRUMENT_NAME, MAX_STEPS, NOTE_NAMES, Phrase,
+    PhraseId, Project, SONG_ROWS, SfxInstrument, SongRowEnding, SongRowMarks, Step, TRACKS,
+    TargetCart, WAVEFORM_SAMPLES, WaveformInstrument, slot_of_custom_instrument,
 };
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
@@ -14,7 +14,7 @@ pub type Migration = fn(&str) -> Result<String, String>;
 
 const MIGRATIONS: [Migration; FORMAT_VERSION as usize - 1] = [];
 
-const SILENT_TOKEN: &str = "--- -- - -";
+const SILENT_TOKEN: &str = "--- - - -";
 const EMPTY_CELL: &str = "--";
 const SEMITONES_PER_OCTAVE: u8 = 12;
 
@@ -97,8 +97,6 @@ struct VersionHeader {
 struct ProjectDocument {
     version: u32,
     default_speed: u8,
-    song_loop_row: Option<u16>,
-    export_tracks: Vec<Option<u8>>,
     target_cart: Option<TargetCartDocument>,
     song: Vec<SongRowDocument>,
     chains: Vec<ChainDocument>,
@@ -129,6 +127,37 @@ struct PatternRangeDocument {
 struct SongRowDocument {
     row: u16,
     tracks: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    loop_start: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ending: Option<EndingDocument>,
+}
+
+#[derive(Serialize, Deserialize)]
+enum EndingDocument {
+    LoopBack,
+    Stop,
+}
+
+impl EndingDocument {
+    const fn of(ending: SongRowEnding) -> Self {
+        match ending {
+            SongRowEnding::LoopBack => Self::LoopBack,
+            SongRowEnding::Stop => Self::Stop,
+        }
+    }
+
+    const fn ending(&self) -> SongRowEnding {
+        match self {
+            Self::LoopBack => SongRowEnding::LoopBack,
+            Self::Stop => SongRowEnding::Stop,
+        }
+    }
+}
+
+#[expect(clippy::trivially_copy_pass_by_ref)]
+const fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Serialize, Deserialize)]
@@ -213,8 +242,6 @@ impl ProjectDocument {
         Self {
             version: FORMAT_VERSION,
             default_speed: project.default_speed(),
-            song_loop_row: project.song_loop_row().map(|row| row as u16),
-            export_tracks: project.export_track_numbers().to_vec(),
             target_cart: project.target_cart().map(TargetCartDocument::from_cart),
             song,
             chains,
@@ -228,15 +255,6 @@ impl ProjectDocument {
         require(self.default_speed >= 1, "DEFAULT SPEED IS 0")?;
         project.set_default_speed(i32::from(self.default_speed));
 
-        if let Some(row) = self.song_loop_row {
-            require(
-                usize::from(row) < SONG_ROWS,
-                "SONG LOOP ROW IS OUT OF RANGE",
-            )?;
-        }
-        project.set_song_loop_row(self.song_loop_row.map(usize::from));
-
-        read_export_tracks(&mut project, &self.export_tracks)?;
         project.set_target_cart(
             self.target_cart
                 .map(TargetCartDocument::into_cart)
@@ -265,27 +283,6 @@ fn require(condition: bool, problem: &str) -> Result<(), String> {
     } else {
         Err(problem.to_owned())
     }
-}
-
-fn read_export_tracks(project: &mut Project, tracks: &[Option<u8>]) -> Result<(), String> {
-    require(
-        tracks.len() == EXPORT_CHANNELS,
-        "EXPORT TRACKS NEED 4 CHANNELS",
-    )?;
-    for (channel, track) in tracks.iter().enumerate() {
-        if let Some(track) = *track {
-            require(
-                (1..=TRACKS as u8).contains(&track),
-                "EXPORT TRACK IS OUT OF RANGE",
-            )?;
-            require(
-                !tracks[..channel].contains(&Some(track)),
-                "A TRACK IS ON TWO CHANNELS",
-            )?;
-        }
-        project.set_export_track(channel, *track);
-    }
-    Ok(())
 }
 
 impl TargetCartDocument {
@@ -330,8 +327,12 @@ impl SongRowDocument {
         let cells: Vec<Option<ChainId>> = (0..TRACKS)
             .map(|track| project.song_cell(row, track))
             .collect();
-        cells.iter().any(Option::is_some).then(|| Self {
+        let marks = project.song_row_marks(row);
+        let has_marks = marks != SongRowMarks::default();
+        (has_marks || cells.iter().any(Option::is_some)).then(|| Self {
             row: row as u16,
+            loop_start: marks.loop_start,
+            ending: marks.ending.map(EndingDocument::of),
             tracks: cells
                 .iter()
                 .map(|cell| {
@@ -349,7 +350,7 @@ impl SongRowDocument {
         let row = usize::from(self.row);
         require(row < SONG_ROWS, "SONG ROW IS OUT OF RANGE")?;
         let cells: Vec<&str> = self.tracks.split(' ').collect();
-        require(cells.len() == TRACKS, "A SONG ROW NEEDS 8 TRACKS")?;
+        require(cells.len() == TRACKS, "A SONG ROW NEEDS 4 TRACKS")?;
         for (track, cell) in cells.into_iter().enumerate() {
             let chain = if cell == EMPTY_CELL {
                 None
@@ -360,6 +361,13 @@ impl SongRowDocument {
             };
             project.set_song_cell(row, track, chain);
         }
+        project.set_song_row_marks(
+            row,
+            SongRowMarks {
+                loop_start: self.loop_start,
+                ending: self.ending.as_ref().map(EndingDocument::ending),
+            },
+        );
         Ok(())
     }
 }
@@ -494,7 +502,7 @@ impl InstrumentDocument {
 
     fn read_into(self, project: &mut Project) -> Result<(), String> {
         require(
-            self.id >= FIRST_CUSTOM_INSTRUMENT,
+            slot_of_custom_instrument(self.id).is_some(),
             "CUSTOM INSTRUMENT NUMBER IS OUT OF RANGE",
         )?;
         if let Some(name) = &self.name {
@@ -572,7 +580,7 @@ fn step_token(step: Step) -> String {
     let name = NOTE_NAMES[usize::from(step.pitch() % SEMITONES_PER_OCTAVE)];
     let octave = step.pitch() / SEMITONES_PER_OCTAVE;
     format!(
-        "{name}{octave} {:02X} {} {}",
+        "{name}{octave} {:X} {} {}",
         step.instrument(),
         step.volume(),
         step.effect()
@@ -602,14 +610,22 @@ fn read_step(token: &str) -> Option<Step> {
     let pitch = single_digit(octave)?.checked_mul(SEMITONES_PER_OCTAVE)? + semitone;
     Step::new(
         pitch,
-        parse_hex(instrument)?,
+        single_hex_digit(instrument)?,
         single_digit(volume)?,
         single_digit(effect)?,
     )
 }
 
 fn single_digit(text: &str) -> Option<u8> {
+    single_digit_in_radix(text, 10)
+}
+
+fn single_hex_digit(text: &str) -> Option<u8> {
+    single_digit_in_radix(text, 16)
+}
+
+fn single_digit_in_radix(text: &str, radix: u32) -> Option<u8> {
     let mut chars = text.chars();
-    let digit = chars.next()?.to_digit(10)? as u8;
+    let digit = chars.next()?.to_digit(radix)? as u8;
     chars.next().is_none().then_some(digit)
 }

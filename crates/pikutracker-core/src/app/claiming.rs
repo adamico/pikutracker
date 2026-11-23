@@ -84,7 +84,7 @@ impl App {
             return;
         }
         let Some(mut target) = self.project.target_cart().cloned() else {
-            self.remark = Some(PICK_A_CART_FIRST);
+            self.remark = Some(PICK_A_CART_FIRST.into());
             return;
         };
         edit(view);
@@ -94,7 +94,7 @@ impl App {
 
     fn suggest_claim(&mut self) {
         let Some(target) = self.project.target_cart() else {
-            self.remark = Some(PICK_A_CART_FIRST);
+            self.remark = Some(PICK_A_CART_FIRST.into());
             return;
         };
         self.apply_suggestion(target.clone());
@@ -106,7 +106,7 @@ impl App {
         };
         let needs = export::needs(&self.project);
         let hash = target.claimed_bytes_hash.as_deref();
-        if let Some(claim) = view.suggested_claim(hash, needs) {
+        if let Some(claim) = view.suggested_claim(hash, &needs) {
             view.show_claim(&claim);
             target.claim = claim;
         }

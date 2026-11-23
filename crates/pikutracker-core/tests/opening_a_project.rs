@@ -1,9 +1,14 @@
-use pikutracker_core::app::{Action, App, Direction, DirectoryEntry, FileRequest, FileResponse};
+mod support;
+
+use pikutracker_core::app::{
+    Action, App, Direction, DirectoryEntry, FileRequest, FileResponse, layout,
+};
 use pikutracker_core::player::{AudioRequest, Player, TrackMix};
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
 use pikutracker_core::project_file;
 use pikutracker_core::synth::SAMPLES_PER_TICK;
 use std::path::PathBuf;
+use support::pane_text;
 
 const STEP_SAMPLES: usize = 16 * SAMPLES_PER_TICK as usize;
 const TRACK_HEADER_ROW: usize = 1;
@@ -56,11 +61,8 @@ fn open(app: &mut App, project: &Project) {
 }
 
 fn headers(app: &App) -> String {
-    app.grid()
-        .text_dump()
-        .lines()
-        .nth(TRACK_HEADER_ROW)
-        .unwrap()[4..27]
+    pane_text(app, layout::SONG, TRACK_HEADER_ROW)
+        .trim_start()
         .to_owned()
 }
 
@@ -122,7 +124,7 @@ fn opening_a_project_resets_mute_and_solo() {
 
     open(&mut app, &song());
 
-    assert_eq!(headers(&app), "T1 T2 T3 T4 T5 T6 T7 T8");
+    assert_eq!(headers(&app), "T1 T2 T3 T4");
     assert!(
         app.take_audio_requests()
             .contains(&AudioRequest::SetTrackMix(TrackMix::default())),
@@ -137,7 +139,7 @@ fn a_new_project_resets_mute_and_solo_too() {
 
     app.apply(Action::NewProject);
 
-    assert_eq!(headers(&app), "T1 T2 T3 T4 T5 T6 T7 T8");
+    assert_eq!(headers(&app), "T1 T2 T3 T4");
 }
 
 #[test]
@@ -150,5 +152,5 @@ fn a_failed_open_leaves_mute_and_solo_alone() {
         contents: "not a project".to_owned(),
     });
 
-    assert_eq!(headers(&app), "M1 T2 T3 T4 T5 T6 T7 T8");
+    assert_eq!(headers(&app), "M1 T2 T3 T4");
 }

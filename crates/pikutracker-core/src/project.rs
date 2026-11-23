@@ -1,19 +1,21 @@
 mod change;
+mod song_order;
 mod usage;
 
 pub(crate) use change::ProjectChange;
+pub use song_order::{SongRowEnding, SongRowMarks};
 pub use usage::UnusedItems;
 
 use std::collections::BTreeMap;
 use std::ops::Range;
 
 pub const MAX_STEPS: usize = 32;
-pub const TRACKS: usize = 8;
+pub const TRACKS: usize = 4;
 pub const CHAIN_ENTRIES: usize = 16;
 pub const SONG_ROWS: usize = 256;
-pub const EXPORT_CHANNELS: usize = 4;
 pub const WAVEFORM_SAMPLES: usize = 64;
 pub const FIRST_CUSTOM_INSTRUMENT: u8 = 8;
+pub const LAST_CUSTOM_INSTRUMENT: u8 = 0xF;
 pub const MAX_INSTRUMENT_NAME: usize = 12;
 pub const CART_SLOTS: u8 = 64;
 pub const MAX_FILTER_LEVEL: i32 = 2;
@@ -30,9 +32,10 @@ const DEFAULT_LENGTH: usize = 16;
 const DEFAULT_SPEED: u8 = 16;
 const DEFAULT_PITCH: u8 = 24;
 pub(crate) const MAX_PITCH: i32 = 63;
-const MAX_INSTRUMENT: i32 = u8::MAX as i32;
+const MAX_INSTRUMENT: i32 = LAST_CUSTOM_INSTRUMENT as i32;
 const MAX_VOLUME: i32 = 7;
 const MAX_EFFECT: i32 = 7;
+pub const SEMITONES_PER_OCTAVE: i32 = 12;
 const EFFECT_ARPEGGIO_FAST: u8 = 6;
 const EFFECT_ARPEGGIO_SLOW: u8 = 7;
 pub const ARPEGGIO_GROUP: usize = 4;
@@ -52,6 +55,18 @@ pub struct Step {
     effect: u8,
 }
 
+pub const fn custom_instrument_of_slot(slot: u8) -> u8 {
+    FIRST_CUSTOM_INSTRUMENT + slot
+}
+
+pub const fn slot_of_custom_instrument(instrument: u8) -> Option<u8> {
+    if instrument >= FIRST_CUSTOM_INSTRUMENT && instrument <= LAST_CUSTOM_INSTRUMENT {
+        Some(instrument - FIRST_CUSTOM_INSTRUMENT)
+    } else {
+        None
+    }
+}
+
 impl Default for Step {
     fn default() -> Self {
         Self {
@@ -65,7 +80,11 @@ impl Default for Step {
 
 impl Step {
     pub const fn new(pitch: u8, instrument: u8, volume: u8, effect: u8) -> Option<Self> {
-        if pitch as i32 > MAX_PITCH || volume as i32 > MAX_VOLUME || effect as i32 > MAX_EFFECT {
+        if pitch as i32 > MAX_PITCH
+            || instrument as i32 > MAX_INSTRUMENT
+            || volume as i32 > MAX_VOLUME
+            || effect as i32 > MAX_EFFECT
+        {
             return None;
         }
         Some(Self {
@@ -94,6 +113,11 @@ impl Step {
 
     pub const fn is_silent(self) -> bool {
         self.volume == 0
+    }
+
+    pub fn transposed_pitch(self, transpose: i8) -> Option<u8> {
+        let pitch = i32::from(self.pitch) + i32::from(transpose);
+        (0..=MAX_PITCH).contains(&pitch).then_some(pitch as u8)
     }
 
     pub const fn plays_arpeggio(self) -> bool {
@@ -218,6 +242,14 @@ impl Phrase {
         self.phrase_loop().is_some()
     }
 
+    pub fn step_after(&self, step: usize) -> Option<usize> {
+        if step + 1 < self.length() {
+            Some(step + 1)
+        } else {
+            self.phrase_loop().map(|steps| steps.start)
+        }
+    }
+
     pub const fn loop_start(&self) -> u8 {
         self.loop_start
     }
@@ -272,10 +304,9 @@ impl Phrase {
 
     pub fn step_is_out_of_range(&self, index: usize, transpose: i8) -> bool {
         let step = self.steps[index];
-        let pitch = i32::from(step.pitch) + i32::from(transpose);
         let heard =
             (index < self.length() && !step.is_silent()) || self.steps_read_by_arpeggios()[index];
-        heard && !(0..=MAX_PITCH).contains(&pitch)
+        heard && step.transposed_pitch(transpose).is_none()
     }
 
     pub fn out_of_range_steps(&self, transpose: i8) -> impl Iterator<Item = usize> + '_ {
@@ -450,12 +481,47 @@ pub struct TargetCart {
     pub claimed_bytes_hash: Option<String>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Track(usize);
+
+impl Track {
+    pub const fn from_index(index: usize) -> Self {
+        assert!(index < TRACKS);
+        Self(index)
+    }
+
+    pub fn all() -> impl DoubleEndedIterator<Item = Self> {
+        (0..TRACKS).map(Self)
+    }
+
+    pub const fn index(self) -> usize {
+        self.0
+    }
+
+    pub const fn number(self) -> usize {
+        self.0 + 1
+    }
+
+    pub fn before(self) -> impl DoubleEndedIterator<Item = Self> {
+        (0..self.0).map(Self)
+    }
+
+    pub fn after(self) -> impl DoubleEndedIterator<Item = Self> {
+        (self.0 + 1..TRACKS).map(Self)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ChainRowPlace {
+    pub song_row: usize,
+    pub entry: usize,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SongPlace {
-    pub song_row: usize,
+    pub chain_row: ChainRowPlace,
     pub track: usize,
-    pub chain_row: usize,
-    pub step: usize,
+    pub step_index: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -463,9 +529,8 @@ pub struct Project {
     phrases: Vec<Phrase>,
     chains: Vec<Chain>,
     song: Vec<[Option<ChainId>; TRACKS]>,
-    song_loop_row: Option<usize>,
+    song_marks: Vec<SongRowMarks>,
     default_speed: u8,
-    export_tracks: [Option<u8>; EXPORT_CHANNELS],
     target_cart: Option<TargetCart>,
     custom_instruments: BTreeMap<u8, CustomInstrument>,
 }
@@ -476,9 +541,8 @@ impl Default for Project {
             phrases: vec![Phrase::default(); ID_COUNT],
             chains: vec![Chain::default(); ID_COUNT],
             song: vec![[None; TRACKS]; SONG_ROWS],
-            song_loop_row: Some(0),
+            song_marks: vec![SongRowMarks::default(); SONG_ROWS],
             default_speed: DEFAULT_SPEED,
-            export_tracks: [None; EXPORT_CHANNELS],
             target_cart: None,
             custom_instruments: BTreeMap::new(),
         }
@@ -545,15 +609,7 @@ impl Project {
     }
 
     pub fn song_row_is_empty(&self, row: usize) -> bool {
-        (0..CHAIN_ENTRIES).all(|chain_row| self.chain_row_ticks(row, chain_row) == 0)
-    }
-
-    pub const fn song_loop_row(&self) -> Option<usize> {
-        self.song_loop_row
-    }
-
-    pub fn set_song_loop_row(&mut self, row: Option<usize>) {
-        self.song_loop_row = row;
+        self.played_chain_rows(row).next().is_none()
     }
 
     pub const fn default_speed(&self) -> u8 {
@@ -562,19 +618,6 @@ impl Project {
 
     pub fn set_default_speed(&mut self, speed: i32) {
         self.default_speed = speed.clamp(MIN_SPEED, MAX_SPEED) as u8;
-    }
-
-    pub const fn export_track_numbers(&self) -> [Option<u8>; EXPORT_CHANNELS] {
-        self.export_tracks
-    }
-
-    pub fn export_track_indices(&self) -> [Option<usize>; EXPORT_CHANNELS] {
-        self.export_tracks
-            .map(|track| track.map(|track| usize::from(track) - 1))
-    }
-
-    pub fn set_export_track(&mut self, channel: usize, track_number: Option<u8>) {
-        self.export_tracks[channel] = track_number;
     }
 
     pub const fn target_cart(&self) -> Option<&TargetCart> {
@@ -596,6 +639,9 @@ impl Project {
     }
 
     pub fn set_custom_instrument(&mut self, id: u8, instrument: Option<CustomInstrument>) {
+        if slot_of_custom_instrument(id).is_none() {
+            return;
+        }
         match instrument {
             Some(instrument) => self.custom_instruments.insert(id, instrument),
             None => self.custom_instruments.remove(&id),

@@ -1,4 +1,4 @@
-use super::{EMPTY, HEADING, VALUE, stepped};
+use super::{EMPTY, HEADING, INSTRUMENT_NAMES, VALUE, stepped};
 use crate::app::{Action, Direction};
 use crate::midi_import::{
     self, Analysis, Choices, DRUM_ROWS, GridOption, Imported, MidiTable, STEPS_PER_BEAT,
@@ -11,16 +11,6 @@ use std::path::PathBuf;
 
 const PAGE_NAMES: [&str; 4] = ["1 VOICES", "2 STEPS PER BEAT", "3 INSTRUMENTS", "4 REVIEW"];
 const PAGE_GAP: &str = " > ";
-const INSTRUMENT_NAMES: [&str; 8] = [
-    "TRIANGLE",
-    "TILTED SAW",
-    "SAW",
-    "SQUARE",
-    "PULSE",
-    "ORGAN",
-    "NOISE",
-    "PHASER",
-];
 
 const HEADER_ROW: usize = 0;
 const FILE_ROW: usize = 1;

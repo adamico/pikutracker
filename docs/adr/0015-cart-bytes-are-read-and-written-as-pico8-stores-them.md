@@ -1,4 +1,5 @@
 # Cart bytes are read and written exactly as PICO-8 stores them
+_Partly superseded by [ADR 0023](0023-the-song-mirrors-the-carts-pattern-list.md): Export writes Pattern flags only from Song row marks, so it no longer sets LOOP START on a loop target that has no Loop start mark._
 
 The Cart codec touches only the bytes it understands and writes them back in PICO-8's own layout, so that a Cart re-saved by PICO-8 after Export is unchanged and nothing outside the Claim moves.
 

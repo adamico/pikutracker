@@ -1,10 +1,11 @@
 mod support;
 
 use pikutracker_core::cart::Cart;
-use pikutracker_core::cart_import::{import, import_song, songs};
+use pikutracker_core::cart_import::import;
+use pikutracker_core::export::export;
 use pikutracker_core::project::{
-    ChainId, CustomInstrument, InstrumentSound, Phrase, PhraseId, Project, SfxInstrument, Step,
-    TRACKS, WaveformInstrument,
+    ChainId, CustomInstrument, InstrumentSound, Phrase, PhraseId, Project, SfxInstrument,
+    SongRowEnding, SongRowMarks, Step, WaveformInstrument,
 };
 use pikutracker_core::project_file;
 use support::{TestCart, TestPattern, TestSfx, music_samples, render_music, render_song};
@@ -58,26 +59,8 @@ fn each_pattern_becomes_one_song_row_with_channel_n_on_track_n() {
             let entry = project.chain_row_entry(row, track, 0).unwrap();
             assert_eq!(project.phrase(entry.phrase()).step(0).pitch(), *pitch);
         }
-        for track in 4..TRACKS {
-            assert_eq!(project.song_cell(row, track), None);
-        }
     }
     assert!(project.song_row_is_empty(2));
-}
-
-#[test]
-fn the_export_tracks_are_tracks_1_to_4() {
-    let cart = TestCart {
-        sfx: two_sfx(),
-        patterns: vec![pattern([Some(0), None, None, None])],
-    };
-
-    let (project, _) = imported(&cart);
-
-    assert_eq!(
-        project.export_track_numbers(),
-        [Some(1), Some(2), Some(3), Some(4)]
-    );
 }
 
 #[test]
@@ -231,27 +214,165 @@ fn the_claimed_bytes_hash_is_stored_with_one_checksum_per_slot() {
 }
 
 #[test]
-fn a_song_ending_in_stop_does_not_loop_and_stops_the_claim() {
-    let mut last = pattern([Some(1), None, None, None]);
-    last.stop = true;
+fn every_pattern_from_the_first_non_empty_to_the_last_becomes_one_song_row() {
+    let mut stop = pattern([Some(1), None, None, None]);
+    stop.stop = true;
     let cart = TestCart {
         sfx: two_sfx(),
         patterns: vec![
+            pattern([None, None, None, None]),
             pattern([Some(0), None, None, None]),
-            last,
-            pattern([Some(0), None, None, None]),
+            stop,
+            pattern([None, None, None, None]),
+            pattern([Some(1), None, None, None]),
         ],
     };
 
     let (project, warnings) = imported(&cart);
 
-    assert_eq!(project.song_loop_row(), None);
+    let first_pitch = |row| {
+        let entry = project.chain_row_entry(row, 0, 0).unwrap();
+        project.phrase(entry.phrase()).step(0).pitch()
+    };
+    assert_eq!(first_pitch(0), 12);
+    assert_eq!(first_pitch(1), 19);
+    assert!(project.song_row_is_empty(2));
+    assert_eq!(first_pitch(3), 19);
+    assert!(project.song_row_is_empty(4));
+    assert_eq!(project.song_row_marks(1).ending, Some(SongRowEnding::Stop));
     assert_eq!(
         project.target_cart().unwrap().claim.first_and_last_pattern,
-        Some((0, 1))
+        Some((1, 4))
     );
-    assert!(project.song_row_is_empty(2));
     assert_eq!(warnings, Vec::<String>::new());
+}
+
+#[test]
+fn each_patterns_flow_flags_become_the_marks_of_the_same_name_on_its_song_row() {
+    let mut start_and_stop = pattern([Some(0), None, None, None]);
+    start_and_stop.loop_start = true;
+    start_and_stop.stop = true;
+    let mut back = pattern([Some(1), None, None, None]);
+    back.loop_back = true;
+    let mut empty_start = pattern([None, None, None, None]);
+    empty_start.loop_start = true;
+    let cart = TestCart {
+        sfx: two_sfx(),
+        patterns: vec![
+            start_and_stop,
+            back,
+            empty_start,
+            pattern([Some(0), None, None, None]),
+        ],
+    };
+
+    let (project, _) = imported(&cart);
+
+    let marks = |loop_start, ending| SongRowMarks { loop_start, ending };
+    assert_eq!(
+        project.song_row_marks(0),
+        marks(true, Some(SongRowEnding::Stop))
+    );
+    assert_eq!(
+        project.song_row_marks(1),
+        marks(false, Some(SongRowEnding::LoopBack))
+    );
+    assert_eq!(project.song_row_marks(2), marks(true, None));
+    assert_eq!(project.song_row_marks(3), marks(false, None));
+}
+
+#[test]
+fn the_claim_covers_every_sfx_the_imported_patterns_play_and_the_rest_stay_loose() {
+    let mut stop = pattern([Some(0), None, None, None]);
+    stop.stop = true;
+    let cart = TestCart {
+        sfx: vec![
+            TestSfx::with_pitches(8, &[12]),
+            TestSfx::with_pitches(8, &[14]),
+            TestSfx::with_pitches(8, &[16]),
+        ],
+        patterns: vec![stop, pattern([None, Some(2), None, None])],
+    };
+
+    let (project, warnings) = imported(&cart);
+
+    let claim = &project.target_cart().unwrap().claim;
+    assert_eq!(claim.sfx, [0, 2]);
+    assert_eq!(claim.first_and_last_pattern, Some((0, 1)));
+    assert_eq!(phrases_starting_on(&project, 14).len(), 1);
+    assert_eq!(
+        warnings,
+        ["SFX 01 KEPT AS A LOOSE PHRASE OUTSIDE THE CLAIM."]
+    );
+}
+
+#[test]
+fn importing_and_exporting_straight_back_keeps_the_claimed_pattern_flags() {
+    let mut start = pattern([Some(0), None, None, None]);
+    start.loop_start = true;
+    let mut back = pattern([Some(1), Some(0), None, None]);
+    back.loop_back = true;
+    let mut stop = pattern([Some(1), None, None, None]);
+    stop.stop = true;
+    let mut start_and_stop = pattern([Some(0), None, None, None]);
+    start_and_stop.loop_start = true;
+    start_and_stop.stop = true;
+    let cart = TestCart {
+        sfx: two_sfx(),
+        patterns: vec![
+            start,
+            back,
+            stop,
+            pattern([None, None, None, None]),
+            start_and_stop,
+            pattern([Some(0), None, None, None]),
+        ],
+    };
+    let original = cart.p8();
+    let (project, _) = imported(&cart);
+    let claim = project.target_cart().unwrap().claim.clone();
+
+    let exported = export(&project, &claim, &original).unwrap();
+
+    let (before, after) = (
+        Cart::read(&original).unwrap(),
+        Cart::read(&exported.cart_bytes).unwrap(),
+    );
+    let flags = |cart: &Cart, slot| {
+        let pattern = cart.pattern(slot);
+        (pattern.loop_start(), pattern.loop_back(), pattern.stop())
+    };
+    for slot in 0..=5 {
+        assert_eq!(flags(&after, slot), flags(&before, slot), "pattern {slot}");
+    }
+}
+
+#[test]
+fn a_loop_back_with_no_loop_start_keeps_the_carts_flags_through_a_round_trip() {
+    let mut back = pattern([Some(1), None, None, None]);
+    back.loop_back = true;
+    let cart = TestCart {
+        sfx: two_sfx(),
+        patterns: vec![
+            pattern([None, None, None, None]),
+            pattern([None, None, None, None]),
+            pattern([Some(0), None, None, None]),
+            back,
+        ],
+    };
+    let original = cart.p8();
+    let (project, _) = imported(&cart);
+    let claim = project.target_cart().unwrap().claim.clone();
+
+    let exported = export(&project, &claim, &original).unwrap();
+
+    let after = Cart::read(&exported.cart_bytes).unwrap();
+    let flags = |slot| {
+        let pattern = after.pattern(slot);
+        (pattern.loop_start(), pattern.loop_back(), pattern.stop())
+    };
+    assert_eq!(flags(2), (false, false, false));
+    assert_eq!(flags(3), (false, true, false));
 }
 
 #[test]
@@ -267,7 +388,11 @@ fn loop_back_jumps_to_the_nearest_loop_start_before_it() {
 
     let (project, _) = imported(&cart);
 
-    assert_eq!(project.song_loop_row(), Some(1));
+    assert!(project.song_row_marks(1).loop_start);
+    assert_eq!(
+        project.song_row_marks(2).ending,
+        Some(SongRowEnding::LoopBack)
+    );
 }
 
 #[test]
@@ -279,7 +404,7 @@ fn a_song_that_runs_into_an_empty_pattern_ends_there_without_a_loop() {
 
     let (project, _) = imported(&cart);
 
-    assert_eq!(project.song_loop_row(), None);
+    assert_eq!(project.song_row_marks(0), SongRowMarks::default());
     assert_eq!(
         project.target_cart().unwrap().claim.first_and_last_pattern,
         Some((0, 0))
@@ -296,7 +421,7 @@ fn a_cart_with_no_music_gives_an_empty_song_and_an_empty_claim() {
     let (project, _) = imported(&cart);
 
     assert!(project.song_row_is_empty(0));
-    assert_eq!(project.song_loop_row(), None);
+    assert_eq!(project.song_row_marks(0), SongRowMarks::default());
     let claim = &project.target_cart().unwrap().claim;
     assert!(claim.sfx.is_empty());
     assert_eq!(claim.first_and_last_pattern, None);
@@ -399,94 +524,6 @@ fn a_png_cart_imports_to_the_same_project_as_its_text_twin() {
     assert_eq!(from_text.project, from_pixels.project);
 }
 
-#[test]
-fn songs_start_at_pattern_0_and_after_stop_loop_back_or_an_empty_pattern() {
-    let mut stop = pattern([Some(1), None, None, None]);
-    stop.stop = true;
-    let mut loop_back = pattern([Some(0), None, None, None]);
-    loop_back.loop_back = true;
-    let cart = TestCart {
-        sfx: two_sfx(),
-        patterns: vec![
-            pattern([Some(0), None, None, None]),
-            stop,
-            loop_back,
-            pattern([Some(1), None, None, None]),
-            pattern([None, None, None, None]),
-            pattern([Some(0), None, None, None]),
-        ],
-    };
-
-    let found: Vec<(u8, u8)> = songs(&Cart::read(&cart.p8()).unwrap())
-        .iter()
-        .map(|song| song.patterns)
-        .collect();
-
-    assert_eq!(found, [(0, 1), (2, 2), (3, 3), (5, 5)]);
-}
-
-fn imported_song(cart: &TestCart, index: usize) -> (Project, Vec<String>) {
-    let cart = Cart::read(&cart.p8()).unwrap();
-    let song = songs(&cart)[index];
-    let imported = import_song(&cart, CART_NAME, Some(song));
-    let warnings = imported.warnings.into_iter().map(|w| w.text).collect();
-    (imported.project, warnings)
-}
-
-#[test]
-fn a_later_song_starts_on_song_row_0_and_claims_only_its_own_patterns() {
-    let mut stop = pattern([Some(0), None, None, None]);
-    stop.stop = true;
-    let cart = TestCart {
-        sfx: two_sfx(),
-        patterns: vec![stop, pattern([Some(1), None, None, None])],
-    };
-
-    let (project, _) = imported_song(&cart, 1);
-
-    let entry = project.chain_row_entry(0, 0, 0).unwrap();
-    assert_eq!(project.phrase(entry.phrase()).step(0).pitch(), 19);
-    assert!(project.song_row_is_empty(1));
-    let claim = &project.target_cart().unwrap().claim;
-    assert_eq!(claim.first_and_last_pattern, Some((1, 1)));
-    assert_eq!(claim.sfx, [1]);
-}
-
-#[test]
-fn the_song_loop_row_is_where_loop_back_jumps_inside_the_song() {
-    let mut stop = pattern([Some(0), None, None, None]);
-    stop.stop = true;
-    let mut start = pattern([Some(1), None, None, None]);
-    start.loop_start = true;
-    let mut back = pattern([Some(0), None, None, None]);
-    back.loop_back = true;
-    let cart = TestCart {
-        sfx: two_sfx(),
-        patterns: vec![stop, pattern([Some(0), None, None, None]), start, back],
-    };
-
-    let (project, _) = imported_song(&cart, 1);
-
-    assert_eq!(project.song_loop_row(), Some(1));
-}
-
-#[test]
-fn a_loop_back_that_jumps_outside_the_song_means_no_loop() {
-    let mut start = pattern([Some(0), None, None, None]);
-    start.loop_start = true;
-    start.stop = true;
-    let mut back = pattern([Some(1), None, None, None]);
-    back.loop_back = true;
-    let cart = TestCart {
-        sfx: two_sfx(),
-        patterns: vec![start, back],
-    };
-
-    let (project, _) = imported_song(&cart, 1);
-
-    assert_eq!(project.song_loop_row(), None);
-}
-
 fn melody_on_sfx_1() -> TestSfx {
     let mut melody = TestSfx::with_pitches(16, &[36, 40]);
     melody.notes[0].custom = true;
@@ -537,6 +574,33 @@ fn an_sfx_used_as_an_instrument_becomes_an_sfx_instrument_numbered_8_above_its_s
     assert_eq!(imported, &expected);
     assert_eq!(project.custom_instruments().count(), 1);
     assert_eq!(project.target_cart().unwrap().claim.sfx, [0, 1]);
+}
+
+#[test]
+fn an_import_export_round_trip_keeps_every_instrument_in_its_slot() {
+    let mut melody = TestSfx::with_pitches(16, &[36, 40]);
+    melody.notes[0].custom = true;
+    melody.notes[0].instrument = 5;
+    melody.notes[1].instrument = 3;
+    let silent = TestSfx::with_pitches(8, &[]);
+    let instrument = TestSfx::with_pitches(4, &[24, 31, 28]);
+    let cart = TestCart {
+        sfx: vec![melody, silent, silent, silent, silent, instrument],
+        patterns: vec![pattern([Some(0), None, None, None])],
+    };
+    let original = cart.p8();
+    let (project, _) = imported(&cart);
+    let claim = project.target_cart().unwrap().claim.clone();
+
+    let exported = export(&project, &claim, &original).unwrap();
+
+    let (before, after) = (
+        Cart::read(&original).unwrap(),
+        Cart::read(&exported.cart_bytes).unwrap(),
+    );
+    assert!(project.custom_instrument(0x0D).is_some());
+    assert_eq!(after.sfx_bytes(5)[..64], before.sfx_bytes(5)[..64]);
+    assert_eq!(after.sfx_bytes(0)[..4], before.sfx_bytes(0)[..4]);
 }
 
 #[test]
@@ -714,4 +778,28 @@ fn an_sfx_that_only_a_loose_phrase_uses_as_an_instrument_is_a_custom_instrument_
         10
     );
     assert_eq!(project.target_cart().unwrap().claim.sfx, [0]);
+}
+
+#[test]
+fn an_sfx_looping_over_all_32_notes_becomes_one_phrase_wherever_it_plays() {
+    let mut whole_loop = TestSfx::with_pitches(8, &(10..42).collect::<Vec<u8>>());
+    whole_loop.loop_end = 32;
+    let mut other_loop = TestSfx::with_pitches(8, &[20, 22, 24, 26]);
+    other_loop.loop_end = 4;
+    let once = TestSfx::with_pitches(8, &[30, 31]);
+    let cart = TestCart {
+        sfx: vec![whole_loop, other_loop, once],
+        patterns: vec![
+            pattern([Some(0), Some(1), None, None]),
+            pattern([Some(0), Some(2), None, None]),
+        ],
+    };
+
+    let (project, warnings) = imported(&cart);
+
+    assert_eq!(warnings, Vec::<String>::new());
+    let first = project.chain_row_entry(0, 0, 0).unwrap().phrase();
+    let second = project.chain_row_entry(1, 0, 0).unwrap().phrase();
+    assert_eq!(first, second);
+    assert_eq!(pikutracker_core::export::needs(&project).sfx, 3);
 }

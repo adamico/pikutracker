@@ -1,21 +1,21 @@
 use super::{
-    EMPTY, HEADING, SELECTED, VALUE, draw_row_label, draw_styled_value, draw_title, id_text,
-    nudged_id, stepped, typed_value,
+    EMPTY, HEADING, LOOP_MARK, SELECTED, VALUE, draw_row_label, draw_styled_value, draw_title,
+    id_text, mark_text, nudged_id, stepped, typed_value,
 };
 use crate::app::Direction;
 use crate::app::layout::Area;
 use crate::app::selection::{CellPosition, CellRange};
 use crate::player::{Playhead, TrackMix};
-use crate::project::{ChainId, Project, SONG_ROWS, TRACKS};
+use crate::project::{ChainId, Project, SONG_ROWS, SongRowMarks, TRACKS};
 use crate::screen::grid::{Grid, Style};
 use crate::screen::palette::Colour;
 
 const SOLOED: Style = Style::fg(Colour::Yellow);
-const EXPORT_CHANNEL_NUMBER: Style = Style::fg(Colour::Green);
 const PLAYING_BAR: Colour = Colour::DarkGreen;
 const WAITING_BAR: Colour = Colour::DarkGrey;
 
 const HEADER_ROWS: usize = 2;
+const MARK_COLUMN: usize = 2;
 const FIRST_TRACK_COLUMN: usize = 4;
 const TRACK_WIDTH: usize = 3;
 
@@ -172,15 +172,16 @@ impl SongPane {
             for track in cells.columns() {
                 if (song_row, track) != (self.row, self.track) {
                     let column = area.column + FIRST_TRACK_COLUMN + track * TRACK_WIDTH;
-                    grid.restyle(column, HEADER_ROWS + song_row - top, 2, SELECTED);
+                    grid.restyle(column, area.row + HEADER_ROWS + song_row - top, 2, SELECTED);
                 }
             }
         }
     }
 
-    pub fn toggle_loop_row(&self, project: &mut Project) {
-        let row = (project.song_loop_row() != Some(self.row)).then_some(self.row);
-        project.set_song_loop_row(row);
+    pub fn change_marks(&self, project: &mut Project, change: impl FnOnce(&mut SongRowMarks)) {
+        let mut marks = project.song_row_marks(self.row);
+        change(&mut marks);
+        project.set_song_row_marks(self.row, marks);
     }
 
     pub fn draw(
@@ -194,30 +195,23 @@ impl SongPane {
     ) {
         let playing_row = playhead
             .and_then(|playhead| playhead.chain_row)
-            .map(|(row, _)| row);
-        let loop_row = project
-            .song_loop_row()
-            .map_or_else(|| "--".to_owned(), |row| format!("{row:02X}"));
-        let title = format!("SONG  LOOP {loop_row}");
-        draw_title(grid, area.column, 0, &title, focused);
-        let export_tracks = project.export_track_numbers();
+            .map(|place| place.song_row);
+        draw_title(grid, area.column, area.row, "SONG", focused);
         for track in 0..TRACKS {
             let column = area.column + FIRST_TRACK_COLUMN + track * TRACK_WIDTH;
             let (letter, style) = track_header(track_mix, track);
-            grid.put(column, 1, &format!("{letter}{}", track + 1), style);
-            let number = track as u8 + 1;
-            let channel = export_tracks
-                .iter()
-                .position(|exported| *exported == Some(number));
-            if let Some(channel) = channel {
-                grid.put(column + 2, 1, &channel.to_string(), EXPORT_CHANNEL_NUMBER);
-            }
+            grid.put(
+                column,
+                area.row + 1,
+                &format!("{letter}{}", track + 1),
+                style,
+            );
         }
 
         let visible = area.rows - HEADER_ROWS;
         let top = self.top_row(visible);
         for offset in 0..visible {
-            let row = HEADER_ROWS + offset;
+            let row = area.row + HEADER_ROWS + offset;
             let song_row = top + offset;
             let label = format!("{song_row:02X}");
             draw_row_label(
@@ -227,6 +221,8 @@ impl SongPane {
                 &label,
                 playing_row == Some(song_row),
             );
+            let mark = mark_text(project.song_row_marks(song_row));
+            grid.put(area.column + MARK_COLUMN, row, mark, LOOP_MARK);
             for track in 0..TRACKS {
                 let column = area.column + FIRST_TRACK_COLUMN + track * TRACK_WIDTH;
                 let is_cursor = focused && song_row == self.row && track == self.track;

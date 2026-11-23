@@ -3,8 +3,8 @@ use super::claim_text::named_slots;
 use super::files::{Accepted, OVERWRITE_ANSWERS, Waiting, shown_name};
 use super::messages::{LogItem, Report, Severity};
 use crate::cart::{Cart, Slots};
-use crate::export::{self, ExportFailure, ExportWarning, Exported};
-use crate::project::{Claim, EXPORT_CHANNELS, SongPlace};
+use crate::export::{self, ExportFailure, Exported};
+use crate::project::{ChainRowPlace, Claim, SongPlace};
 use crate::wording::counted;
 use std::path::{Path, PathBuf};
 
@@ -17,20 +17,6 @@ pub(super) struct FinishedExport {
     report: Report,
 }
 
-fn tracks_text(tracks: [Option<u8>; EXPORT_CHANNELS]) -> String {
-    let mut tracks: Vec<u8> = tracks.into_iter().flatten().collect();
-    tracks.sort_unstable();
-    let is_run = tracks.windows(2).all(|pair| pair[0] + 1 == pair[1]);
-    match (tracks.first(), tracks.last()) {
-        (Some(first), Some(last)) if is_run && first != last => format!("T{first}-T{last}"),
-        _ => tracks
-            .iter()
-            .map(|track| format!("T{track}"))
-            .collect::<Vec<_>>()
-            .join(" "),
-    }
-}
-
 fn failure_location(failure: ExportFailure) -> Option<SongPlace> {
     match failure {
         ExportFailure::NoteOutOfRange {
@@ -40,10 +26,12 @@ fn failure_location(failure: ExportFailure) -> Option<SongPlace> {
             chain_row,
             ..
         } => Some(SongPlace {
-            song_row,
+            chain_row: ChainRowPlace {
+                song_row,
+                entry: chain_row,
+            },
             track,
-            chain_row,
-            step,
+            step_index: step,
         }),
         _ => None,
     }
@@ -56,7 +44,7 @@ const fn is_about_the_claim(failure: ExportFailure) -> bool {
             | ExportFailure::BadClaim
             | ExportFailure::TooFewSfx { .. }
             | ExportFailure::TooFewPatterns { .. }
-            | ExportFailure::TooFewInstrumentSlots { .. }
+            | ExportFailure::MissingInstrumentSlot { .. }
     )
 }
 
@@ -102,36 +90,9 @@ fn changed_slots_text(changed: &Slots) -> String {
     .join(" AND ")
 }
 
-fn warning_item(warning: ExportWarning) -> LogItem {
-    let item = LogItem::new(Severity::Warning, warning.to_string());
-    match warning {
-        ExportWarning::UnexportedTrackSetsLength {
-            song_row,
-            chain_row,
-            track,
-        } => item.at(SongPlace {
-            song_row,
-            track,
-            chain_row,
-            step: 0,
-        }),
-    }
-}
-
-fn written_report(summary: String, warnings: &[ExportWarning]) -> Report {
-    if warnings.is_empty() {
-        return Report::info(summary);
-    }
-    let count = counted(warnings.len(), "WARNING");
-    let items = warnings.iter().copied().map(warning_item).collect();
-    Report::warning(format!("{summary} WITH {count}")).with_items(items)
-}
-
 fn failure_report(cart_name: &str, failures: &[ExportFailure]) -> Report {
     let summary = if failures.contains(&ExportFailure::EmptyClaim) {
         format!("EXPORT FAILED: NO CLAIM IN {cart_name}")
-    } else if failures == [ExportFailure::NoExportTracks] {
-        "EXPORT FAILED: NO EXPORT TRACKS".to_owned()
     } else {
         format!("EXPORT FAILED: {}", counted(failures.len(), "PROBLEM"))
     };
@@ -204,13 +165,10 @@ impl App {
 
     pub(super) fn write_target(&mut self, path: PathBuf, exported: Exported) {
         let cart_name = shown_name(&path);
-        let summary = format!(
-            "EXPORTED TO {cart_name}: {} SFX, {} PATTERNS. {}",
-            exported.sfx_count,
-            exported.pattern_count,
-            tracks_text(self.project.export_track_numbers()),
-        );
-        let report = written_report(summary, &exported.warnings);
+        let report = Report::info(format!(
+            "EXPORTED TO {cart_name}: {} SFX, {} PATTERNS.",
+            exported.sfx_count, exported.pattern_count,
+        ));
         self.request_write_bytes(path.clone(), exported.cart_bytes);
         self.waiting = Some(Waiting::ExportWriting(
             path,

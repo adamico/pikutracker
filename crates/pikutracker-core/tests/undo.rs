@@ -1,5 +1,6 @@
 mod support;
 
+use pikutracker_core::app::layout;
 use pikutracker_core::app::{Action, App, Direction, DirectoryEntry, FileRequest, FileResponse};
 use pikutracker_core::player::Player;
 use pikutracker_core::project::{
@@ -9,7 +10,7 @@ use pikutracker_core::project::{
 use pikutracker_core::project_file;
 use pikutracker_core::synth::SAMPLES_PER_TICK;
 use std::path::PathBuf;
-use support::{apply, status_line};
+use support::{apply, pane_text, status_line};
 
 const DOWN: Action = Action::Move(Direction::Down);
 const UP: Action = Action::Move(Direction::Up);
@@ -137,7 +138,7 @@ fn undo_moves_the_cursor_back_to_the_change() {
 #[test]
 fn undo_brings_focus_back_to_the_pane_of_the_change() {
     let mut app = App::with_project(project_with_a_song());
-    apply(&mut app, &[Action::HexDigit(5), Action::FocusNext]);
+    apply(&mut app, &[Action::HexDigit(5), Action::FocusPrevious]);
 
     app.apply(Action::Undo);
     app.apply(Action::HexDigit(6));
@@ -152,10 +153,10 @@ fn edits_in_every_pane_are_undone_in_order() {
     apply(
         &mut app,
         &[
-            Action::ToggleSongLoopRow,
-            Action::FocusNext,
+            Action::ToggleLoopStart,
+            Action::FocusPrevious,
             NUDGE_UP,
-            Action::FocusNext,
+            Action::FocusPrevious,
             Action::PianoKey(0),
             UP,
             UP,
@@ -225,8 +226,8 @@ fn a_cursor_moved_by_follow_ends_a_merge() {
     apply(
         &mut app,
         &[
-            Action::FocusNext,
-            Action::FocusNext,
+            Action::FocusPrevious,
+            Action::FocusPrevious,
             Action::ToggleFollow,
             Action::PlaySongFromCursor,
             NUDGE_UP,
@@ -285,7 +286,7 @@ fn actions_that_change_no_music_are_not_steps() {
         &mut app,
         &[
             DOWN,
-            Action::FocusNext,
+            Action::FocusPrevious,
             Action::OctaveUp,
             Action::Mute { track_number: 1 },
             Action::Solo { track_number: 2 },
@@ -305,12 +306,12 @@ fn undo_leaves_mute_and_solo_alone() {
         &mut app,
         &[Action::HexDigit(1), Action::Mute { track_number: 1 }],
     );
-    let muted = app.grid().text_dump().lines().nth(1).unwrap().to_owned();
+    let muted = pane_text(&app, layout::SONG, 1);
+    assert_eq!(muted, "    M1 T2 T3 T4");
 
     app.apply(Action::Undo);
 
-    let after = app.grid().text_dump().lines().nth(1).unwrap().to_owned();
-    assert_eq!(after[..28], muted[..28]);
+    assert_eq!(pane_text(&app, layout::SONG, 1), muted);
 }
 
 #[test]
@@ -326,15 +327,15 @@ fn undo_turns_follow_off_because_it_moves_the_cursor() {
 #[test]
 fn the_history_keeps_the_last_thousand_steps() {
     let mut app = App::new();
-    apply(&mut app, &[Action::ToggleSongLoopRow; 1001]);
-    assert_eq!(app.project().song_loop_row(), None);
+    apply(&mut app, &[Action::ToggleLoopStart; 1001]);
+    assert!(app.project().song_row_marks(0).loop_start);
 
     apply(&mut app, &[Action::Undo; 1000]);
-    assert_eq!(app.project().song_loop_row(), None);
+    assert!(app.project().song_row_marks(0).loop_start);
 
     app.apply(Action::Undo);
     assert_eq!(status_line(&app), NOTHING_TO_UNDO);
-    assert_eq!(app.project().song_loop_row(), None);
+    assert!(app.project().song_row_marks(0).loop_start);
 }
 
 #[test]

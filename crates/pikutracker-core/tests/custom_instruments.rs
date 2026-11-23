@@ -1,6 +1,6 @@
 mod support;
 
-use pikutracker_core::app::{Action, App, Direction, KeyContext};
+use pikutracker_core::app::{Action, App, Direction, KeyContext, layout};
 use pikutracker_core::keymap::{Key, KeyPress, Keymap, Modifiers};
 use pikutracker_core::player::{AudioRequest, Player};
 use pikutracker_core::project::{
@@ -79,8 +79,8 @@ fn assert_near(actual: f32, expected: f32, tolerance: f32) {
 
 #[test]
 fn a_step_on_a_waveform_instrument_at_c2_plays_at_261_6_hz() {
-    let mut project = playing_one_note(C2, 0x30);
-    project.set_custom_instrument(0x30, Some(waveform_instrument()));
+    let mut project = playing_one_note(C2, 0x0C);
+    project.set_custom_instrument(0x0C, Some(waveform_instrument()));
 
     let samples = render_song(project, 10_000);
 
@@ -98,21 +98,18 @@ fn an_sfx_instrument_plays_relative_to_c2() {
 }
 
 #[test]
-fn a_project_plays_more_than_8_custom_instruments() {
-    let mut project = playing_one_note(C2, 0x10);
-    for id in 0x08..0x10 {
-        project.set_custom_instrument(id, Some(sfx_instrument()));
-    }
-    project.set_custom_instrument(0x10, Some(waveform_instrument()));
+fn a_project_holds_custom_instruments_8_to_f_only() {
+    let mut project = Project::new();
+    project.set_custom_instrument(0x0F, Some(sfx_instrument()));
+    project.set_custom_instrument(0x10, Some(sfx_instrument()));
 
-    let samples = render_song(project, 10_000);
-
-    assert_near(frequency(&samples[SETTLED..]), 261.63, 1.0);
+    let ids: Vec<u8> = project.custom_instruments().map(|(id, _)| id).collect();
+    assert_eq!(ids, [0x0F]);
 }
 
 #[test]
 fn a_step_on_an_undefined_custom_instrument_is_silent() {
-    let project = playing_one_note(C2, 0x40);
+    let project = playing_one_note(C2, 0x0E);
 
     let samples = render_song(project, 10_000);
 
@@ -134,9 +131,9 @@ fn phrase_app(actions: &[Action]) -> App {
         &mut app,
         &[
             Action::HexDigit(0),
-            Action::FocusNext,
+            Action::FocusPrevious,
             Action::HexDigit(0),
-            Action::FocusNext,
+            Action::FocusPrevious,
         ],
     );
     apply(&mut app, actions);
@@ -149,7 +146,7 @@ fn typed(value: u8) -> [Action; 2] {
 
 fn on_instrument(instrument: u8) -> App {
     let mut app = phrase_app(&[C_KEY, UP, RIGHT]);
-    apply(&mut app, &typed(instrument));
+    app.apply(Action::HexDigit(instrument));
     app
 }
 
@@ -166,12 +163,106 @@ fn lines(app: &App) -> Vec<String> {
 }
 
 #[test]
-fn a_step_can_use_instruments_08_to_ff() {
-    for instrument in [0x08, 0x42, 0xff] {
-        let app = on_instrument(instrument);
+fn a_step_instrument_is_one_hex_digit() {
+    let mut app = on_instrument(0x0C);
+    app.apply(Action::HexDigit(0x0A));
 
-        assert_eq!(first_step(&app).instrument(), instrument);
-    }
+    assert_eq!(first_step(&app).instrument(), 0x0A);
+    assert_eq!(
+        support::pane_text(&app, layout::PHRASE, 7),
+        "00 C-2 [A]   5   0"
+    );
+}
+
+const CUSTOM_INSTRUMENTS_END_AT_F: &str = "CUSTOM INSTRUMENTS END AT F";
+
+#[test]
+fn nudging_a_step_instrument_past_f_stays_on_f_with_a_remark() {
+    let mut app = on_instrument(0x0F);
+    app.apply(NUDGE_UP);
+
+    assert_eq!(first_step(&app).instrument(), 0x0F);
+    assert_eq!(support::status_line(&app), CUSTOM_INSTRUMENTS_END_AT_F);
+}
+
+fn on_the_pen_instrument() -> App {
+    phrase_app(&[UP, UP, RIGHT])
+}
+
+#[test]
+fn nudging_the_pen_instrument_past_f_stays_on_f_with_a_remark() {
+    let mut app = on_the_pen_instrument();
+    apply(&mut app, &[Action::HexDigit(0x0F), NUDGE_UP]);
+
+    assert_eq!(support::pane_text(&app, layout::PHRASE, 4), "OCT 2  INS[F]");
+    assert_eq!(support::status_line(&app), CUSTOM_INSTRUMENTS_END_AT_F);
+}
+
+#[test]
+fn setting_a_step_to_an_undefined_custom_instrument_keeps_it_with_a_remark() {
+    let app = on_instrument(0x0A);
+
+    assert_eq!(first_step(&app).instrument(), 0x0A);
+    assert_eq!(
+        support::status_line(&app),
+        "CUSTOM INSTRUMENT A IS NOT DEFINED"
+    );
+}
+
+#[test]
+fn nudging_a_step_onto_an_undefined_custom_instrument_keeps_it_with_a_remark() {
+    let mut app = on_instrument(0x09);
+    app.apply(NUDGE_UP);
+
+    assert_eq!(first_step(&app).instrument(), 0x0A);
+    assert_eq!(
+        support::status_line(&app),
+        "CUSTOM INSTRUMENT A IS NOT DEFINED"
+    );
+}
+
+#[test]
+fn setting_the_pen_to_an_undefined_custom_instrument_keeps_it_with_a_remark() {
+    let mut app = on_the_pen_instrument();
+    app.apply(Action::HexDigit(0x0C));
+
+    assert_eq!(support::pane_text(&app, layout::PHRASE, 4), "OCT 2  INS[C]");
+    assert_eq!(
+        support::status_line(&app),
+        "CUSTOM INSTRUMENT C IS NOT DEFINED"
+    );
+}
+
+#[test]
+fn setting_a_step_to_a_defined_custom_instrument_needs_no_remark() {
+    let mut project = Project::new();
+    project.set_custom_instrument(0x0A, Some(sfx_instrument()));
+    let mut app = App::with_project(project);
+    apply(
+        &mut app,
+        &[
+            Action::HexDigit(0),
+            Action::FocusPrevious,
+            Action::HexDigit(0),
+            Action::FocusPrevious,
+            C_KEY,
+            UP,
+            RIGHT,
+            Action::HexDigit(0x0A),
+        ],
+    );
+
+    assert_eq!(first_step(&app).instrument(), 0x0A);
+    assert!(!support::status_line(&app).contains("NOT DEFINED"));
+}
+
+#[test]
+fn jumping_past_instrument_f_stays_on_f_with_a_remark() {
+    let mut app = instrument_view(0x0F);
+    app.apply(Action::Jump(Direction::Right));
+
+    assert_eq!(lines(&app)[0], "INSTRUMENT F");
+    assert_eq!(support::status_line(&app), CUSTOM_INSTRUMENTS_END_AT_F);
 }
 
 #[test]
@@ -187,12 +278,12 @@ fn nudging_a_step_instrument_goes_on_past_the_built_in_instruments() {
 
 #[test]
 fn new_notes_take_the_custom_instrument_last_typed() {
-    let mut app = on_instrument(0x20);
+    let mut app = on_instrument(0x0B);
     apply(&mut app, &[LEFT, DOWN, C_KEY]);
 
     assert_eq!(
         app.project().phrase(PhraseId::new(0)).step(1).instrument(),
-        0x20
+        0x0B
     );
 }
 
@@ -236,15 +327,15 @@ fn enter_on_a_step_instrument_column_opens_the_instrument_full_screen() {
     let app = instrument_view(0x08);
 
     let lines = lines(&app);
-    assert_eq!(lines[0], "INSTRUMENT 08");
+    assert_eq!(lines[0], "INSTRUMENT 8");
     assert!(lines.iter().all(|line| !line.contains("PHRASE")));
     assert_eq!(lines[2], "NAME[............]");
     assert_eq!(lines[3], "KIND SFX");
     assert_eq!(lines[4], "SPD 10  LEN 10  LOOP 00 TO 00");
     assert_eq!(lines[5], "NZ 0  BZ 0  DT 0  RV 0  DP 0");
-    assert_eq!(lines[7], "   NOT IN V F");
-    assert_eq!(lines[8], "00 ... .. . .");
-    assert_eq!(lines[23], "0F ... .. . .");
+    assert_eq!(lines[7], "   NOTE INST VOL FX");
+    assert_eq!(lines[8], "00 ...  .    .   .");
+    assert_eq!(lines[23], "0F ...  .    .   .");
     assert_eq!(lines[24], "");
 }
 
@@ -253,7 +344,7 @@ fn a_built_in_instrument_has_no_view() {
     let mut app = on_instrument(0x03);
     app.apply(ENTER);
 
-    assert!(lines(&app)[0].starts_with("SONG"));
+    assert!(lines(&app)[0].starts_with("PHRASE"));
     assert_eq!(
         support::status_line(&app),
         "BUILT-IN INSTRUMENTS HAVE NO SETTINGS"
@@ -265,7 +356,7 @@ fn escape_closes_the_instrument_view() {
     let mut app = instrument_view(0x08);
     app.apply(ESC);
 
-    assert!(lines(&app)[0].starts_with("SONG"));
+    assert!(lines(&app)[0].starts_with("PHRASE"));
     assert_eq!(first_step(&app).instrument(), 0x08);
 }
 
@@ -282,14 +373,14 @@ fn an_sfx_instrument_edits_its_steps() {
     apply(&mut app, &[DOWN, DOWN, DOWN, DOWN, C_KEY]);
 
     assert_eq!(sfx(&app, 0x08).steps[0], step(C2, 2, 5));
-    assert_eq!(lines(&app)[8], "00 C-2 02 5 0");
+    assert_eq!(lines(&app)[8], "00 C-2  2    5   0");
 }
 
 #[test]
 fn an_sfx_instrument_steps_use_only_built_in_instruments() {
     let mut app = instrument_view(0x08);
     apply(&mut app, &[DOWN, DOWN, DOWN, DOWN, C_KEY, UP, RIGHT]);
-    apply(&mut app, &typed(0x12));
+    app.apply(Action::HexDigit(0x0C));
 
     assert_eq!(sfx(&app, 0x08).steps[0].instrument(), 7);
 }
@@ -423,7 +514,7 @@ fn type_samples(app: &mut App, sample: impl Fn(usize) -> u8) {
 
 #[test]
 fn space_in_the_instrument_view_auditions_it_at_c2_until_pressed_again() {
-    let mut app = waveform_view(0x30);
+    let mut app = waveform_view(0x0C);
     type_samples(&mut app, |index| if index < 32 { 0x64 } else { 0x9c });
     app.take_audio_requests();
     let mut player = Player::new();
@@ -442,7 +533,7 @@ fn space_in_the_instrument_view_auditions_it_at_c2_until_pressed_again() {
 
 #[test]
 fn an_edit_during_an_audition_is_heard() {
-    let mut app = waveform_view(0x30);
+    let mut app = waveform_view(0x0C);
     app.apply(SPACE);
     app.take_audio_requests();
     apply(&mut app, &[DOWN, DOWN, DOWN]);
@@ -457,7 +548,7 @@ fn an_edit_during_an_audition_is_heard() {
 
 #[test]
 fn closing_the_instrument_view_ends_an_audition() {
-    let mut app = waveform_view(0x30);
+    let mut app = waveform_view(0x0C);
     app.apply(SPACE);
     app.take_audio_requests();
     app.apply(ESC);
@@ -479,7 +570,7 @@ fn instrument_edits_are_undoable() {
 
 #[test]
 fn custom_instruments_save_and_reload_through_the_project_file() {
-    let mut app = waveform_view(0x30);
+    let mut app = waveform_view(0x0C);
     apply(&mut app, &[UP, Action::TypeChar('W'), DOWN]);
     apply(&mut app, &[DOWN, DOWN, DOWN]);
     apply(&mut app, &typed(0x9c));
@@ -494,8 +585,8 @@ fn custom_instruments_save_and_reload_through_the_project_file() {
     let reloaded = project_file::parse(&saved).unwrap();
 
     assert_eq!(reloaded, *app.project());
-    assert_eq!(wave(&app, 0x30).samples[0], -100);
-    assert_eq!(instrument(&app, 0x30).name.as_deref(), Some("W"));
+    assert_eq!(wave(&app, 0x0C).samples[0], -100);
+    assert_eq!(instrument(&app, 0x0C).name.as_deref(), Some("W"));
     assert_eq!(sfx(&app, 0x08).steps[0], step(C2, 2, 5));
 }
 

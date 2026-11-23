@@ -60,7 +60,9 @@ pub enum Action {
     OctaveUp,
     OctaveDown,
     Clear,
-    ToggleSongLoopRow,
+    ToggleLoopStart,
+    ToggleLoopBack,
+    ToggleStop,
     Nudge { up: bool, coarse: bool },
     MoveRows { up: bool },
     Confirm,
@@ -76,6 +78,30 @@ pub enum Action {
     ResetMidiTable,
 }
 
+impl Action {
+    pub const fn acts_on_cells(self) -> bool {
+        matches!(
+            self,
+            Action::Clear
+                | Action::Copy
+                | Action::Cut
+                | Action::Paste
+                | Action::Clone
+                | Action::DeepClone
+                | Action::NewUnused
+                | Action::InsertRow
+                | Action::DeleteRow
+                | Action::MoveRows { .. }
+                | Action::StartSelection
+                | Action::Select(_)
+                | Action::SelectJump(_)
+                | Action::PianoKey(_)
+                | Action::HexDigit(_)
+                | Action::Nudge { .. }
+        )
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum KeyContext {
     Navigation,
@@ -85,7 +111,6 @@ pub enum KeyContext {
     FileName,
     InstrumentName,
     MidiImport,
-    SongPicker,
     SpeedEntry,
     ClaimText,
 }

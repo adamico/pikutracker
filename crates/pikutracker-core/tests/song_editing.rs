@@ -1,16 +1,16 @@
 mod support;
 
-use pikutracker_core::app::{Action, App, Direction, KeyContext};
+use pikutracker_core::app::{Action, App, Direction, KeyContext, layout};
 use pikutracker_core::keymap::{Key, KeyPress, Keymap, Modifiers};
 use pikutracker_core::project::{ChainId, PhraseId};
-use support::{apply, status_line};
+use support::{apply, pane_text, status_line};
 
 const UP: Action = Action::Move(Direction::Up);
 const DOWN: Action = Action::Move(Direction::Down);
 const LEFT: Action = Action::Move(Direction::Left);
 const RIGHT: Action = Action::Move(Direction::Right);
+const SHIFT_TAB: Action = Action::FocusPrevious;
 const TAB: Action = Action::FocusNext;
-const BACK: Action = Action::FocusPrevious;
 const NUDGE_UP: Action = Action::Nudge {
     up: true,
     coarse: false,
@@ -36,35 +36,20 @@ fn id(value: u8) -> [Action; 2] {
     [Action::HexDigit(value >> 4), Action::HexDigit(value & 0xF)]
 }
 
-fn pane_text(app: &App, line: usize, columns: std::ops::Range<usize>) -> String {
-    let text: String = app
-        .grid()
-        .text_dump()
-        .lines()
-        .nth(line)
-        .unwrap()
-        .chars()
-        .chain(std::iter::repeat(' '))
-        .skip(columns.start)
-        .take(columns.len())
-        .collect();
-    text.trim_end().to_owned()
-}
-
 fn song_text(app: &App, line: usize) -> String {
-    pane_text(app, line, 0..28)
+    pane_text(app, layout::SONG, line)
 }
 
 fn chain_text(app: &App, line: usize) -> String {
-    pane_text(app, line, 29..62)
+    pane_text(app, layout::CHAIN, line)
 }
 
 fn phrase_text(app: &App, line: usize) -> String {
-    pane_text(app, line, 63..82)
+    pane_text(app, layout::PHRASE, line)
 }
 
 fn chain_app() -> App {
-    app_after(&[&id(3)[..], &[TAB]].concat())
+    app_after(&[&id(3)[..], &[SHIFT_TAB]].concat())
 }
 
 #[test]
@@ -72,21 +57,18 @@ fn two_hex_digits_place_a_chain_on_a_song_row() {
     let app = app_after(&[&[DOWN, RIGHT][..], &id(0x3A)].concat());
 
     assert_eq!(app.project().song_cell(1, 1), Some(ChainId::new(0x3A)));
-    assert_eq!(
-        song_text(&app, FIRST_ROW_LINE + 1),
-        "01  --[3A]-- -- -- -- -- --"
-    );
+    assert_eq!(song_text(&app, FIRST_ROW_LINE + 1), "01  --[3A]-- --");
 }
 
 #[test]
-fn all_eight_tracks_take_chains() {
+fn all_four_tracks_take_chains() {
     let mut app = App::new();
-    for track in 0..8 {
+    for track in 0..4 {
         apply(&mut app, &id(track as u8));
         app.apply(RIGHT);
     }
 
-    for track in 0..8 {
+    for track in 0..4 {
         assert_eq!(
             app.project().song_cell(0, track),
             Some(ChainId::new(track as u8))
@@ -98,7 +80,7 @@ fn all_eight_tracks_take_chains() {
 fn clear_removes_a_chain_from_the_song_row_and_keeps_the_chain() {
     let mut app = chain_app();
     apply(&mut app, &id(5));
-    apply(&mut app, &[BACK, Action::Clear]);
+    apply(&mut app, &[TAB, Action::Clear]);
 
     assert_eq!(app.project().song_cell(0, 0), None);
     assert!(app.project().chain(ChainId::new(3)).entry(0).is_some());
@@ -142,7 +124,7 @@ fn a_chain_entry_holds_a_phrase_with_no_transpose_at_first() {
     let entry = app.project().chain(ChainId::new(3)).entry(0).unwrap();
     assert_eq!(entry.phrase(), PhraseId::new(0x1F));
     assert_eq!(entry.transpose(), 0);
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0[1F]+00         256");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "00[1F]    +00");
 }
 
 #[test]
@@ -151,7 +133,7 @@ fn an_untouched_chain_entry_stays_empty() {
     apply(&mut app, &id(1));
 
     assert!(app.project().chain(ChainId::new(3)).entry(1).is_none());
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE + 1), "1 -- ---           -");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE + 1), "01 --     ---");
 }
 
 #[test]
@@ -162,7 +144,7 @@ fn the_transpose_column_nudges_by_semitones_and_octaves() {
 
     let entry = app.project().chain(ChainId::new(3)).entry(0).unwrap();
     assert_eq!(entry.transpose(), -10);
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0 01[-0A]        256");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "00 01    [-0A]");
 }
 
 #[test]
@@ -194,7 +176,7 @@ fn clear_on_the_phrase_column_empties_the_whole_entry() {
     apply(&mut app, &[Action::Clear]);
 
     assert!(app.project().chain(ChainId::new(3)).entry(0).is_none());
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0[--]---           -");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "00[--]    ---");
 }
 
 #[test]
@@ -214,36 +196,36 @@ fn the_chain_pane_has_no_fill_column() {
     apply(&mut app, &id(1));
     apply(&mut app, &[RIGHT, RIGHT, RIGHT]);
 
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0 01[+00]        256");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "00 01    [+00]");
 }
 
 #[test]
 fn editing_a_chain_entry_with_no_chain_under_the_cursor_says_so() {
-    let app = app_after(&[&[TAB][..], &id(1)].concat());
+    let app = app_after(&[&[SHIFT_TAB][..], &id(1)].concat());
 
     assert_eq!(status_line(&app), "NO CHAIN HERE");
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0[--]---           -");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "00[--]    ---");
 }
 
 #[test]
 fn editing_with_no_phrase_under_the_cursor_says_so() {
-    let app = app_after(&[TAB, TAB, Action::PianoKey(0)]);
+    let app = app_after(&[SHIFT_TAB, SHIFT_TAB, Action::PianoKey(0)]);
 
     assert_eq!(status_line(&app), "NO PHRASE HERE");
-    assert_eq!(app.phrase_under_cursor(), None);
+    assert_eq!(app.shown_phrase_id(), None);
 }
 
 #[test]
 fn the_chain_pane_follows_the_song_cursor() {
     let mut app = chain_app();
     apply(&mut app, &id(7));
-    apply(&mut app, &[BACK, DOWN]);
-    assert_eq!(chain_text(&app, 0), "CHAIN --  T1 ROW 01");
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0 -- ---           -");
+    apply(&mut app, &[TAB, DOWN]);
+    assert_eq!(chain_text(&app, 0), "CHAIN --");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "00 --     ---");
 
     app.apply(UP);
-    assert_eq!(chain_text(&app, 0), "CHAIN 03  T1 ROW 00");
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0 07 +00         256");
+    assert_eq!(chain_text(&app, 0), "CHAIN 03");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "00 07     +00");
 }
 
 #[test]
@@ -253,31 +235,31 @@ fn the_phrase_pane_follows_the_chain_cursor() {
     apply(&mut app, &[DOWN]);
     apply(&mut app, &id(9));
 
-    assert_eq!(app.phrase_under_cursor(), Some(PhraseId::new(9)));
-    assert_eq!(phrase_text(&app, 0), "PHRASE 09   OCT 2");
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(9)));
+    assert_eq!(phrase_text(&app, 0), "PHRASE 09");
 
     app.apply(UP);
-    assert_eq!(app.phrase_under_cursor(), Some(PhraseId::new(7)));
-    assert_eq!(phrase_text(&app, 0), "PHRASE 07   OCT 2");
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(7)));
+    assert_eq!(phrase_text(&app, 0), "PHRASE 07");
 }
 
 #[test]
 fn the_phrase_pane_follows_the_song_cursor_through_the_chain() {
     let mut app = chain_app();
     apply(&mut app, &id(7));
-    app.apply(BACK);
+    app.apply(TAB);
     apply(&mut app, &[DOWN]);
-    assert_eq!(phrase_text(&app, 0), "PHRASE --   OCT 2");
+    assert_eq!(phrase_text(&app, 0), "PHRASE --");
 
     app.apply(UP);
-    assert_eq!(phrase_text(&app, 0), "PHRASE 07   OCT 2");
+    assert_eq!(phrase_text(&app, 0), "PHRASE 07");
 }
 
 #[test]
 fn a_note_goes_into_the_phrase_under_the_chain_cursor() {
     let mut app = chain_app();
     apply(&mut app, &id(7));
-    apply(&mut app, &[TAB, Action::PianoKey(0)]);
+    apply(&mut app, &[SHIFT_TAB, Action::PianoKey(0)]);
 
     let written = app.project().phrase(PhraseId::new(7)).step(0);
     assert_eq!(written.pitch(), 24);
@@ -290,9 +272,9 @@ fn two_entries_sharing_a_phrase_show_the_same_notes() {
     apply(&mut app, &id(7));
     app.apply(DOWN);
     apply(&mut app, &id(7));
-    apply(&mut app, &[TAB, Action::PianoKey(0), BACK, UP]);
+    apply(&mut app, &[SHIFT_TAB, Action::PianoKey(0), TAB, UP]);
 
-    assert_eq!(phrase_text(&app, 5), "00 C-2 02 5 0");
+    assert_eq!(phrase_text(&app, 7), "00 C-2  2    5   0");
 }
 
 #[test]
@@ -304,7 +286,9 @@ fn the_phrase_cursor_keeps_its_step_past_the_length_of_a_shorter_phrase_it_follo
     apply(
         &mut app,
         &[
-            TAB,
+            SHIFT_TAB,
+            UP,
+            UP,
             UP,
             UP,
             UP,
@@ -313,26 +297,14 @@ fn the_phrase_cursor_keeps_its_step_past_the_length_of_a_shorter_phrase_it_follo
             Action::HexDigit(2),
         ],
     );
-    apply(&mut app, &[LEFT, DOWN, DOWN, DOWN, BACK, UP, TAB]);
+    apply(
+        &mut app,
+        &[LEFT, DOWN, DOWN, DOWN, DOWN, DOWN, TAB, UP, SHIFT_TAB],
+    );
     apply(&mut app, &[DOWN; 15]);
-    apply(&mut app, &[BACK, DOWN, TAB]);
+    apply(&mut app, &[TAB, DOWN, SHIFT_TAB]);
 
-    assert_eq!(phrase_text(&app, 20), "0F[...].. . .");
-}
-
-#[test]
-fn set_song_loop_row_moves_the_loop_and_a_second_press_turns_it_off() {
-    let mut app = app_after(&[DOWN, DOWN]);
-    assert_eq!(app.project().song_loop_row(), Some(0));
-    assert_eq!(song_text(&app, 0), "SONG  LOOP 00");
-
-    app.apply(Action::ToggleSongLoopRow);
-    assert_eq!(app.project().song_loop_row(), Some(2));
-    assert_eq!(song_text(&app, 0), "SONG  LOOP 02");
-
-    app.apply(Action::ToggleSongLoopRow);
-    assert_eq!(app.project().song_loop_row(), None);
-    assert_eq!(song_text(&app, 0), "SONG  LOOP --");
+    assert_eq!(phrase_text(&app, 22), "0F[...] .    .   .");
 }
 
 #[test]
@@ -345,7 +317,7 @@ fn the_song_editing_keys_are_bound_in_the_pc_tracker_preset() {
     );
     assert_eq!(
         keymap.action_for(KeyPress::new(Key::Char('r'), Modifiers::CTRL)),
-        Some(Action::ToggleSongLoopRow)
+        Some(Action::ToggleLoopStart)
     );
 }
 
@@ -354,5 +326,5 @@ fn left_moves_back_to_the_phrase_column_of_a_chain_entry() {
     let mut app = chain_app();
     apply(&mut app, &[RIGHT, RIGHT, LEFT, LEFT]);
 
-    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "0[--]---           -");
+    assert_eq!(chain_text(&app, FIRST_ROW_LINE), "00[--]    ---");
 }

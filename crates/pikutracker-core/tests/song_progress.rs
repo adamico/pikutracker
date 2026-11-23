@@ -1,4 +1,4 @@
-use pikutracker_core::app::{Action, App};
+use pikutracker_core::app::{Action, App, layout};
 use pikutracker_core::player::Player;
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
 use pikutracker_core::screen::grid::{CELL_WIDTH, ProgressBar};
@@ -11,8 +11,8 @@ const SPACE: Action = Action::PlayFocusedPane;
 const SPEED: i32 = 8;
 const STEP_SAMPLES: usize = SPEED as usize * SAMPLES_PER_TICK as usize;
 
-const FIRST_SONG_ROW: usize = 2;
-const FIRST_TRACK_COLUMN: usize = 4;
+const FIRST_SONG_ROW: usize = layout::SONG.row + 2;
+const FIRST_TRACK_COLUMN: usize = layout::SONG.column + 4;
 const TRACK_WIDTH: usize = 3;
 const BAR_PIXELS: usize = 2 * CELL_WIDTH;
 

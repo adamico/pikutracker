@@ -3,15 +3,14 @@ mod support;
 use pikutracker_core::cart::Cart;
 use pikutracker_core::export::export;
 use pikutracker_core::project::{
-    Chain, ChainEntry, ChainId, Claim, CustomInstrument, EXPORT_CHANNELS, InstrumentSound,
-    PhraseId, Project, SfxInstrument, Step, WaveformInstrument,
+    Chain, ChainEntry, ChainId, Claim, CustomInstrument, InstrumentSound, PhraseId, Project,
+    SfxInstrument, SongRowEnding, SongRowMarks, Step, TRACKS, WaveformInstrument,
 };
 use pikutracker_core::synth::SAMPLES_PER_TICK;
-use support::{HEADER, assert_same_samples, render_export_tracks, render_music};
+use support::{HEADER, assert_same_samples, render_music, render_song};
 
 const SFX_INSTRUMENT: u8 = 0x0C;
-const WAVEFORM_INSTRUMENT: u8 = 0x20;
-const SONG_TRACKS: usize = 5;
+const WAVEFORM_INSTRUMENT: u8 = 0x09;
 const FIRST_PATTERN: u8 = 12;
 const TAIL_TICKS: usize = 40;
 
@@ -50,14 +49,14 @@ fn transposed(phrase: u8, semitones: i32) -> Option<ChainEntry> {
 fn place_song_row(
     project: &mut Project,
     song_row: usize,
-    chain_rows: &[[Option<ChainEntry>; SONG_TRACKS]],
+    chain_rows: &[[Option<ChainEntry>; TRACKS]],
 ) {
-    for track in 0..SONG_TRACKS {
+    for track in 0..TRACKS {
         let mut chain = Chain::default();
         for (chain_row, entries) in chain_rows.iter().enumerate() {
             *chain.entry_mut(chain_row) = entries[track];
         }
-        let id = ChainId::new((song_row * SONG_TRACKS + track) as u8);
+        let id = ChainId::new((song_row * TRACKS + track) as u8);
         *project.chain_mut(id) = chain;
         project.set_song_cell(song_row, track, Some(id));
     }
@@ -97,28 +96,27 @@ fn instrumented_project() -> Project {
             sound: InstrumentSound::Waveform(wave),
         }),
     );
-    for channel in 0..EXPORT_CHANNELS {
-        project.set_export_track(channel, Some(channel as u8 + 1));
-    }
-    project.set_song_loop_row(None);
     project
 }
 
 fn assert_exports_sample_for_sample(project: &Project, song_ticks: usize) {
+    assert_exports_sample_for_sample_from(project, FIRST_PATTERN, song_ticks);
+}
+
+fn assert_exports_sample_for_sample_from(project: &Project, first_pattern: u8, song_ticks: usize) {
     let claim = Claim {
-        sfx: (0..4).chain(10..30).collect(),
-        first_and_last_pattern: Some((FIRST_PATTERN, 30)),
+        sfx: (0..8).chain(10..30).collect(),
+        first_and_last_pattern: Some((first_pattern, 30)),
     };
     let original = format!("{HEADER}__lua__\nprint(1)\n");
 
     let exported = export(project, &claim, original.as_bytes()).unwrap();
 
-    assert_eq!(exported.warnings, []);
     let cart = Cart::read(&exported.cart_bytes).unwrap();
     let samples = (song_ticks + TAIL_TICKS) * SAMPLES_PER_TICK as usize;
     assert_same_samples(
-        &render_music(&cart, FIRST_PATTERN, samples),
-        &render_export_tracks(project.clone(), samples),
+        &render_music(&cart, first_pattern, samples),
+        &render_song(project.clone(), samples),
     );
 }
 
@@ -135,11 +133,10 @@ fn every_kind_of_chain_row_plays_the_same_after_export() {
     write_phrase(&mut project, 7, 4, 8, &[2]);
     write_phrase(&mut project, 8, 32, 5, &[0, SFX_INSTRUMENT]);
     let shorter_left_of_longest_then_looping_then_shorter =
-        [plays(0), plays(1), plays(2), plays(3), None];
-    let every_phrase_looping = [plays(4), plays(5), None, None, None];
-    let timed_by_unexported_t5_with_shorter_left_of_free_channel =
-        [plays(7), None, plays(2), None, plays(6)];
-    let no_exported_entries = [None, None, None, None, plays(4)];
+        [plays(0), plays(1), plays(2), plays(3)];
+    let every_phrase_looping = [plays(4), plays(5), None, None];
+    let timed_by_t4_with_shorter_left_of_an_empty_channel = [plays(7), None, plays(2), plays(6)];
+    let only_t4_plays = [None, None, None, plays(4)];
     loop_from(&mut project, 2, 1);
     loop_from(&mut project, 4, 0);
     loop_from(&mut project, 5, 2);
@@ -149,14 +146,14 @@ fn every_kind_of_chain_row_plays_the_same_after_export() {
         &[
             shorter_left_of_longest_then_looping_then_shorter,
             every_phrase_looping,
-            timed_by_unexported_t5_with_shorter_left_of_free_channel,
-            no_exported_entries,
+            timed_by_t4_with_shorter_left_of_an_empty_channel,
+            only_t4_plays,
         ],
     );
     place_song_row(
         &mut project,
         1,
-        &[[plays(0), transposed(8, 5), plays(8), None, None]],
+        &[[plays(0), transposed(8, 5), plays(8), None]],
     );
 
     let song_row_0_ticks = 96 + 64 + 128 + 64;
@@ -191,8 +188,8 @@ fn phrase_filters_play_the_same_after_export() {
         &mut project,
         0,
         &[
-            [plays(0), plays(1), plays(2), plays(3), None],
-            [plays(3), plays(0), plays(1), plays(2), None],
+            [plays(0), plays(1), plays(2), plays(3)],
+            [plays(3), plays(0), plays(1), plays(2)],
         ],
     );
 
@@ -212,8 +209,8 @@ fn a_shorter_32_step_phrase_left_of_a_longer_one_plays_the_same_after_export() {
         &mut project,
         0,
         &[
-            [plays(0), plays(1), None, None, None],
-            [plays(1), plays(0), None, None, None],
+            [plays(0), plays(1), None, None],
+            [plays(1), plays(0), None, None],
         ],
     );
 
@@ -230,8 +227,8 @@ fn a_phrase_loop_longer_than_its_chain_row_is_cut_the_same_after_export() {
         &mut project,
         0,
         &[
-            [plays(0), plays(1), None, None, None],
-            [plays(1), plays(0), None, None, None],
+            [plays(0), plays(1), None, None],
+            [plays(1), plays(0), None, None],
         ],
     );
 
@@ -239,17 +236,13 @@ fn a_phrase_loop_longer_than_its_chain_row_is_cut_the_same_after_export() {
 }
 
 #[test]
-fn an_all_looping_chain_row_timed_by_an_unexported_track_plays_the_same_after_export() {
+fn an_all_looping_chain_row_timed_by_the_rightmost_track_plays_the_same_after_export() {
     let mut project = instrumented_project();
     write_phrase(&mut project, 0, 8, 6, &[0, 3]);
     write_phrase(&mut project, 1, 16, 8, &[1]);
     loop_from(&mut project, 0, 0);
     loop_from(&mut project, 1, 3);
-    place_song_row(
-        &mut project,
-        0,
-        &[[plays(0), plays(0), None, None, plays(1)]],
-    );
+    place_song_row(&mut project, 0, &[[plays(0), plays(0), None, plays(1)]]);
 
     assert_exports_sample_for_sample(&project, 128);
 }
@@ -261,20 +254,86 @@ fn a_looping_song_plays_the_same_after_export() {
     write_phrase(&mut project, 1, 16, 6, &[2, 4]);
     write_phrase(&mut project, 2, 4, 6, &[WAVEFORM_INSTRUMENT]);
     loop_from(&mut project, 2, 0);
-    place_song_row(&mut project, 0, &[[plays(1), None, None, None, None]]);
+    place_song_row(&mut project, 0, &[[plays(1), None, None, None]]);
     place_song_row(
         &mut project,
         1,
         &[
-            [plays(0), plays(1), None, None, None],
-            [plays(2), plays(0), None, None, None],
+            [plays(0), plays(1), None, None],
+            [plays(2), plays(0), None, None],
         ],
     );
-    project.set_song_loop_row(Some(1));
+    mark(&mut project, 1, true, Some(SongRowEnding::LoopBack));
 
     let song_row_0_ticks = 96;
     let song_row_1_ticks = 96 + 48;
     assert_exports_sample_for_sample(&project, song_row_0_ticks + 3 * song_row_1_ticks);
+}
+
+fn mark(project: &mut Project, row: usize, loop_start: bool, ending: Option<SongRowEnding>) {
+    project.set_song_row_marks(row, SongRowMarks { loop_start, ending });
+}
+
+fn three_row_song() -> Project {
+    let mut project = instrumented_project();
+    write_phrase(&mut project, 0, 8, 6, &[0, SFX_INSTRUMENT]);
+    write_phrase(&mut project, 1, 16, 6, &[2, 4]);
+    write_phrase(&mut project, 2, 4, 6, &[WAVEFORM_INSTRUMENT]);
+    loop_from(&mut project, 2, 0);
+    place_song_row(&mut project, 0, &[[plays(1), None, None, None]]);
+    place_song_row(
+        &mut project,
+        1,
+        &[
+            [plays(0), plays(1), None, None],
+            [plays(2), plays(0), None, None],
+        ],
+    );
+    place_song_row(&mut project, 2, &[[plays(0), None, plays(2), None]]);
+    project
+}
+
+const THREE_ROW_TICKS: [usize; 3] = [96, 96 + 48, 48];
+
+#[test]
+fn a_loop_back_to_a_loop_start_plays_the_same_after_export() {
+    let mut project = three_row_song();
+    mark(&mut project, 1, true, None);
+    mark(&mut project, 2, false, Some(SongRowEnding::LoopBack));
+
+    let [row_0, row_1, row_2] = THREE_ROW_TICKS;
+    assert_exports_sample_for_sample(&project, row_0 + 3 * (row_1 + row_2));
+}
+
+#[test]
+fn a_loop_back_with_no_loop_start_plays_the_same_after_export_from_pattern_0() {
+    let mut project = three_row_song();
+    mark(&mut project, 1, false, Some(SongRowEnding::LoopBack));
+
+    let [row_0, row_1, _] = THREE_ROW_TICKS;
+    assert_exports_sample_for_sample_from(&project, 0, 3 * (row_0 + row_1));
+}
+
+#[test]
+fn a_stop_plays_the_same_after_export() {
+    let mut project = three_row_song();
+    mark(&mut project, 1, true, Some(SongRowEnding::Stop));
+    mark(&mut project, 2, false, Some(SongRowEnding::LoopBack));
+
+    let [row_0, row_1, _] = THREE_ROW_TICKS;
+    assert_exports_sample_for_sample(&project, row_0 + row_1);
+}
+
+#[test]
+fn an_empty_song_row_ends_the_song_the_same_after_export() {
+    let mut project = three_row_song();
+    place_song_row(&mut project, 3, &[[plays(1), None, None, None]]);
+    for track in 0..TRACKS {
+        project.set_song_cell(2, track, None);
+    }
+
+    let [row_0, row_1, _] = THREE_ROW_TICKS;
+    assert_exports_sample_for_sample(&project, row_0 + row_1);
 }
 
 #[test]
@@ -285,7 +344,7 @@ fn a_shorter_phrase_under_reverb_and_dampen_left_of_a_longer_one_plays_the_same_
     let filters = project.phrase_mut(PhraseId::new(0)).filters_mut();
     filters.set_reverb(2);
     filters.set_dampen(2);
-    place_song_row(&mut project, 0, &[[plays(0), plays(1), None, None, None]]);
+    place_song_row(&mut project, 0, &[[plays(0), plays(1), None, None]]);
 
     assert_exports_sample_for_sample(&project, 96);
 }
@@ -307,11 +366,41 @@ fn silent_steps_on_custom_instruments_under_detune_and_reverb_play_the_same_afte
     write_silent_steps_on(&mut project, 0, &[3, SFX_INSTRUMENT], SFX_INSTRUMENT);
     write_silent_steps_on(&mut project, 1, &[2], WAVEFORM_INSTRUMENT);
     write_silent_steps_on(&mut project, 2, &[4], 0x0E);
-    place_song_row(
-        &mut project,
-        0,
-        &[[plays(0), plays(1), plays(2), None, None]],
-    );
+    place_song_row(&mut project, 0, &[[plays(0), plays(1), plays(2), None]]);
 
     assert_exports_sample_for_sample(&project, 96);
+}
+
+#[test]
+fn a_whole_phrase_loop_that_sets_an_all_looping_chain_row_is_one_sfx_wherever_it_plays() {
+    let mut project = instrumented_project();
+    write_phrase(&mut project, 0, 32, 8, &[0, 3]);
+    write_phrase(&mut project, 1, 8, 6, &[1]);
+    write_phrase(&mut project, 2, 16, 8, &[2]);
+    loop_from(&mut project, 0, 0);
+    loop_from(&mut project, 1, 0);
+    place_song_row(&mut project, 0, &[[plays(0), plays(1), None, None]]);
+    place_song_row(&mut project, 1, &[[plays(0), plays(2), None, None]]);
+    let claim = Claim {
+        sfx: (0..8).chain(10..30).collect(),
+        first_and_last_pattern: Some((FIRST_PATTERN, 30)),
+    };
+    let original = format!("{HEADER}__lua__\nprint(1)\n");
+
+    let exported = export(&project, &claim, original.as_bytes()).unwrap();
+
+    assert_eq!(exported.sfx_count, 3);
+    assert_exports_sample_for_sample(&project, 256 + 128);
+}
+
+#[test]
+fn a_whole_phrase_loop_beside_a_slower_loop_plays_the_same_after_export() {
+    let mut project = instrumented_project();
+    write_phrase(&mut project, 0, 32, 6, &[0, 3]);
+    write_phrase(&mut project, 1, 4, 16, &[1]);
+    loop_from(&mut project, 0, 0);
+    loop_from(&mut project, 1, 0);
+    place_song_row(&mut project, 0, &[[plays(0), plays(1), None, None]]);
+
+    assert_exports_sample_for_sample(&project, 192);
 }

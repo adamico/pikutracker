@@ -4,7 +4,7 @@ use super::panes::file_list::{Choice, FileList, Purpose};
 use super::paths::{relative_path, resolved};
 use super::{Action, App, Focus};
 use crate::export::Exported;
-use crate::player::{AudioRequest, SCOPE_COLUMNS, TrackMix};
+use crate::player::{AudioRequest, TrackMix};
 use crate::project::Project;
 use crate::project_file;
 use std::path::{Path, PathBuf};
@@ -275,7 +275,6 @@ impl App {
             self.audio_requests.push(AudioRequest::Stop);
         }
         self.playhead = None;
-        self.scope = [0; SCOPE_COLUMNS];
         if self.track_mix != TrackMix::default() {
             self.track_mix = TrackMix::default();
             self.audio_requests
@@ -291,7 +290,9 @@ impl App {
         self.song = Default::default();
         self.chain = Default::default();
         self.phrase.return_to_top();
-        self.overview = Default::default();
+        self.multitrack = Default::default();
+        self.shown = Default::default();
+        self.show_what_the_cursors_point_at();
         self.cart_view = None;
         self.focus = Focus::Song;
         self.played_pane = Focus::Song;

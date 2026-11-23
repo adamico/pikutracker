@@ -2,14 +2,16 @@ mod support;
 
 use pikutracker_core::app::{Action, App, Direction};
 use pikutracker_core::player::Player;
-use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
+use pikutracker_core::project::{
+    ChainEntry, ChainId, PhraseId, Project, SongRowEnding, SongRowMarks,
+};
 use pikutracker_core::synth::{SAMPLE_RATE, SAMPLES_PER_TICK};
 use support::apply;
 
 const UP: Action = Action::Move(Direction::Up);
 const DOWN: Action = Action::Move(Direction::Down);
 const RIGHT: Action = Action::Move(Direction::Right);
-const TAB: Action = Action::FocusNext;
+const SHIFT_TAB: Action = Action::FocusPrevious;
 const PLAY_SONG: Action = Action::PlaySongFromCursor;
 const OCTAVE_UP: Action = Action::Nudge {
     up: true,
@@ -98,7 +100,7 @@ fn four_steps_then_a3() -> Project {
 
 fn playing_in_phrase_pane(project: Project) -> App {
     let mut app = App::with_project(project);
-    apply(&mut app, &[TAB, TAB, PLAY_SONG]);
+    apply(&mut app, &[SHIFT_TAB, SHIFT_TAB, PLAY_SONG]);
     app
 }
 
@@ -145,6 +147,13 @@ fn an_edit_to_a_step_already_passed_waits_for_the_next_time_round() {
     let mut project = Project::new();
     let tone = write(&mut project, 1, &[A2, A2]);
     place(&mut project, 0, 0, 0, tone);
+    project.set_song_row_marks(
+        0,
+        SongRowMarks {
+            loop_start: false,
+            ending: Some(SongRowEnding::LoopBack),
+        },
+    );
     let mut app = playing_in_phrase_pane(project);
     let mut player = Player::new();
     let mut samples = render(&mut app, &mut player, 1);
@@ -192,7 +201,7 @@ fn a_speed_change_applies_from_the_next_step() {
 
     apply(
         &mut app,
-        &[UP, UP, UP, Action::HexDigit(1), Action::HexDigit(0)],
+        &[UP, UP, UP, UP, UP, Action::HexDigit(1), Action::HexDigit(0)],
     );
     samples.extend(render(&mut app, &mut player, 5));
 
@@ -208,7 +217,16 @@ fn a_phrase_shortened_past_the_playhead_ends_its_entry() {
 
     apply(
         &mut app,
-        &[UP, UP, UP, RIGHT, Action::HexDigit(0), Action::HexDigit(1)],
+        &[
+            UP,
+            UP,
+            UP,
+            UP,
+            UP,
+            RIGHT,
+            Action::HexDigit(0),
+            Action::HexDigit(1),
+        ],
     );
     let rest = render(&mut app, &mut player, 2);
     samples.extend(rest);
@@ -226,7 +244,7 @@ fn a_cleared_entry_stays_silent_until_the_next_chain_row() {
     place(&mut project, 0, 1, 1, tone);
     place(&mut project, 1, 0, 2, next);
     let mut app = App::with_project(project);
-    apply(&mut app, &[RIGHT, TAB, PLAY_SONG]);
+    apply(&mut app, &[RIGHT, SHIFT_TAB, PLAY_SONG]);
     let mut player = Player::new();
     let mut samples = render(&mut app, &mut player, 1);
     samples.extend(player.render(STEP_SAMPLES / 2));
@@ -259,7 +277,7 @@ fn an_emptied_song_row_acts_like_reaching_an_empty_row() {
     apply(&mut app, &[DOWN, Action::Clear]);
     samples.extend(render(&mut app, &mut player, 2));
 
-    assert_steps(&samples, &[220.0, 440.0, 220.0]);
+    assert_steps(&samples, &[220.0, 440.0, 0.0]);
 }
 
 #[test]
@@ -268,7 +286,7 @@ fn a_chain_with_every_entry_cleared_keeps_playing_until_it_has_notes_again() {
     let tone = write(&mut project, 1, &[A2, A2]);
     place(&mut project, 0, 0, 0, tone);
     let mut app = App::with_project(project);
-    apply(&mut app, &[TAB, Action::PlayFocusedPane]);
+    apply(&mut app, &[SHIFT_TAB, Action::PlayFocusedPane]);
     let mut player = Player::new();
     render(&mut app, &mut player, 1);
 
@@ -298,6 +316,8 @@ fn a_looping_phrase_shortened_past_the_playhead_starts_its_loop_again() {
     apply(
         &mut app,
         &[
+            UP,
+            UP,
             UP,
             UP,
             UP,

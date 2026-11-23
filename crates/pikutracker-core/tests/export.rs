@@ -1,10 +1,10 @@
 mod support;
 
 use pikutracker_core::cart::Cart;
-use pikutracker_core::export::{ExportFailure, ExportWarning, export};
+use pikutracker_core::export::{ExportFailure, export};
 use pikutracker_core::project::{
     Chain, ChainEntry, ChainId, Claim, CustomInstrument, Filters, InstrumentSound, PhraseId,
-    Project, SfxInstrument, Step, WaveformInstrument,
+    Project, SfxInstrument, SongRowEnding, SongRowMarks, Step, WaveformInstrument,
 };
 use support::{HEADER, assert_same_samples, render_notes, render_song, sound_of};
 
@@ -39,9 +39,11 @@ fn one_row_project() -> Project {
     let mut project = Project::new();
     write_phrase(&mut project, 0, 16, 20);
     place(&mut project, 0, 0, 0, 0);
-    project.set_export_track(0, Some(1));
-    project.set_song_loop_row(None);
     project
+}
+
+fn mark(project: &mut Project, row: usize, loop_start: bool, ending: Option<SongRowEnding>) {
+    project.set_song_row_marks(row, SongRowMarks { loop_start, ending });
 }
 
 fn exported_cart(project: &Project, claim: &Claim) -> Cart {
@@ -119,26 +121,28 @@ fn each_chain_row_becomes_one_pattern_in_song_order() {
 
     assert_eq!(cart.pattern_bytes(4), [8, 0x42, 0x43, 0x44]);
     assert_eq!(cart.pattern_bytes(5), [9, 0x42, 0x43, 0x44]);
-    assert_eq!(cart.pattern_bytes(6), [9, 0x42, 0x43 | 0x80, 0x44]);
+    assert_eq!(cart.pattern_bytes(6), [9, 0x42, 0x43, 0x44]);
 }
 
 #[test]
-fn export_tracks_choose_the_channels() {
-    let mut project = one_row_project();
-    place(&mut project, 0, 4, 1, 0);
-    project.set_export_track(0, None);
-    project.set_export_track(2, Some(5));
+fn track_n_exports_to_channel_n_minus_1_with_nothing_to_pick() {
+    let mut project = Project::new();
+    for (track, phrase, speed) in [(1, 1, 20), (3, 3, 10)] {
+        write_phrase(&mut project, phrase, 16, speed);
+        place(&mut project, 0, track, phrase, phrase);
+    }
 
-    let cart = exported_cart(&project, &claim(&[8], (0, 0)));
+    let cart = exported_cart(&project, &claim(&[8, 9], (0, 0)));
 
-    assert_eq!(cart.pattern_bytes(0), [0x41, 0x42, 8 | 0x80, 0x44]);
+    let without_flags = cart.pattern_bytes(0).map(|byte| byte & 0x7F);
+    assert_eq!(without_flags, [0x41, 8, 0x43, 9]);
 }
 
 #[test]
-fn a_looping_song_marks_its_loop_target_and_its_last_pattern() {
+fn loop_start_and_loop_back_on_one_row_flag_its_pattern() {
     let mut project = one_row_project();
     place(&mut project, 1, 0, 0, 0);
-    project.set_song_loop_row(Some(1));
+    mark(&mut project, 1, true, Some(SongRowEnding::LoopBack));
 
     let cart = exported_cart(&project, &claim(&[8], (2, 3)));
 
@@ -193,42 +197,39 @@ fn the_new_hash_describes_the_exported_claimed_bytes() {
 
 #[test]
 fn every_failure_is_reported_at_once() {
-    let mut project = one_row_project();
-    project.set_export_track(0, None);
-
-    let failures = export(&project, &Claim::default(), &blank_cart()).unwrap_err();
+    let failures = export(&Project::new(), &Claim::default(), &blank_cart()).unwrap_err();
 
     assert_eq!(
         failures,
-        [ExportFailure::NoExportTracks, ExportFailure::EmptyClaim]
+        [ExportFailure::EmptyClaim, ExportFailure::EmptySong]
     );
 }
 
 #[test]
-fn missing_export_tracks_do_not_hide_a_claim_that_is_too_small() {
+fn a_note_out_of_range_does_not_hide_a_claim_that_is_too_small() {
     let mut project = one_row_project();
     place(&mut project, 1, 0, 0, 0);
-    project.set_export_track(0, None);
+    let chain = project.chain_mut(ChainId::new(0));
+    chain.entry_mut(0).as_mut().unwrap().set_transpose(60);
 
     let failures = export(&project, &claim(&[8], (0, 0)), &blank_cart()).unwrap_err();
 
+    assert!(matches!(failures[0], ExportFailure::NoteOutOfRange { .. }));
     assert_eq!(
-        failures,
-        [
-            ExportFailure::NoExportTracks,
-            ExportFailure::TooFewPatterns {
-                needed: 2,
-                claimed: 1
-            },
-        ]
+        failures.last(),
+        Some(&ExportFailure::TooFewPatterns {
+            needed: 2,
+            claimed: 1
+        })
     );
 }
 
 #[test]
-fn a_song_looping_to_its_first_row_still_writes_loop_start() {
+fn marks_become_flags_over_bytes_that_were_there() {
     let mut project = one_row_project();
     place(&mut project, 1, 0, 0, 0);
-    project.set_song_loop_row(Some(0));
+    mark(&mut project, 0, true, None);
+    mark(&mut project, 1, false, Some(SongRowEnding::LoopBack));
     let mut original = blank_cart();
     original.extend(b"__music__\n07 08424344\n07 08424344\n");
 
@@ -240,26 +241,83 @@ fn a_song_looping_to_its_first_row_still_writes_loop_start() {
 }
 
 #[test]
-fn a_song_loop_row_past_a_gap_is_compiled_as_the_player_plays_it() {
+fn a_stop_mark_becomes_the_stop_flag() {
     let mut project = one_row_project();
-    write_phrase(&mut project, 1, 8, 9);
-    place(&mut project, 2, 0, 1, 1);
-    project.set_song_loop_row(Some(2));
-
-    let cart = exported_cart(&project, &claim(&[8, 9], (0, 1)));
-
-    assert_eq!(cart.pattern_bytes(0), [8, 0x42, 0x43, 0x44]);
-    assert_eq!(cart.pattern_bytes(1), [9 | 0x80, 0x42 | 0x80, 0x43, 0x44]);
-}
-
-#[test]
-fn a_song_loop_row_on_an_empty_row_stops_the_song() {
-    let mut project = one_row_project();
-    project.set_song_loop_row(Some(5));
+    mark(&mut project, 0, false, Some(SongRowEnding::Stop));
 
     let cart = exported_cart(&project, &claim(&[8], (0, 0)));
 
     assert_eq!(cart.pattern_bytes(0), [8, 0x42, 0x43 | 0x80, 0x44]);
+}
+
+#[test]
+fn a_song_row_of_several_chain_rows_flags_its_first_and_last_patterns() {
+    let mut project = one_row_project();
+    write_phrase(&mut project, 1, 8, 9);
+    *project.chain_mut(ChainId::new(0)).entry_mut(1) = Some(ChainEntry::new(PhraseId::new(1)));
+    *project.chain_mut(ChainId::new(0)).entry_mut(2) = Some(ChainEntry::new(PhraseId::new(0)));
+    place(&mut project, 1, 0, 1, 1);
+    mark(&mut project, 0, true, Some(SongRowEnding::LoopBack));
+    mark(&mut project, 1, true, Some(SongRowEnding::Stop));
+
+    let cart = exported_cart(&project, &claim(&[8, 9], (0, 3)));
+
+    assert_eq!(cart.pattern_bytes(0), [8 | 0x80, 0x42, 0x43, 0x44]);
+    assert_eq!(cart.pattern_bytes(1), [9, 0x42, 0x43, 0x44]);
+    assert_eq!(cart.pattern_bytes(2), [8, 0x42 | 0x80, 0x43, 0x44]);
+    assert_eq!(cart.pattern_bytes(3), [9 | 0x80, 0x42, 0x43 | 0x80, 0x44]);
+}
+
+#[test]
+fn an_empty_song_row_between_played_rows_becomes_an_empty_pattern_with_its_marks() {
+    let mut project = one_row_project();
+    write_phrase(&mut project, 1, 8, 9);
+    place(&mut project, 2, 0, 1, 1);
+    mark(&mut project, 1, false, Some(SongRowEnding::Stop));
+
+    let exported = export(&project, &claim(&[8, 9], (0, 2)), &blank_cart()).unwrap();
+
+    let cart = Cart::read(&exported.cart_bytes).unwrap();
+    assert_eq!(exported.pattern_count, 3);
+    assert_eq!(cart.pattern_bytes(0), [8, 0x42, 0x43, 0x44]);
+    assert_eq!(cart.pattern_bytes(1), [0x41, 0x42, 0x43 | 0x80, 0x44]);
+    assert_eq!(cart.pattern_bytes(2), [9, 0x42, 0x43, 0x44]);
+}
+
+#[test]
+fn a_loop_back_with_no_loop_start_adds_no_loop_start_flag_on_a_first_pattern_past_pattern_0() {
+    let mut project = one_row_project();
+    place(&mut project, 1, 0, 0, 0);
+    mark(&mut project, 1, false, Some(SongRowEnding::LoopBack));
+
+    let cart = exported_cart(&project, &claim(&[8], (2, 3)));
+
+    assert_eq!(cart.pattern_bytes(2), [8, 0x42, 0x43, 0x44]);
+    assert_eq!(cart.pattern_bytes(3), [8, 0x42 | 0x80, 0x43, 0x44]);
+}
+
+#[test]
+fn a_loop_back_to_song_row_00_needs_no_loop_start_on_pattern_0() {
+    let mut project = one_row_project();
+    place(&mut project, 1, 0, 0, 0);
+    mark(&mut project, 1, false, Some(SongRowEnding::LoopBack));
+
+    let cart = exported_cart(&project, &claim(&[8], (0, 1)));
+
+    assert_eq!(cart.pattern_bytes(0), [8, 0x42, 0x43, 0x44]);
+}
+
+#[test]
+fn marks_after_the_last_played_song_row_are_not_exported() {
+    let mut project = one_row_project();
+    mark(&mut project, 5, true, Some(SongRowEnding::Stop));
+
+    let exported = export(&project, &claim(&[8], (0, 1)), &blank_cart()).unwrap();
+
+    let cart = Cart::read(&exported.cart_bytes).unwrap();
+    assert_eq!(exported.pattern_count, 1);
+    assert_eq!(cart.pattern_bytes(0), [8, 0x42, 0x43, 0x44]);
+    assert_eq!(cart.pattern_bytes(1), EMPTY_PATTERN);
 }
 
 #[test]
@@ -370,8 +428,7 @@ fn a_silent_step_an_arpeggio_reads_pushed_out_of_range_is_named() {
 
 #[test]
 fn an_empty_song_has_nothing_to_export() {
-    let mut project = Project::new();
-    project.set_export_track(0, Some(1));
+    let project = Project::new();
 
     let failures = export(&project, &claim(&[8], (0, 0)), &blank_cart()).unwrap_err();
 
@@ -390,7 +447,6 @@ fn a_phrase_loop_is_written_as_the_sfx_loop_byte_for_byte() {
     let mut project = one_row_project();
     write_phrase(&mut project, 1, 32, 20);
     place(&mut project, 0, 1, 1, 1);
-    project.set_export_track(1, Some(2));
     project.phrase_mut(PhraseId::new(0)).set_loop(4, 12);
 
     let cart = exported_cart(&project, &claim(&[8, 9], (0, 0)));
@@ -414,7 +470,6 @@ fn in_an_all_looping_chain_row_the_longest_phrase_plays_once_through_with_len() 
     let mut project = one_row_project();
     write_phrase(&mut project, 1, 8, 20);
     place(&mut project, 0, 1, 1, 1);
-    project.set_export_track(1, Some(2));
     project.phrase_mut(PhraseId::new(0)).set_loop(4, 16);
     project.phrase_mut(PhraseId::new(1)).set_loop(2, 8);
 
@@ -429,7 +484,6 @@ fn a_shorter_phrase_on_the_left_loops_on_the_step_after_its_length() {
     let mut project = one_row_project();
     write_phrase(&mut project, 1, 32, 20);
     place(&mut project, 0, 1, 1, 1);
-    project.set_export_track(1, Some(2));
 
     let cart = exported_cart(&project, &claim(&[8, 9], (0, 0)));
 
@@ -443,7 +497,6 @@ fn a_shorter_32_step_phrase_on_the_left_loops_past_its_last_step() {
     project.phrase_mut(PhraseId::new(0)).set_length(32);
     write_phrase(&mut project, 1, 32, 30);
     place(&mut project, 0, 1, 1, 1);
-    project.set_export_track(1, Some(2));
 
     let cart = exported_cart(&project, &claim(&[8, 9], (0, 0)));
 
@@ -455,64 +508,10 @@ fn a_shorter_phrase_on_the_right_is_simple() {
     let mut project = one_row_project();
     write_phrase(&mut project, 1, 8, 20);
     place(&mut project, 0, 1, 1, 1);
-    project.set_export_track(1, Some(2));
 
     let cart = exported_cart(&project, &claim(&[8, 9], (0, 0)));
 
-    assert_eq!(cart.pattern_bytes(0), [8, 9, 0x43 | 0x80, 0x44]);
-}
-
-#[test]
-fn a_chain_row_timed_by_an_unexported_track_is_padded_with_a_silent_sfx() {
-    let mut project = one_row_project();
-    write_phrase(&mut project, 1, 32, 20);
-    place(&mut project, 0, 5, 1, 1);
-
-    let exported = export(&project, &claim(&[8, 9], (0, 0)), &blank_cart()).unwrap();
-
-    let cart = Cart::read(&exported.cart_bytes).unwrap();
-    assert_eq!(exported.warnings, []);
-    assert_eq!(cart.pattern_bytes(0), [8, 9, 0x43 | 0x80, 0x44]);
-    assert_eq!(cart.sfx_bytes(9)[..64], [0; 64]);
-    assert_eq!(cart.sfx_bytes(9)[64..], [0x01, 160, 4, 0]);
-    assert_eq!(cart.sfx_bytes(8)[66..], [16, 17]);
-}
-
-#[test]
-fn a_chain_row_with_no_exported_entries_becomes_one_silent_sfx() {
-    let mut project = one_row_project();
-    write_phrase(&mut project, 1, 16, 20);
-    let mut chain = Chain::default();
-    *chain.entry_mut(1) = Some(ChainEntry::new(PhraseId::new(1)));
-    *project.chain_mut(ChainId::new(1)) = chain;
-    project.set_song_cell(0, 5, Some(ChainId::new(1)));
-
-    let cart = exported_cart(&project, &claim(&[8, 9], (0, 1)));
-
-    assert_eq!(cart.pattern_bytes(1), [9, 0x42, 0x43 | 0x80, 0x44]);
-    assert_eq!(cart.sfx_bytes(9)[64..], [0x01, 160, 2, 0]);
-}
-
-#[test]
-fn a_chain_row_timed_by_an_unexported_track_with_no_free_channel_warns() {
-    let mut project = one_row_project();
-    for track in 1..4 {
-        place(&mut project, 0, track, 0, 0);
-        project.set_export_track(track, Some(track as u8 + 1));
-    }
-    write_phrase(&mut project, 1, 32, 20);
-    place(&mut project, 0, 5, 1, 1);
-
-    let exported = export(&project, &claim(&[8], (0, 0)), &blank_cart()).unwrap();
-
-    assert_eq!(
-        exported.warnings,
-        [ExportWarning::UnexportedTrackSetsLength {
-            song_row: 0,
-            chain_row: 0,
-            track: 5,
-        }]
-    );
+    assert_eq!(cart.pattern_bytes(0), [8, 9, 0x43, 0x44]);
 }
 
 fn arpeggio_past_len() -> Project {
@@ -597,14 +596,14 @@ fn sfx_instrument() -> InstrumentSound {
 }
 
 #[test]
-fn a_custom_instrument_takes_the_lowest_free_claimed_slot_in_0_to_7() {
+fn custom_instrument_8_plus_k_exports_to_sfx_k() {
     let project = custom_instrument_project(sfx_instrument());
 
-    let cart = exported_cart(&project, &claim(&[20, 5, 3, 8], (0, 0)));
+    let cart = exported_cart(&project, &claim(&[20, 5, 2, 8], (0, 0)));
 
     let first_note = 36u16 | 2 << 6 | 5 << 9;
     let second_note = 40u16 | 1 << 6 | 4 << 9 | 3 << 12;
-    let instrument = cart.sfx_bytes(3);
+    let instrument = cart.sfx_bytes(2);
     assert_eq!(instrument[..2], first_note.to_le_bytes());
     assert_eq!(instrument[2..4], second_note.to_le_bytes());
     assert_eq!(instrument[4..64], [0; 60]);
@@ -613,27 +612,28 @@ fn a_custom_instrument_takes_the_lowest_free_claimed_slot_in_0_to_7() {
 }
 
 #[test]
-fn steps_playing_a_custom_instrument_name_its_slot() {
+fn steps_playing_a_custom_instrument_keep_its_digit() {
     let project = custom_instrument_project(sfx_instrument());
 
-    let cart = exported_cart(&project, &claim(&[20, 5, 3, 8], (0, 0)));
+    let cart = exported_cart(&project, &claim(&[20, 5, 2, 8], (0, 0)));
 
     let note = cart.sfx(5).note(2);
-    assert_eq!((note.instrument, note.custom), (3, true));
+    assert_eq!((note.instrument, note.custom), (2, true));
     assert!(!cart.sfx(5).note(0).custom);
 }
 
 #[test]
-fn custom_instruments_take_slots_in_order_of_their_number() {
+fn each_custom_instrument_keeps_its_slot_whatever_else_is_claimed() {
     let mut project = custom_instrument_project(sfx_instrument());
-    *project.phrase_mut(PhraseId::new(0)).step_mut(3) = Step::new(12, 0x09, 5, 0).unwrap();
-    project.set_custom_instrument(0x09, Some(CustomInstrument::default()));
+    *project.phrase_mut(PhraseId::new(0)).step_mut(3) = Step::new(12, 0x0F, 5, 0).unwrap();
+    project.set_custom_instrument(0x0F, Some(CustomInstrument::default()));
 
-    let cart = exported_cart(&project, &claim(&[1, 6, 8], (0, 0)));
+    let cart = exported_cart(&project, &claim(&[0, 1, 2, 7, 8], (0, 0)));
 
-    assert_eq!(cart.sfx(8).note(3).instrument, 1);
-    assert_eq!(cart.sfx(8).note(2).instrument, 6);
-    assert_eq!(cart.sfx_bytes(6)[64..], [1 + 24, 4, 0, 2]);
+    assert_eq!(cart.sfx(0).note(3).instrument, 7);
+    assert_eq!(cart.sfx(0).note(2).instrument, 2);
+    assert_eq!(cart.sfx_bytes(2)[64..], [1 + 24, 4, 0, 2]);
+    assert_eq!(cart.pattern(0).channel(0), Some(0));
 }
 
 #[test]
@@ -649,9 +649,9 @@ fn a_waveform_instrument_writes_its_samples_and_the_fixed_header() {
         dampen: 1,
     }));
 
-    let cart = exported_cart(&project, &claim(&[0, 8], (0, 0)));
+    let cart = exported_cart(&project, &claim(&[2, 8], (0, 0)));
 
-    let instrument = cart.sfx_bytes(0);
+    let instrument = cart.sfx_bytes(2);
     assert_eq!(instrument[..3], [0xFF, 100, 0]);
     assert_eq!(instrument[64..], [1 + 16 + 72, 17, 0x80, 0]);
 }
@@ -686,25 +686,29 @@ fn under_reverb_a_silent_step_takes_a_slot_for_its_custom_instrument() {
     *phrase.step_mut(2) = Step::new(12, 0x0A, 0, 0).unwrap();
     phrase.filters_mut().set_reverb(1);
 
-    let exported = export(&project, &claim(&[3, 8], (0, 0)), &blank_cart()).unwrap();
+    let exported = export(&project, &claim(&[2, 8], (0, 0)), &blank_cart()).unwrap();
 
     assert_eq!(exported.sfx_count, 2);
     let note = Cart::read(&exported.cart_bytes).unwrap().sfx(8).note(2);
-    assert_eq!((note.instrument, note.custom, note.volume), (3, true, 0));
+    assert_eq!((note.instrument, note.custom, note.volume), (2, true, 0));
 }
 
 #[test]
-fn too_few_claimed_slots_in_0_to_7_fail_the_export() {
+fn a_claim_without_sfx_k_fails_an_export_that_plays_custom_instrument_8_plus_k() {
     let project = custom_instrument_project(sfx_instrument());
 
-    let failures = export(&project, &claim(&[8, 9], (0, 0)), &blank_cart()).unwrap_err();
+    let failures = export(&project, &claim(&[0, 1, 3, 8], (0, 0)), &blank_cart()).unwrap_err();
 
     assert_eq!(
         failures,
-        [ExportFailure::TooFewInstrumentSlots {
-            needed: 1,
-            claimed: 0
+        [ExportFailure::MissingInstrumentSlot {
+            instrument: 0x0A,
+            slot: 2
         }]
+    );
+    assert_eq!(
+        failures[0].to_string(),
+        "INSTRUMENT A NEEDS SFX 02, WHICH THE CLAIM LACKS"
     );
 }
 
@@ -712,7 +716,7 @@ fn too_few_claimed_slots_in_0_to_7_fail_the_export() {
 fn instruments_count_towards_the_sfx_a_claim_must_hold() {
     let project = custom_instrument_project(sfx_instrument());
 
-    let failures = export(&project, &claim(&[3], (0, 0)), &blank_cart()).unwrap_err();
+    let failures = export(&project, &claim(&[2], (0, 0)), &blank_cart()).unwrap_err();
 
     assert_eq!(
         failures,

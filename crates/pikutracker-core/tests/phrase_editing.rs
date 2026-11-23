@@ -1,9 +1,13 @@
-use pikutracker_core::app::{Action, App, Direction, KeyContext};
+mod support;
+
+use pikutracker_core::app::{Action, App, Direction, KeyContext, layout};
 use pikutracker_core::keymap::{Key, KeyPress, Keymap, Modifiers};
 use pikutracker_core::project::{Phrase, Step};
 use pikutracker_core::screen::palette::Colour;
+use support::pane_text;
 
-const FIRST_STEP_LINE: usize = 5;
+const PEN_OCTAVE_LINE: usize = 4;
+const FIRST_STEP_LINE: usize = 7;
 const UP: Action = Action::Move(Direction::Up);
 const DOWN: Action = Action::Move(Direction::Down);
 const LEFT: Action = Action::Move(Direction::Left);
@@ -14,9 +18,9 @@ fn phrase_app(actions: &[Action]) -> App {
     let mut app = App::new();
     let chain_00_holding_phrase_00 = [
         Action::HexDigit(0),
-        Action::FocusNext,
+        Action::FocusPrevious,
         Action::HexDigit(0),
-        Action::FocusNext,
+        Action::FocusPrevious,
     ];
     for action in chain_00_holding_phrase_00 {
         app.apply(action);
@@ -28,7 +32,7 @@ fn phrase_app(actions: &[Action]) -> App {
 }
 
 fn phrase(app: &App) -> &Phrase {
-    app.project().phrase(app.phrase_under_cursor().unwrap())
+    app.project().phrase(app.shown_phrase_id().unwrap())
 }
 
 fn step(app: &App, index: usize) -> Step {
@@ -36,17 +40,7 @@ fn step(app: &App, index: usize) -> Step {
 }
 
 fn phrase_line(app: &App, line: usize) -> String {
-    let text: String = app
-        .grid()
-        .text_dump()
-        .lines()
-        .nth(line)
-        .unwrap()
-        .chars()
-        .skip(63)
-        .take(19)
-        .collect();
-    text.trim_end().to_owned()
+    pane_text(app, layout::PHRASE, line)
 }
 
 fn step_line(app: &App, index: usize) -> String {
@@ -57,9 +51,9 @@ fn step_line(app: &App, index: usize) -> String {
 fn a_new_phrase_shows_empty_steps() {
     let app = phrase_app(&[]);
 
-    assert_eq!(step_line(&app, 0), "00[...].. . .");
-    assert_eq!(step_line(&app, 15), "0F ... .. . .");
-    assert_eq!(step_line(&app, 31), "1F ... .. . .");
+    assert_eq!(step_line(&app, 0), "00[...] .    .   .");
+    assert_eq!(step_line(&app, 15), "0F ...  .    .   .");
+    assert_eq!(step_line(&app, 31), "1F ...  .    .   .");
 }
 
 #[test]
@@ -71,29 +65,29 @@ fn a_piano_key_enters_a_note_with_the_current_instrument_volume_and_octave() {
     assert_eq!(entered.instrument(), 2);
     assert_eq!(entered.volume(), 5);
     assert_eq!(entered.effect(), 0);
-    assert_eq!(step_line(&app, 0), "00 C-2 02 5 0");
+    assert_eq!(step_line(&app, 0), "00 C-2  2    5   0");
 }
 
 #[test]
 fn entering_a_note_moves_the_cursor_down_one_step() {
     let app = phrase_app(&[C]);
 
-    assert_eq!(step_line(&app, 1), "01[...].. . .");
+    assert_eq!(step_line(&app, 1), "01[...] .    .   .");
 }
 
 #[test]
 fn the_cursor_stays_on_step_31_after_entering_a_note_there() {
     let app = phrase_app(&[&[DOWN; 31][..], &[C]].concat());
 
-    assert_eq!(step_line(&app, 31), "1F[C-2]02 5 0");
+    assert_eq!(step_line(&app, 31), "1F[C-2] 2    5   0");
 }
 
 #[test]
 fn piano_keys_cover_two_octaves_of_semitones() {
     let app = phrase_app(&[Action::PianoKey(1), Action::PianoKey(13)]);
 
-    assert_eq!(step_line(&app, 0), "00 C#2 02 5 0");
-    assert_eq!(step_line(&app, 1), "01 C#3 02 5 0");
+    assert_eq!(step_line(&app, 0), "00 C#2  2    5   0");
+    assert_eq!(step_line(&app, 1), "01 C#3  2    5   0");
 }
 
 #[test]
@@ -101,7 +95,7 @@ fn pitch_33_is_named_a_2() {
     let app = phrase_app(&[Action::PianoKey(9)]);
 
     assert_eq!(step(&app, 0).pitch(), 33);
-    assert_eq!(step_line(&app, 0), "00 A-2 02 5 0");
+    assert_eq!(step_line(&app, 0), "00 A-2  2    5   0");
 }
 
 #[test]
@@ -119,19 +113,12 @@ fn the_octave_keys_change_the_octave_of_later_notes() {
 }
 
 #[test]
-fn the_phrase_title_shows_the_octave() {
-    let app = phrase_app(&[Action::OctaveUp]);
-
-    assert_eq!(phrase_line(&app, 0), "PHRASE 00   OCT 3");
-}
-
-#[test]
 fn the_octave_stops_at_0_and_4() {
     let app = phrase_app(&[Action::OctaveUp; 9]);
-    assert_eq!(phrase_line(&app, 0), "PHRASE 00   OCT 4");
+    assert_eq!(phrase_line(&app, PEN_OCTAVE_LINE), "OCT 4  INS 2 SAW");
 
     let app = phrase_app(&[Action::OctaveDown; 9]);
-    assert_eq!(phrase_line(&app, 0), "PHRASE 00   OCT 0");
+    assert_eq!(phrase_line(&app, PEN_OCTAVE_LINE), "OCT 0  INS 2 SAW");
 }
 
 #[test]
@@ -139,7 +126,7 @@ fn a_note_above_the_pitch_range_stops_at_d_sharp_5() {
     let app = phrase_app(&[&[Action::OctaveUp; 4][..], &[Action::PianoKey(23)]].concat());
 
     assert_eq!(step(&app, 0).pitch(), 63);
-    assert_eq!(step_line(&app, 0), "00 D#5 02 5 0");
+    assert_eq!(step_line(&app, 0), "00 D#5  2    5   0");
 }
 
 #[test]
@@ -159,7 +146,7 @@ fn hex_digits_edit_the_instrument_volume_and_effect_of_a_step() {
     assert_eq!(edited.instrument(), 4);
     assert_eq!(edited.volume(), 3);
     assert_eq!(edited.effect(), 6);
-    assert_eq!(step_line(&app, 0), "00 C-2 04 3[6]");
+    assert_eq!(step_line(&app, 0), "00 C-2  4    3  [6]");
 }
 
 #[test]
@@ -228,7 +215,7 @@ fn a_volume_0_step_shows_as_empty_and_keeps_its_pitch_and_instrument() {
         DOWN,
     ]);
 
-    assert_eq!(step_line(&app, 0), "00 ... .. . .");
+    assert_eq!(step_line(&app, 0), "00 ...  .    .   .");
     let silent = step(&app, 0);
     assert_eq!(silent.volume(), 0);
     assert_eq!(silent.pitch(), 33);
@@ -251,7 +238,7 @@ fn volume_0_can_be_the_current_volume() {
 
     assert_eq!(step(&app, 1).pitch(), 24);
     assert_eq!(step(&app, 1).volume(), 0);
-    assert_eq!(step_line(&app, 1), "01 ... .. . .");
+    assert_eq!(step_line(&app, 1), "01 ...  .    .   .");
 }
 
 #[test]
@@ -284,7 +271,7 @@ fn piano_keys_do_nothing_outside_the_pitch_column() {
 
 #[test]
 fn step_edits_do_nothing_outside_the_phrase_pane() {
-    let app = phrase_app(&[Action::FocusNext, C, Action::HexDigit(3)]);
+    let app = phrase_app(&[Action::FocusPrevious, C, Action::HexDigit(3)]);
 
     assert_eq!(step(&app, 0), Step::default());
 }
@@ -294,8 +281,8 @@ fn the_key_context_follows_the_phrase_cursor() {
     let mut app = App::new();
     assert_eq!(app.key_context(), KeyContext::ReferenceValue);
 
-    app.apply(Action::FocusNext);
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusPrevious);
     assert_eq!(app.key_context(), KeyContext::PhrasePitch);
 
     app.apply(RIGHT);
@@ -375,9 +362,10 @@ fn the_pc_tracker_brackets_change_the_octave_and_modified_arrows_nudge() {
     );
 }
 
-const PHRASE_COLUMN: usize = 63;
 const PITCH_OFFSET: usize = 3;
-const LEN_8: [Action; 10] = [
+const LEN_8: [Action; 14] = [
+    UP,
+    UP,
     UP,
     UP,
     UP,
@@ -388,18 +376,26 @@ const LEN_8: [Action; 10] = [
     DOWN,
     DOWN,
     DOWN,
+    DOWN,
+    DOWN,
 ];
 
 fn pitch_colour(app: &App, index: usize) -> Colour {
     app.grid()
-        .cell(PHRASE_COLUMN + PITCH_OFFSET, FIRST_STEP_LINE + index)
+        .cell(
+            layout::PHRASE.column + PITCH_OFFSET,
+            layout::PHRASE.row + FIRST_STEP_LINE + index,
+        )
         .style
         .fg
 }
 
 fn label_colour(app: &App, index: usize) -> Colour {
     app.grid()
-        .cell(PHRASE_COLUMN, FIRST_STEP_LINE + index)
+        .cell(
+            layout::PHRASE.column,
+            layout::PHRASE.row + FIRST_STEP_LINE + index,
+        )
         .style
         .fg
 }
@@ -409,8 +405,8 @@ fn steps_past_len_are_shown_dimmed_with_their_notes() {
     let app = phrase_app(&[&[DOWN; 10][..], &[C], &[UP; 11], &LEN_8].concat());
 
     assert_eq!(phrase(&app).length(), 8);
-    assert_eq!(step_line(&app, 10), "0A C-2 02 5 0");
-    assert_eq!(step_line(&app, 31), "1F ... .. . .");
+    assert_eq!(step_line(&app, 10), "0A C-2  2    5   0");
+    assert_eq!(step_line(&app, 31), "1F ...  .    .   .");
     assert_eq!(pitch_colour(&app, 10), Colour::DarkGrey);
     assert_eq!(label_colour(&app, 10), Colour::DarkGrey);
     assert_eq!(label_colour(&app, 7), Colour::Lavender);
@@ -425,14 +421,23 @@ fn lengthening_shows_the_steps_in_the_normal_style_with_no_data_change() {
             &[C],
             &[UP; 11],
             &LEN_8,
-            &[UP, UP, UP, RIGHT, Action::HexDigit(1), Action::HexDigit(0)],
+            &[
+                UP,
+                UP,
+                UP,
+                UP,
+                UP,
+                RIGHT,
+                Action::HexDigit(1),
+                Action::HexDigit(0),
+            ],
         ]
         .concat(),
     );
 
     assert_eq!(phrase(&app).length(), 16);
     assert_eq!(phrase(&app).step(10), phrase(&shortened).step(10));
-    assert_eq!(step_line(&app, 10), "0A C-2 02 5 0");
+    assert_eq!(step_line(&app, 10), "0A C-2  2    5   0");
     assert_eq!(pitch_colour(&app, 10), Colour::White);
     assert_eq!(label_colour(&app, 10), Colour::Lavender);
 }
@@ -441,7 +446,7 @@ fn lengthening_shows_the_steps_in_the_normal_style_with_no_data_change() {
 fn the_cursor_moves_past_len_and_stops_at_step_31() {
     let app = phrase_app(&[&LEN_8[..], &[DOWN; 40]].concat());
 
-    assert_eq!(step_line(&app, 31), "1F[...].. . .");
+    assert_eq!(step_line(&app, 31), "1F[...] .    .   .");
 }
 
 #[test]
@@ -458,12 +463,12 @@ fn a_step_past_len_can_be_edited_and_still_does_not_play() {
     assert_eq!(phrase(&app).length(), 8);
     assert_eq!(step(&app, 20).pitch(), 24);
     assert_eq!(step(&app, 20).instrument(), 3);
-    assert_eq!(step_line(&app, 20), "14 C-2[03]5 0");
+    assert_eq!(step_line(&app, 20), "14 C-2 [3]   5   0");
 }
 
 #[test]
 fn entering_a_note_on_the_last_step_within_len_moves_into_the_dimmed_steps() {
     let app = phrase_app(&[&LEN_8[..], &[DOWN; 7], &[C]].concat());
 
-    assert_eq!(step_line(&app, 8), "08[...].. . .");
+    assert_eq!(step_line(&app, 8), "08[...] .    .   .");
 }

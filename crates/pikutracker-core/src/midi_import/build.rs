@@ -2,8 +2,8 @@ use super::read::{Metre, Note, Score, Unused};
 use super::table::drum_row;
 use super::{Analysis, Choices, Voice};
 use crate::project::{
-    Chain, ChainEntry, ChainId, MAX_STEPS, Phrase, PhraseId, Project, SONG_ROWS, SongPlace, Step,
-    TRACKS,
+    Chain, ChainEntry, ChainId, ChainRowPlace, MAX_STEPS, Phrase, PhraseId, Project, SONG_ROWS,
+    SongPlace, Step, TRACKS,
 };
 use crate::wording::counted;
 
@@ -515,10 +515,12 @@ fn song_place_of(slots: &[Slot], track: usize, step: usize) -> Option<SongPlace>
         .iter()
         .position(|slot| (slot.start..slot.start + slot.length).contains(&step))?;
     Some(SongPlace {
-        song_row: index / CHAIN_ROWS_PER_SONG_ROW,
+        chain_row: ChainRowPlace {
+            song_row: index / CHAIN_ROWS_PER_SONG_ROW,
+            entry: index % CHAIN_ROWS_PER_SONG_ROW,
+        },
         track,
-        chain_row: index % CHAIN_ROWS_PER_SONG_ROW,
-        step: step - slots[index].start,
+        step_index: step - slots[index].start,
     })
 }
 
@@ -585,7 +587,7 @@ fn warnings(
         let row = timing
             .first_close_step
             .and_then(|step| song_place_of(slots, 0, step))
-            .map_or(0, |place| place.song_row);
+            .map_or(0, |place| place.chain_row.song_row);
         warnings.push(Warning::new(format!(
             "{} CLOSER THAN ONE STEP: THE LAST ONE WON. (ROW {row:02X})",
             counted(timing.close_tempos, "TEMPO CHANGE")
@@ -620,12 +622,13 @@ fn collision_warning(
         song_place_of(slots, track, step)
     });
     let named = first.and_then(|place| {
-        let entry = project.chain_row_entry(place.song_row, place.track, place.chain_row)?;
+        let ChainRowPlace { song_row, entry } = place.chain_row;
+        let entry = project.chain_row_entry(song_row, place.track, entry)?;
         Some(format!(
             " FIRST: T{} PHRASE {:02X} STEP {:02X}",
             place.track + 1,
             entry.phrase().number(),
-            place.step
+            place.step_index
         ))
     });
     Warning {

@@ -1,6 +1,4 @@
-use super::{
-    Chain, ChainId, CustomInstrument, EXPORT_CHANNELS, Phrase, Project, TRACKS, TargetCart,
-};
+use super::{Chain, ChainId, CustomInstrument, Phrase, Project, SongRowMarks, TRACKS, TargetCart};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Swap<T> {
@@ -35,9 +33,8 @@ pub(crate) struct ProjectChange {
     phrases: Vec<(usize, Swap<Phrase>)>,
     chains: Vec<(usize, Swap<Chain>)>,
     song_rows: Vec<(usize, Swap<[Option<ChainId>; TRACKS]>)>,
-    song_loop_row: Option<Swap<Option<usize>>>,
+    song_marks: Vec<(usize, Swap<SongRowMarks>)>,
     default_speed: Option<Swap<u8>>,
-    export_tracks: Option<Swap<[Option<u8>; EXPORT_CHANNELS]>>,
     target_cart: Option<Swap<Option<TargetCart>>>,
     custom_instruments: Vec<(u8, Swap<Option<CustomInstrument>>)>,
 }
@@ -86,9 +83,8 @@ impl ProjectChange {
             phrases: changed_items(&before.phrases, &after.phrases),
             chains: changed_items(&before.chains, &after.chains),
             song_rows: changed_items(&before.song, &after.song),
-            song_loop_row: Swap::between(&before.song_loop_row, &after.song_loop_row),
+            song_marks: changed_items(&before.song_marks, &after.song_marks),
             default_speed: Swap::between(&before.default_speed, &after.default_speed),
-            export_tracks: Swap::between(&before.export_tracks, &after.export_tracks),
             target_cart,
             custom_instruments,
         }
@@ -116,14 +112,11 @@ impl ProjectChange {
         for (index, swap) in &self.song_rows {
             project.song[*index] = *swap.value(way);
         }
-        if let Some(swap) = &self.song_loop_row {
-            project.song_loop_row = *swap.value(way);
+        for (index, swap) in &self.song_marks {
+            project.song_marks[*index] = *swap.value(way);
         }
         if let Some(swap) = &self.default_speed {
             project.default_speed = *swap.value(way);
-        }
-        if let Some(swap) = &self.export_tracks {
-            project.export_tracks = *swap.value(way);
         }
         if let Some(swap) = &self.target_cart {
             project.target_cart =

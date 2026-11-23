@@ -7,7 +7,7 @@ use support::{apply, status_line};
 
 const DOWN: Action = Action::Move(Direction::Down);
 const RIGHT: Action = Action::Move(Direction::Right);
-const TAB: Action = Action::FocusNext;
+const SHIFT_TAB: Action = Action::FocusPrevious;
 const SELECT_DOWN: Action = Action::Select(Direction::Down);
 const SELECT_RIGHT: Action = Action::Select(Direction::Right);
 
@@ -65,7 +65,7 @@ fn cloning_a_phrase_copies_all_of_it_with_its_loop_and_keeps_the_entrys_transpos
     *project.chain_mut(ChainId::new(0)).entry_mut(0) = Some(transposed);
     let mut app = App::with_project(project);
 
-    apply(&mut app, &[TAB, Action::Clone]);
+    apply(&mut app, &[SHIFT_TAB, Action::Clone]);
 
     let cloned = entry(&app, 0, 0).unwrap();
     assert_eq!(cloned.phrase().number(), 2);
@@ -91,7 +91,7 @@ fn a_clone_never_lands_on_a_loose_phrase_or_a_chain_nothing_places() {
     app.apply(Action::Clone);
     assert_eq!(song_cell(&app, 0, 0), Some(2));
 
-    apply(&mut app, &[TAB, Action::Clone]);
+    apply(&mut app, &[SHIFT_TAB, Action::Clone]);
     assert_eq!(entry_phrase(&app, 2, 0), Some(4));
 }
 
@@ -128,7 +128,7 @@ fn deep_clone_keeps_each_entrys_transpose() {
 fn deep_clone_in_the_chain_pane_copies_the_phrase_under_the_cursor() {
     let mut app = App::with_project(project_with_a_song());
 
-    apply(&mut app, &[TAB, Action::DeepClone]);
+    apply(&mut app, &[SHIFT_TAB, Action::DeepClone]);
 
     assert_eq!(entry_phrase(&app, 0, 0), Some(2));
     assert_eq!(entry_phrase(&app, 0, 2), Some(0));
@@ -175,7 +175,10 @@ fn deep_cloning_a_song_selection_keeps_phrases_shared_between_the_new_chains() {
 fn cloning_a_chain_selection_makes_one_copy_per_distinct_phrase() {
     let mut app = App::with_project(project_with_a_song());
 
-    apply(&mut app, &[TAB, SELECT_DOWN, SELECT_DOWN, Action::Clone]);
+    apply(
+        &mut app,
+        &[SHIFT_TAB, SELECT_DOWN, SELECT_DOWN, Action::Clone],
+    );
 
     assert_eq!(entry_phrase(&app, 0, 0), Some(2));
     assert_eq!(entry_phrase(&app, 0, 1), Some(3));
@@ -186,7 +189,7 @@ fn cloning_a_chain_selection_makes_one_copy_per_distinct_phrase() {
 fn a_chain_selection_only_clones_the_entries_inside_it() {
     let mut app = App::with_project(project_with_a_song());
 
-    apply(&mut app, &[TAB, SELECT_DOWN, Action::Clone]);
+    apply(&mut app, &[SHIFT_TAB, SELECT_DOWN, Action::Clone]);
 
     assert_eq!(entry_phrase(&app, 0, 2), Some(0));
 }
@@ -199,7 +202,7 @@ fn cloning_an_empty_cell_says_there_is_nothing_to_clone() {
     assert!(status_line(&app).contains("NO CHAIN HERE"));
     assert_eq!(song_cell(&app, 1, 0), None);
 
-    apply(&mut app, &[Action::Move(Direction::Up), TAB]);
+    apply(&mut app, &[Action::Move(Direction::Up), SHIFT_TAB]);
     apply(&mut app, &[DOWN, DOWN, DOWN, Action::Clone]);
     assert!(status_line(&app).contains("NO PHRASE HERE"));
     assert_eq!(entry(&app, 0, 3), None);
@@ -210,7 +213,7 @@ fn the_phrase_pane_has_no_cell_to_point_at_a_clone() {
     let mut app = App::with_project(project_with_a_song());
     let before = app.project().clone();
 
-    apply(&mut app, &[TAB, TAB, Action::Clone]);
+    apply(&mut app, &[SHIFT_TAB, SHIFT_TAB, Action::Clone]);
 
     assert!(app.project() == &before);
     assert!(status_line(&app).contains("SONG OR CHAIN PANE"));
@@ -280,7 +283,7 @@ fn new_unused_puts_a_new_phrase_at_the_projects_default_speed_on_the_chain_entry
     project.set_default_speed(7);
     let mut app = App::with_project(project);
 
-    apply(&mut app, &[TAB, DOWN, DOWN, DOWN, Action::NewUnused]);
+    apply(&mut app, &[SHIFT_TAB, DOWN, DOWN, DOWN, Action::NewUnused]);
 
     assert_eq!(entry_phrase(&app, 0, 3), Some(2));
     assert_eq!(app.project().phrase(PhraseId::new(2)).speed(), 7);
@@ -294,7 +297,7 @@ fn new_unused_over_a_transposed_entry_keeps_its_transpose() {
     *project.chain_mut(ChainId::new(0)).entry_mut(0) = Some(transposed);
     let mut app = App::with_project(project);
 
-    apply(&mut app, &[TAB, Action::NewUnused]);
+    apply(&mut app, &[SHIFT_TAB, Action::NewUnused]);
 
     let entry = entry(&app, 0, 0).unwrap();
     assert_eq!(entry.phrase().number(), 2);

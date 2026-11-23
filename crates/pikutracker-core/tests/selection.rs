@@ -1,6 +1,6 @@
 mod support;
 
-use pikutracker_core::app::{Action, App, Direction};
+use pikutracker_core::app::{Action, App, Direction, layout};
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project, Step};
 use pikutracker_core::screen::palette::Colour;
 use support::apply;
@@ -8,7 +8,7 @@ use support::apply;
 const UP: Action = Action::Move(Direction::Up);
 const DOWN: Action = Action::Move(Direction::Down);
 const RIGHT: Action = Action::Move(Direction::Right);
-const TAB: Action = Action::FocusNext;
+const SHIFT_TAB: Action = Action::FocusPrevious;
 const SELECT: Action = Action::StartSelection;
 const SELECT_UP: Action = Action::Select(Direction::Up);
 const SELECT_DOWN: Action = Action::Select(Direction::Down);
@@ -28,8 +28,8 @@ const OCTAVE_UP: Action = Action::Nudge {
 };
 
 const SELECTED: Colour = Colour::Lavender;
-const SONG_FIRST_LINE: usize = 2;
-const SONG_FIRST_COLUMN: usize = 4;
+const SONG_FIRST_LINE: usize = layout::SONG.row + 2;
+const SONG_FIRST_COLUMN: usize = layout::SONG.column + 4;
 const SONG_TRACK_WIDTH: usize = 3;
 
 fn song_cell(app: &App, row: usize, track: usize) -> Option<u8> {
@@ -128,8 +128,8 @@ fn nudging_clamps_each_value_at_its_own_limit() {
     apply(
         &mut app,
         &[
-            TAB,
-            TAB,
+            SHIFT_TAB,
+            SHIFT_TAB,
             SELECT_DOWN,
             SELECT_RIGHT,
             SELECT_RIGHT,
@@ -146,7 +146,7 @@ fn nudging_clamps_each_value_at_its_own_limit() {
 #[test]
 fn a_coarse_nudge_moves_pitches_by_an_octave() {
     let mut app = App::with_project(music());
-    apply(&mut app, &[TAB, TAB, SELECT_DOWN, OCTAVE_UP]);
+    apply(&mut app, &[SHIFT_TAB, SHIFT_TAB, SELECT_DOWN, OCTAVE_UP]);
 
     assert_eq!(step(&app, 0).pitch(), 36);
     assert_eq!(step(&app, 1).pitch(), 37);
@@ -157,7 +157,10 @@ fn nudging_a_selection_leaves_silent_steps_silent() {
     let mut project = music();
     *project.phrase_mut(PhraseId::new(0)).step_mut(1) = Step::new(30, 2, 0, 0).unwrap();
     let mut app = App::with_project(project);
-    apply(&mut app, &[TAB, TAB, RIGHT, RIGHT, SELECT_DOWN, NUDGE_UP]);
+    apply(
+        &mut app,
+        &[SHIFT_TAB, SHIFT_TAB, RIGHT, RIGHT, SELECT_DOWN, NUDGE_UP],
+    );
 
     assert_eq!(step(&app, 0).volume(), 6);
     assert_eq!(step(&app, 1), Step::new(30, 2, 0, 0).unwrap());
@@ -168,7 +171,10 @@ fn nudging_a_selection_keeps_custom_instruments() {
     let mut project = music();
     *project.phrase_mut(PhraseId::new(0)).step_mut(0) = Step::new(24, 0x0A, 5, 0).unwrap();
     let mut app = App::with_project(project);
-    apply(&mut app, &[TAB, TAB, RIGHT, SELECT_DOWN, NUDGE_UP]);
+    apply(
+        &mut app,
+        &[SHIFT_TAB, SHIFT_TAB, RIGHT, SELECT_DOWN, NUDGE_UP],
+    );
 
     assert_eq!(step(&app, 0).instrument(), 0x0A);
     assert_eq!(step(&app, 1).instrument(), 3);
@@ -179,7 +185,10 @@ fn nudging_a_selection_stops_built_in_instruments_at_07() {
     let mut project = music();
     *project.phrase_mut(PhraseId::new(0)).step_mut(0) = Step::new(24, 0x07, 5, 0).unwrap();
     let mut app = App::with_project(project);
-    apply(&mut app, &[TAB, TAB, RIGHT, SELECT_DOWN, NUDGE_UP]);
+    apply(
+        &mut app,
+        &[SHIFT_TAB, SHIFT_TAB, RIGHT, SELECT_DOWN, NUDGE_UP],
+    );
 
     assert_eq!(step(&app, 0).instrument(), 0x07);
 }
@@ -187,7 +196,10 @@ fn nudging_a_selection_stops_built_in_instruments_at_07() {
 #[test]
 fn nudging_chain_entries_changes_transposes_and_skips_empty_entries() {
     let mut app = App::with_project(music());
-    apply(&mut app, &[TAB, RIGHT, DOWN, DOWN, SELECT_DOWN, NUDGE_DOWN]);
+    apply(
+        &mut app,
+        &[SHIFT_TAB, RIGHT, DOWN, DOWN, SELECT_DOWN, NUDGE_DOWN],
+    );
 
     assert_eq!(entry(&app, 2).unwrap().transpose(), -1);
     assert_eq!(entry(&app, 3), None);
@@ -210,7 +222,7 @@ fn clear_empties_every_selected_song_cell_as_one_step() {
 #[test]
 fn clear_on_selected_chain_entries_empties_them() {
     let mut app = App::with_project(music());
-    apply(&mut app, &[TAB, SELECT_DOWN, Action::Clear]);
+    apply(&mut app, &[SHIFT_TAB, SELECT_DOWN, Action::Clear]);
 
     assert_eq!(entry(&app, 0), None);
     assert_eq!(entry(&app, 1), None);
@@ -223,8 +235,8 @@ fn clear_on_whole_selected_steps_silences_them_and_keeps_their_notes() {
     apply(
         &mut app,
         &[
-            TAB,
-            TAB,
+            SHIFT_TAB,
+            SHIFT_TAB,
             SELECT_DOWN,
             SELECT_RIGHT,
             SELECT_RIGHT,
@@ -243,7 +255,15 @@ fn clear_on_the_effect_column_keeps_the_note_sounding() {
     let mut app = App::with_project(music());
     apply(
         &mut app,
-        &[TAB, TAB, RIGHT, RIGHT, RIGHT, SELECT_DOWN, Action::Clear],
+        &[
+            SHIFT_TAB,
+            SHIFT_TAB,
+            RIGHT,
+            RIGHT,
+            RIGHT,
+            SELECT_DOWN,
+            Action::Clear,
+        ],
     );
 
     assert_eq!(step(&app, 0), Step::new(24, 2, 5, 0).unwrap());
@@ -252,7 +272,7 @@ fn clear_on_the_effect_column_keeps_the_note_sounding() {
 #[test]
 fn clear_without_a_selection_empties_the_step_cell_under_the_cursor() {
     let mut app = App::with_project(music());
-    apply(&mut app, &[TAB, TAB, Action::Clear]);
+    apply(&mut app, &[SHIFT_TAB, SHIFT_TAB, Action::Clear]);
 
     assert_eq!(step(&app, 0), Step::new(24, 2, 0, 1).unwrap());
     assert_eq!(step(&app, 1).volume(), 5);
@@ -295,7 +315,7 @@ fn escape_cancels_the_selection_before_it_dismisses_a_lasting_message() {
 #[test]
 fn changing_focus_drops_the_selection() {
     let mut app = App::with_project(song_block());
-    apply(&mut app, &[SELECT_DOWN, TAB, Action::FocusPrevious]);
+    apply(&mut app, &[SELECT_DOWN, SHIFT_TAB, Action::FocusNext]);
 
     assert_ne!(song_cell_background(&app, 0, 0), SELECTED);
     app.apply(NUDGE_UP);
@@ -315,7 +335,9 @@ fn a_selection_cannot_reach_the_phrase_header() {
     let mut app = App::with_project(music());
     apply(
         &mut app,
-        &[TAB, TAB, DOWN, SELECT_UP, SELECT_UP, SELECT_UP, NUDGE_UP],
+        &[
+            SHIFT_TAB, SHIFT_TAB, DOWN, SELECT_UP, SELECT_UP, SELECT_UP, NUDGE_UP,
+        ],
     );
 
     assert_eq!(app.project().phrase(PhraseId::new(0)).speed(), 16);
@@ -326,7 +348,7 @@ fn a_selection_cannot_reach_the_phrase_header() {
 #[test]
 fn a_selection_cannot_start_in_the_phrase_header() {
     let mut app = App::with_project(music());
-    apply(&mut app, &[TAB, TAB, UP, SELECT_DOWN, NUDGE_UP]);
+    apply(&mut app, &[SHIFT_TAB, SHIFT_TAB, UP, SELECT_DOWN, NUDGE_UP]);
 
     assert_eq!(step(&app, 0).pitch(), 25);
     assert_eq!(step(&app, 1).pitch(), 25);

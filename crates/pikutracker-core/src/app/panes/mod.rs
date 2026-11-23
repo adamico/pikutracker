@@ -4,11 +4,12 @@ pub mod file_list;
 pub mod instrument;
 pub mod log;
 pub mod midi_dialog;
-pub mod overview;
+pub mod multitrack;
 pub mod phrase;
 pub mod song;
-pub mod song_picker;
+pub mod title_number;
 
+use crate::project::{Project, SongRowEnding, SongRowMarks};
 use crate::screen::grid::{Grid, Style};
 use crate::screen::palette::Colour;
 
@@ -30,7 +31,20 @@ const SELECTED: Style = Style {
 const LOOP_MARK: Style = Style::fg(Colour::Pink);
 const OUT_OF_RANGE: Style = Style::fg(Colour::Red);
 const PLAYHEAD: Style = Style::fg(Colour::Green);
-const OUT_OF_RANGE_COLUMN: usize = 14;
+const PEN_LABEL: Style = Style::fg(Colour::LightPeach);
+const INSTRUMENT_NAMES: [&str; 8] = [
+    "TRIANGLE",
+    "TILTED SAW",
+    "SAW",
+    "SQUARE",
+    "PULSE",
+    "ORGAN",
+    "NOISE",
+    "PHASER",
+];
+const EFFECT_NAMES: [&str; 8] = [
+    "NONE", "SLIDE", "VIBRATO", "DROP", "FADE IN", "FADE OUT", "ARP FAST", "ARP SLOW",
+];
 const COARSE_ID: i32 = 16;
 const MAX_ID: i32 = 255;
 
@@ -59,7 +73,7 @@ fn stepped(position: usize, delta: isize, positions: usize) -> usize {
 }
 
 fn draw_out_of_range_flag(grid: &mut Grid, column: usize, row: usize) {
-    grid.put(column + OUT_OF_RANGE_COLUMN, row, "!", OUT_OF_RANGE);
+    grid.put(column, row, "!", OUT_OF_RANGE);
 }
 
 fn draw_row_label(grid: &mut Grid, column: usize, row: usize, label: &str, playing: bool) {
@@ -69,9 +83,12 @@ fn draw_row_label(grid: &mut Grid, column: usize, row: usize, label: &str, playi
     }
 }
 
+fn title_style(focused: bool) -> Style {
+    if focused { FOCUSED_TITLE } else { TITLE }
+}
+
 fn draw_title(grid: &mut Grid, column: usize, row: usize, title: &str, focused: bool) {
-    let style = if focused { FOCUSED_TITLE } else { TITLE };
-    grid.put(column, row, title, style);
+    grid.put(column, row, title, title_style(focused));
 }
 
 fn draw_styled_value(
@@ -88,5 +105,25 @@ fn draw_styled_value(
         grid.put(column + text.chars().count(), row, "]", CURSOR_BRACKET);
     } else {
         grid.put(column, row, text, style);
+    }
+}
+
+pub(super) fn instrument_name(project: &Project, instrument: u8) -> Option<&str> {
+    match INSTRUMENT_NAMES.get(usize::from(instrument)) {
+        Some(name) => Some(name),
+        None => project
+            .custom_instrument(instrument)
+            .and_then(|custom| custom.name.as_deref()),
+    }
+}
+
+const fn mark_text(marks: SongRowMarks) -> &'static str {
+    match (marks.loop_start, marks.ending) {
+        (false, None) => "",
+        (true, None) => ">",
+        (false, Some(SongRowEnding::LoopBack)) => "<",
+        (false, Some(SongRowEnding::Stop)) => "|",
+        (true, Some(SongRowEnding::LoopBack)) => "=",
+        (true, Some(SongRowEnding::Stop)) => "/",
     }
 }

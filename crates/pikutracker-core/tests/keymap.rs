@@ -1,5 +1,8 @@
-use pikutracker_core::app::{Action, App, Direction};
+mod support;
+
+use pikutracker_core::app::{Action, App, Direction, layout};
 use pikutracker_core::keymap::{Key, KeyPress, Keymap, Modifiers};
+use support::pane_text;
 
 const NONE: Modifiers = Modifiers::NONE;
 const CTRL: Modifiers = Modifiers::CTRL;
@@ -64,8 +67,8 @@ fn the_pc_tracker_preset_matches_the_keys_table() {
 }
 
 #[test]
-fn function_keys_mute_and_solo_tracks_one_to_eight() {
-    for track in 1..=8 {
+fn function_keys_mute_and_solo_tracks_one_to_four() {
+    for track in 1..=4 {
         assert_eq!(
             action(Key::F(track), NONE),
             Some(Action::Mute {
@@ -112,21 +115,12 @@ fn key_presses_drive_the_headless_app_through_the_preset() {
     let keymap = Keymap::pc_tracker();
     let mut app = App::new();
 
-    for key in [Key::Tab, Key::Down] {
-        let action = keymap.action_for(KeyPress::new(key, NONE)).unwrap();
+    for (key, modifiers) in [(Key::Tab, SHIFT), (Key::Down, NONE)] {
+        let action = keymap.action_for(KeyPress::new(key, modifiers)).unwrap();
         app.apply(action);
     }
 
-    let dump = app.grid().text_dump();
-    let chain_entry_one: String = dump
-        .lines()
-        .nth(3)
-        .unwrap()
-        .chars()
-        .skip(29)
-        .take(13)
-        .collect();
-    assert_eq!(chain_entry_one, "1[--]---     ");
+    assert_eq!(pane_text(&app, layout::CHAIN, 3), "01[--]    ---");
 }
 
 #[test]

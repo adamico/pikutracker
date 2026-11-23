@@ -2,14 +2,16 @@ mod support;
 
 use pikutracker_core::app::{Action, App, Direction};
 use pikutracker_core::player::{AudioRequest, Player};
-use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
+use pikutracker_core::project::{
+    ChainEntry, ChainId, PhraseId, Project, SongRowEnding, SongRowMarks,
+};
 use pikutracker_core::synth::{SAMPLE_RATE, SAMPLES_PER_TICK};
 use support::status_line;
 
 const DOWN: Action = Action::Move(Direction::Down);
 const SPACE: Action = Action::PlayFocusedPane;
 const SHIFT_SPACE: Action = Action::PlaySongFromCursor;
-const TAB: Action = Action::FocusNext;
+const SHIFT_TAB: Action = Action::FocusPrevious;
 
 const SPEED: i32 = 8;
 const STEP_SAMPLES: usize = SPEED as usize * SAMPLES_PER_TICK as usize;
@@ -133,7 +135,6 @@ fn a_chain_row_lasts_exactly_its_ticks_at_183_samples_each() {
     let mut project = Project::new();
     let tone = write(&mut project, 1, &[A2, A2]);
     place(&mut project, 0, 0, 0, &[plain(tone)]);
-    project.set_song_loop_row(None);
     let mut app = App::with_project(project);
     let mut player = Player::new();
     app.apply(SPACE);
@@ -153,9 +154,9 @@ fn tracks_sound_together_as_a_plain_mix() {
     let mut only_low = both.clone();
     let mut only_high = both.clone();
     place(&mut both, 0, 0, 0, &[plain(low)]);
-    place(&mut both, 0, 7, 1, &[plain(high)]);
+    place(&mut both, 0, 3, 1, &[plain(high)]);
     place(&mut only_low, 0, 0, 0, &[plain(low)]);
-    place(&mut only_high, 0, 7, 1, &[plain(high)]);
+    place(&mut only_high, 0, 3, 1, &[plain(high)]);
 
     let mix = hear(both, &[SPACE], 2);
     let low = hear(only_low, &[SPACE], 2);
@@ -274,10 +275,20 @@ fn three_row_song() -> Project {
     project
 }
 
+fn marked(
+    mut project: Project,
+    row: usize,
+    loop_start: bool,
+    ending: Option<SongRowEnding>,
+) -> Project {
+    project.set_song_row_marks(row, SongRowMarks { loop_start, ending });
+    project
+}
+
 #[test]
-fn the_song_jumps_to_the_loop_row_at_its_first_empty_row() {
-    let mut project = three_row_song();
-    project.set_song_loop_row(Some(1));
+fn after_a_loop_back_row_the_song_returns_to_the_loop_start() {
+    let project = marked(three_row_song(), 1, true, None);
+    let project = marked(project, 2, false, Some(SongRowEnding::LoopBack));
 
     let samples = hear(project, &[SPACE], 6);
 
@@ -285,47 +296,73 @@ fn the_song_jumps_to_the_loop_row_at_its_first_empty_row() {
 }
 
 #[test]
-fn a_new_song_loops_to_its_first_row() {
-    let samples = hear(three_row_song(), &[SPACE], 4);
+fn loop_back_returns_to_the_nearest_loop_start_at_or_before_it() {
+    let project = marked(three_row_song(), 0, true, None);
+    let project = marked(project, 1, true, Some(SongRowEnding::LoopBack));
 
-    assert_steps(&samples, &[220.0, 440.0, 880.0, 220.0]);
+    let samples = hear(project, &[SPACE], 4);
+
+    assert_steps(&samples, &[220.0, 440.0, 440.0, 440.0]);
 }
 
 #[test]
-fn rows_after_the_first_empty_row_do_not_play() {
+fn loop_back_without_a_loop_start_returns_to_song_row_00() {
+    let project = marked(three_row_song(), 2, false, Some(SongRowEnding::LoopBack));
+
+    let samples = hear(project, &[DOWN, SPACE], 4);
+
+    assert_steps(&samples, &[440.0, 880.0, 220.0, 440.0]);
+}
+
+#[test]
+fn playing_from_below_a_loop_start_still_loops_back_to_it() {
+    let project = marked(three_row_song(), 1, true, None);
+    let project = marked(project, 2, false, Some(SongRowEnding::LoopBack));
+
+    let samples = hear(project, &[DOWN, DOWN, SPACE], 3);
+
+    assert_steps(&samples, &[880.0, 440.0, 880.0]);
+}
+
+#[test]
+fn playback_ends_after_a_stop_row() {
+    let project = marked(three_row_song(), 1, false, Some(SongRowEnding::Stop));
+
+    let samples = hear(project, &[SPACE], 4);
+
+    assert_steps(&samples, &[220.0, 440.0, 0.0, 0.0]);
+}
+
+#[test]
+fn playback_ends_at_an_empty_song_row() {
     let mut project = three_row_song();
     project.set_song_cell(1, 0, None);
 
     let samples = hear(project, &[SPACE], 3);
 
-    assert_steps(&samples, &[220.0, 220.0, 220.0]);
+    assert_steps(&samples, &[220.0, 0.0, 0.0]);
 }
 
 #[test]
-fn the_song_stops_at_its_end_when_it_has_no_loop_row() {
-    let mut project = three_row_song();
-    project.set_song_loop_row(None);
-
-    let samples = hear(project, &[SPACE], 5);
+fn playback_ends_after_the_last_row() {
+    let samples = hear(three_row_song(), &[SPACE], 5);
 
     assert_steps(&samples, &[220.0, 440.0, 880.0, 0.0, 0.0]);
 }
 
 #[test]
-fn the_song_stops_when_its_loop_row_is_empty() {
-    let mut project = three_row_song();
-    project.set_song_loop_row(Some(9));
+fn a_loop_back_to_an_empty_row_ends_playback() {
+    let mut project = marked(three_row_song(), 2, false, Some(SongRowEnding::LoopBack));
+    project.set_song_cell(0, 0, None);
 
-    let samples = hear(project, &[SPACE], 5);
+    let samples = hear(project, &[DOWN, SPACE], 4);
 
-    assert_steps(&samples, &[220.0, 440.0, 880.0, 0.0, 0.0]);
+    assert_steps(&samples, &[440.0, 880.0, 0.0, 0.0]);
 }
 
 #[test]
 fn space_plays_again_after_the_song_has_stopped_by_itself() {
-    let mut project = three_row_song();
-    project.set_song_loop_row(None);
-    let mut app = App::with_project(project);
+    let mut app = App::with_project(three_row_song());
     let mut player = Player::new();
     app.apply(SPACE);
     render(&mut app, &mut player, 5);
@@ -341,9 +378,7 @@ fn space_plays_again_after_the_song_has_stopped_by_itself() {
 
 #[test]
 fn a_report_about_an_earlier_play_does_not_stop_the_current_one() {
-    let mut project = three_row_song();
-    project.set_song_loop_row(None);
-    let mut app = App::with_project(project);
+    let mut app = App::with_project(three_row_song());
     let mut player = Player::new();
     app.apply(SPACE);
     render(&mut app, &mut player, 5);
@@ -364,12 +399,16 @@ fn a_report_about_an_earlier_play_does_not_stop_the_current_one() {
 fn space_in_the_song_pane_plays_from_the_cursors_row() {
     let samples = hear(three_row_song(), &[DOWN, SPACE], 3);
 
-    assert_steps(&samples, &[440.0, 880.0, 220.0]);
+    assert_steps(&samples, &[440.0, 880.0, 0.0]);
 }
 
 #[test]
 fn shift_space_plays_the_song_from_the_cursors_row_in_any_pane() {
-    let samples = hear(three_row_song(), &[DOWN, TAB, TAB, SHIFT_SPACE], 2);
+    let samples = hear(
+        three_row_song(),
+        &[DOWN, SHIFT_TAB, SHIFT_TAB, SHIFT_SPACE],
+        2,
+    );
 
     assert_steps(&samples, &[440.0, 880.0]);
 }
@@ -409,7 +448,7 @@ fn moving_the_cursor_during_playback_changes_nothing_that_plays() {
     app.take_audio_requests();
 
     app.apply(DOWN);
-    app.apply(TAB);
+    app.apply(SHIFT_TAB);
 
     assert!(app.take_audio_requests().is_empty());
 }
@@ -426,7 +465,7 @@ fn two_track_chain() -> Project {
 
 #[test]
 fn space_in_the_chain_pane_plays_the_chain_alone_with_chain_row_timing_and_loops() {
-    let samples = hear(two_track_chain(), &[TAB, SPACE], 8);
+    let samples = hear(two_track_chain(), &[SHIFT_TAB, SPACE], 8);
 
     assert_steps(
         &samples,
@@ -436,7 +475,7 @@ fn space_in_the_chain_pane_plays_the_chain_alone_with_chain_row_timing_and_loops
 
 #[test]
 fn the_chain_plays_from_the_cursors_entry_and_loops_to_the_first() {
-    let samples = hear(two_track_chain(), &[TAB, DOWN, SPACE], 4);
+    let samples = hear(two_track_chain(), &[SHIFT_TAB, DOWN, SPACE], 4);
 
     assert_steps(&samples, &[880.0, 880.0, 440.0, 440.0]);
 }
@@ -450,7 +489,7 @@ fn a_phrase_loop_repeats_in_the_chain_pane_as_it_does_in_the_song() {
     place(&mut project, 0, 0, 0, &[plain(riff)]);
     place(&mut project, 0, 1, 1, &[plain(stretch)]);
 
-    let samples = hear(project, &[TAB, SPACE], 4);
+    let samples = hear(project, &[SHIFT_TAB, SPACE], 4);
 
     assert_steps(&samples, &[440.0, 880.0, 440.0, 880.0]);
 }
@@ -463,7 +502,7 @@ fn space_in_the_phrase_pane_plays_the_phrase_alone_with_its_transpose() {
     place(&mut project, 0, 0, 0, &[transposed(riff, 12)]);
     place(&mut project, 0, 1, 1, &[plain(stretch)]);
 
-    let samples = hear(project, &[TAB, TAB, SPACE], 4);
+    let samples = hear(project, &[SHIFT_TAB, SHIFT_TAB, SPACE], 4);
 
     assert_steps(&samples, &[880.0, 440.0, 880.0, 440.0]);
 }
@@ -475,14 +514,14 @@ fn a_phrase_played_alone_repeats_its_phrase_loop_after_the_lead_in() {
     let riff = looping_from(&mut project, riff, 1);
     place(&mut project, 0, 0, 0, &[plain(riff)]);
 
-    let samples = hear(project, &[TAB, TAB, SPACE], 6);
+    let samples = hear(project, &[SHIFT_TAB, SHIFT_TAB, SPACE], 6);
 
     assert_steps(&samples, &[220.0, 440.0, 880.0, 440.0, 880.0, 440.0]);
 }
 
 #[test]
 fn the_right_hand_view_plays_the_last_focused_pane() {
-    let samples = hear(three_row_song(), &[Action::FocusPrevious, SPACE], 2);
+    let samples = hear(three_row_song(), &[Action::FocusNext, SPACE], 2);
 
     assert_steps(&samples, &[220.0, 440.0]);
 }
@@ -506,7 +545,7 @@ fn space_on_a_song_row_with_nothing_on_it_says_so() {
 
 #[test]
 fn space_in_the_chain_pane_with_no_chain_says_so() {
-    assert_nothing_to_play(Project::new(), &[TAB, SPACE]);
+    assert_nothing_to_play(Project::new(), &[SHIFT_TAB, SPACE]);
 }
 
 #[test]
@@ -514,7 +553,7 @@ fn space_on_a_chain_with_no_entries_says_so() {
     let mut project = Project::new();
     project.set_song_cell(0, 0, Some(ChainId::new(0)));
 
-    assert_nothing_to_play(project, &[TAB, SPACE]);
+    assert_nothing_to_play(project, &[SHIFT_TAB, SPACE]);
 }
 
 #[test]
@@ -523,12 +562,12 @@ fn space_on_a_chain_of_silent_phrases_says_so() {
     let silence = write(&mut project, 1, &[REST, REST]);
     place(&mut project, 0, 0, 0, &[plain(silence)]);
 
-    assert_nothing_to_play(project, &[TAB, SPACE]);
+    assert_nothing_to_play(project, &[SHIFT_TAB, SPACE]);
 }
 
 #[test]
 fn space_in_the_phrase_pane_with_no_phrase_says_so() {
-    assert_nothing_to_play(Project::new(), &[TAB, TAB, SPACE]);
+    assert_nothing_to_play(Project::new(), &[SHIFT_TAB, SHIFT_TAB, SPACE]);
 }
 
 #[test]
@@ -537,5 +576,5 @@ fn space_on_a_silent_phrase_says_so() {
     let silence = write(&mut project, 1, &[REST, REST]);
     place(&mut project, 0, 0, 0, &[plain(silence)]);
 
-    assert_nothing_to_play(project, &[TAB, TAB, SPACE]);
+    assert_nothing_to_play(project, &[SHIFT_TAB, SHIFT_TAB, SPACE]);
 }

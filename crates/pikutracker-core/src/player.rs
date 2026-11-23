@@ -1,6 +1,7 @@
 use crate::project::{
-    CHAIN_ENTRIES, ChainEntry, FIRST_CUSTOM_INSTRUMENT, Filters, InstrumentSound, MAX_STEPS,
-    Phrase, PhraseId, Project, SfxInstrument, Step, TRACKS, WaveformInstrument,
+    CHAIN_ENTRIES, ChainEntry, ChainId, ChainRowPlace, FIRST_CUSTOM_INSTRUMENT, Filters,
+    InstrumentSound, MAX_STEPS, Phrase, PhraseId, Project, SfxInstrument, Step, TRACKS,
+    WaveformInstrument,
 };
 use crate::synth::{
     Instrument, Instruments, Note, SAMPLE_RATE, SAMPLES_PER_TICK, Sound, Voice, Waveform,
@@ -20,6 +21,11 @@ pub enum AudioRequest {
         project: Arc<Project>,
         song_row: usize,
         track: usize,
+        from_entry: usize,
+    },
+    PlayChainAlone {
+        project: Arc<Project>,
+        chain: ChainId,
         from_entry: usize,
     },
     PlaySong {
@@ -64,49 +70,6 @@ const AUDITION_PITCH: u8 = 24;
 const AUDITION_VOLUME: u8 = 5;
 const AUDITION_SPEED: u8 = 255;
 
-pub const SCOPE_COLUMNS: usize = 23;
-pub const SCOPE_RANGE: i8 = 100;
-const SAMPLES_PER_SCOPE_COLUMN: usize = 8;
-const SCOPE_SAMPLES: usize = SCOPE_COLUMNS * SAMPLES_PER_SCOPE_COLUMN;
-
-#[derive(Clone, Copy, Debug)]
-struct ScopeTrace {
-    samples: [f32; SCOPE_SAMPLES],
-    next: usize,
-}
-
-impl ScopeTrace {
-    const fn new() -> Self {
-        Self {
-            samples: [0.0; SCOPE_SAMPLES],
-            next: 0,
-        }
-    }
-
-    fn push(&mut self, sample: f32) {
-        self.samples[self.next] = sample;
-        self.next = (self.next + 1) % SCOPE_SAMPLES;
-    }
-
-    fn loudest_per_column(&self) -> [i8; SCOPE_COLUMNS] {
-        let mut columns = [0; SCOPE_COLUMNS];
-        for (column, value) in columns.iter_mut().enumerate() {
-            let start = self.next + column * SAMPLES_PER_SCOPE_COLUMN;
-            let loudest = (start..start + SAMPLES_PER_SCOPE_COLUMN)
-                .map(|index| self.samples[index % SCOPE_SAMPLES])
-                .fold(0.0_f32, |loudest, sample| {
-                    if sample.abs() > loudest.abs() {
-                        sample
-                    } else {
-                        loudest
-                    }
-                });
-            *value = (loudest * f32::from(SCOPE_RANGE)).round() as i8;
-        }
-        columns
-    }
-}
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TrackMix {
     muted: [bool; TRACKS],
@@ -140,10 +103,18 @@ impl TrackMix {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ChainEntryPlace {
+    pub chain: ChainId,
+    pub entry: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Playhead {
-    pub chain_row: Option<(usize, usize)>,
+    pub chain_row: Option<ChainRowPlace>,
+    pub chain_alone: Option<ChainEntryPlace>,
     pub tracks: [Option<(PhraseId, usize)>; TRACKS],
     pub waiting: [bool; TRACKS],
+    pub chain_row_tick: u32,
 }
 
 impl Playhead {
@@ -158,7 +129,6 @@ impl Playhead {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PlaybackReport {
     pub playhead: Option<Playhead>,
-    pub scope: [i8; SCOPE_COLUMNS],
     pub finished_play: u64,
 }
 
@@ -166,6 +136,7 @@ pub struct PlaybackReport {
 enum Route {
     Song,
     Chain { track: usize },
+    ChainAlone { chain: ChainId },
     Phrase { phrase: PhraseId, transpose: i8 },
 }
 
@@ -208,19 +179,15 @@ impl Lane {
         };
         let phrase = project.phrase(entry.phrase());
         self.loops = phrase.loops();
-        let repeat_from = phrase
-            .phrase_loop()
-            .map(|steps| steps.start)
-            .or(repeats.then_some(0));
-        if self.step + 1 < phrase.length() {
-            self.step += 1;
-        } else if let Some(start) = repeat_from {
-            self.step = start;
-            self.played_through = true;
-        } else {
+        let Some(next) = phrase
+            .step_after(self.step)
+            .or_else(|| repeats.then_some(0))
+        else {
             self.state = LaneState::Finished;
             return;
-        }
+        };
+        self.played_through |= next <= self.step;
+        self.step = next;
         self.samples_left = step_samples(phrase);
     }
 }
@@ -237,28 +204,31 @@ struct Playback {
     k: usize,
     lanes: [Lane; TRACKS],
     waiting_for_edit: bool,
+    samples_into_chain_row: u64,
+    chain_row_tick: u32,
 }
 
 impl Playback {
     fn next_chain_row(&self) -> Option<(usize, usize)> {
         let project = &self.project;
-        let later_in_row = first_chain_row(project, self.row, self.k + 1);
         match self.route {
             Route::Phrase { .. } => None,
-            Route::Chain { .. } => later_in_row
-                .or_else(|| first_chain_row(project, self.row, 0))
-                .map(|k| (self.row, k)),
+            Route::Chain { .. } => {
+                first_from_or_wrapping(self.k + 1, |k| first_chain_row(project, self.row, k))
+                    .map(|k| (self.row, k))
+            }
+            Route::ChainAlone { chain } => {
+                first_from_or_wrapping(self.k + 1, |k| first_entry(project, chain, k))
+                    .map(|k| (self.row, k))
+            }
             Route::Song => {
-                let emptied = project.song_row_is_empty(self.row);
-                if let Some(k) = later_in_row.filter(|_| !emptied) {
+                if let Some(k) = first_chain_row(project, self.row, self.k + 1) {
                     return Some((self.row, k));
                 }
-                let next_row = self.row + 1;
-                let row = if emptied || project.song_row_is_empty(next_row) {
-                    project.song_loop_row()?
-                } else {
-                    next_row
-                };
+                if project.song_row_is_empty(self.row) {
+                    return None;
+                }
+                let row = project.song_row_after(self.row)?;
                 Some((row, first_chain_row(project, row, 0)?))
             }
         }
@@ -271,7 +241,12 @@ impl Playback {
                 entry.set_transpose(i32::from(transpose));
                 entry
             }),
-            _ => self.project.chain_row_entry(self.row, track, self.k),
+            Route::ChainAlone { chain } => (track == 0)
+                .then(|| self.project.chain(chain).entry(self.k))
+                .flatten(),
+            Route::Song | Route::Chain { .. } => {
+                self.project.chain_row_entry(self.row, track, self.k)
+            }
         }
     }
 
@@ -279,7 +254,7 @@ impl Playback {
         match self.route {
             Route::Song => true,
             Route::Chain { track: alone } => track == alone,
-            Route::Phrase { .. } => track == 0,
+            Route::Phrase { .. } | Route::ChainAlone { .. } => track == 0,
         }
     }
 
@@ -302,13 +277,25 @@ impl Playback {
             }
         }
         let chain_row = match self.route {
-            Route::Phrase { .. } => None,
-            _ => Some((self.row, self.k)),
+            Route::Song | Route::Chain { .. } => Some(ChainRowPlace {
+                song_row: self.row,
+                entry: self.k,
+            }),
+            Route::Phrase { .. } | Route::ChainAlone { .. } => None,
+        };
+        let chain_alone = match self.route {
+            Route::ChainAlone { chain } => Some(ChainEntryPlace {
+                chain,
+                entry: self.k,
+            }),
+            _ => None,
         };
         Playhead {
             chain_row,
+            chain_alone,
             tracks,
             waiting,
+            chain_row_tick: self.chain_row_tick,
         }
     }
 
@@ -332,7 +319,18 @@ impl Playback {
 }
 
 fn first_chain_row(project: &Project, row: usize, from: usize) -> Option<usize> {
-    (from..CHAIN_ENTRIES).find(|&k| project.chain_row_ticks(row, k) > 0)
+    project.played_chain_rows(row).find(|&k| k >= from)
+}
+
+fn first_from_or_wrapping(
+    from: usize,
+    first_from: impl Fn(usize) -> Option<usize>,
+) -> Option<usize> {
+    first_from(from).or_else(|| first_from(0))
+}
+
+fn first_entry(project: &Project, chain: ChainId, from: usize) -> Option<usize> {
+    (from..CHAIN_ENTRIES).find(|&k| project.chain(chain).entry(k).is_some())
 }
 
 #[derive(Clone, Debug)]
@@ -341,7 +339,6 @@ pub struct Player {
     playback: Option<Playback>,
     track_mix: TrackMix,
     preview: Option<Preview>,
-    scope: ScopeTrace,
     plays: u64,
     finished_play: u64,
 }
@@ -353,7 +350,6 @@ impl Default for Player {
             playback: None,
             track_mix: TrackMix::default(),
             preview: None,
-            scope: ScopeTrace::new(),
             plays: 0,
             finished_play: 0,
         }
@@ -382,9 +378,17 @@ impl Player {
                 track,
                 from_entry,
             } => {
-                let k = first_chain_row(&project, song_row, from_entry)
-                    .or_else(|| first_chain_row(&project, song_row, 0));
+                let k =
+                    first_from_or_wrapping(from_entry, |k| first_chain_row(&project, song_row, k));
                 self.start(project, Route::Chain { track }, song_row, k, 0);
+            }
+            AudioRequest::PlayChainAlone {
+                project,
+                chain,
+                from_entry,
+            } => {
+                let k = first_from_or_wrapping(from_entry, |k| first_entry(&project, chain, k));
+                self.start(project, Route::ChainAlone { chain }, 0, k, 0);
             }
             AudioRequest::PlaySong { project, from_row } => {
                 let k = first_chain_row(&project, from_row, 0);
@@ -422,7 +426,6 @@ impl Player {
     pub fn report(&self) -> PlaybackReport {
         PlaybackReport {
             playhead: self.playback.as_ref().map(Playback::playhead),
-            scope: self.scope.loudest_per_column(),
             finished_play: self.finished_play,
         }
     }
@@ -430,7 +433,6 @@ impl Player {
     fn cut(&mut self) {
         self.playback = None;
         self.preview = None;
-        self.scope = ScopeTrace::new();
         for voice in &mut self.voices {
             voice.stop();
         }
@@ -520,11 +522,15 @@ impl Player {
             k,
             lanes: [Lane::default(); TRACKS],
             waiting_for_edit: false,
+            samples_into_chain_row: 0,
+            chain_row_tick: 0,
         };
         self.enter_chain_row(playback, from_step);
     }
 
     fn enter_chain_row(&mut self, mut playback: Playback, from_step: usize) {
+        playback.samples_into_chain_row = 0;
+        playback.chain_row_tick = 0;
         for (track, voice) in self.voices.iter_mut().enumerate() {
             let lane = Lane::starting(playback.entry(track), &playback.project, from_step);
             playback.lanes[track] = lane;
@@ -546,7 +552,10 @@ impl Player {
         for voice in &mut self.voices {
             voice.play(Sound::default(), 0);
         }
-        if matches!(playback.route, Route::Chain { .. }) {
+        if matches!(
+            playback.route,
+            Route::Chain { .. } | Route::ChainAlone { .. }
+        ) {
             playback.lanes = [Lane::default(); TRACKS];
             playback.waiting_for_edit = true;
             self.playback = Some(playback);
@@ -573,10 +582,13 @@ impl Player {
             if playback.chain_row_is_over() {
                 self.leave_chain_row();
             } else {
+                playback.chain_row_tick =
+                    (playback.samples_into_chain_row / u64::from(SAMPLES_PER_TICK)) as u32;
                 self.start_next_steps(moved);
             }
         }
         if let Some(playback) = self.playback.as_mut() {
+            playback.samples_into_chain_row += 1;
             for lane in &mut playback.lanes {
                 if lane.state == LaneState::Playing {
                     lane.samples_left -= 1;
@@ -615,9 +627,7 @@ impl Player {
                 mix += sample;
             }
         }
-        let output = saturated(mix);
-        self.scope.push(output);
-        output
+        saturated(mix)
     }
 
     pub fn render(&mut self, samples: usize) -> Vec<f32> {

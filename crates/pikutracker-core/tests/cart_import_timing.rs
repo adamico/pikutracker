@@ -158,6 +158,21 @@ fn when_every_channel_loops_the_slowest_is_unrolled_to_32_steps_without_a_phrase
 }
 
 #[test]
+fn when_every_channel_loops_a_slowest_loop_over_all_32_notes_keeps_its_phrase_loop() {
+    let cart = one_pattern(vec![
+        looping(counting(4), 0, 8),
+        looping(counting(8), 0, 32),
+    ]);
+
+    let (project, warnings) = imported(&cart);
+
+    assert_eq!(warnings, Vec::<String>::new());
+    assert_eq!(project.chain_row_ticks(0, 0), 256);
+    assert_eq!(phrase(&project, 1, 0).phrase_loop(), Some(0..32));
+    assert_eq!(pitches(phrase(&project, 1, 0)), audible(10..42));
+}
+
+#[test]
 fn a_loop_start_at_or_past_a_non_zero_loop_end_plays_all_32_notes_and_sets_the_length() {
     let cart = one_pattern(vec![looping(counting(8), 8, 4), counting(4)]);
 

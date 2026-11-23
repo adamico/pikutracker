@@ -126,7 +126,7 @@ impl App {
             Err(reason) => self.report(cannot_read(STATE_RON, &reason)),
             Ok(SettingsRead::Loaded(state)) => {
                 self.follow = state.follow;
-                self.phrase.set_octave(state.octave);
+                self.phrase.set_pen(state.pen);
                 self.midi_table = state.midi_table.clone();
                 self.state_file = Some(state_file);
                 if let Some(last) = state.last_project() {
@@ -188,7 +188,7 @@ impl App {
     fn state_to_remember(&self) -> AppState {
         let mut state = self.app_state.clone();
         state.follow = self.follow;
-        state.octave = self.phrase.octave();
+        state.pen = self.phrase.pen();
         state.midi_table = self.midi_table.clone();
         state
     }

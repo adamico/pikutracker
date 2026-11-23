@@ -1,11 +1,12 @@
 mod support;
 
+use pikutracker_core::app::layout;
 use pikutracker_core::app::{Action, App, Direction, LogItem, Report, Severity};
-use pikutracker_core::project::SongPlace;
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
+use pikutracker_core::project::{ChainRowPlace, SongPlace};
 use pikutracker_core::screen::palette::Colour;
 use std::time::Duration;
-use support::status_line;
+use support::{pane_text, status_line};
 
 const STATUS_ROW: usize = 44;
 const DOWN: Action = Action::Move(Direction::Down);
@@ -15,16 +16,7 @@ fn status_background(app: &App) -> Colour {
 }
 
 fn right_slot(app: &App, line: usize) -> String {
-    let text: String = app
-        .grid()
-        .text_dump()
-        .lines()
-        .nth(line)
-        .unwrap()
-        .chars()
-        .skip(83)
-        .collect();
-    text.trim_end().to_owned()
+    pane_text(app, layout::RIGHT_SLOT, line)
 }
 
 fn right_slot_lines(app: &App) -> Vec<String> {
@@ -32,9 +24,7 @@ fn right_slot_lines(app: &App) -> Vec<String> {
 }
 
 fn song_line(app: &App, line: usize) -> String {
-    app.grid().text_dump().lines().nth(line).unwrap()[..28]
-        .trim_end()
-        .to_owned()
+    pane_text(app, layout::SONG, line)
 }
 
 fn item(text: &str) -> LogItem {
@@ -117,7 +107,7 @@ fn a_result_with_items_opens_the_log_without_taking_focus() {
     app.report(Report::warning("IMPORTED").with_items(vec![item("ONE")]));
 
     assert_eq!(right_slot(&app, 0), "LOG");
-    assert_eq!(song_line(&app, 2), "00 [--]-- -- -- -- -- -- --");
+    assert_eq!(song_line(&app, 2), "00 [--]-- -- --");
 }
 
 #[test]
@@ -125,21 +115,21 @@ fn a_result_without_items_leaves_the_right_hand_view_alone() {
     let mut app = App::new();
     app.report(Report::failure("CANNOT SAVE"));
 
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
 }
 
 #[test]
 fn ctrl_l_opens_the_log_with_focus_and_closes_it_back_to_the_pane_you_came_from() {
     let mut app = App::new();
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
 
     app.apply(Action::ToggleLog);
     assert_eq!(right_slot(&app, 0), "LOG");
-    assert!(!app.grid().text_dump().contains("0[--]---"));
+    assert_eq!(pane_text(&app, layout::CHAIN, 2), "00 --     ---");
 
     app.apply(Action::ToggleLog);
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
-    assert!(app.grid().text_dump().contains("0[--]---"));
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
+    assert_eq!(pane_text(&app, layout::CHAIN, 2), "00[--]    ---");
 }
 
 #[test]
@@ -149,22 +139,22 @@ fn esc_in_the_log_closes_it() {
 
     app.apply(Action::Cancel);
 
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
-    assert_eq!(song_line(&app, 2), "00 [--]-- -- -- -- -- -- --");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
+    assert_eq!(song_line(&app, 2), "00 [--]-- -- --");
 }
 
 #[test]
 fn esc_clears_a_failure_before_it_closes_the_log() {
     let mut app = App::new();
     app.report(Report::failure("EXPORT FAILED").with_items(vec![item("ONE")]));
-    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusNext);
 
     app.apply(Action::Cancel);
     assert_eq!(right_slot(&app, 0), "LOG");
     assert!(!status_line(&app).contains("EXPORT FAILED"));
 
     app.apply(Action::Cancel);
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
 }
 
 #[test]
@@ -174,7 +164,7 @@ fn the_log_joins_the_tab_cycle_as_the_visible_right_hand_view() {
     assert_eq!(right_slot(&app, 1), " WRN ONE");
 
     for _ in 0..3 {
-        app.apply(Action::FocusNext);
+        app.apply(Action::FocusPrevious);
     }
     assert_eq!(right_slot(&app, 1), ">WRN ONE");
 
@@ -182,9 +172,9 @@ fn the_log_joins_the_tab_cycle_as_the_visible_right_hand_view() {
     assert_eq!(right_slot(&app, 1), " WRN ONE");
     assert_eq!(right_slot(&app, 2), ">WRN TWO");
 
-    app.apply(Action::FocusNext);
+    app.apply(Action::FocusPrevious);
     assert_eq!(right_slot(&app, 0), "LOG");
-    assert_eq!(song_line(&app, 2), "00 [--]-- -- -- -- -- -- --");
+    assert_eq!(song_line(&app, 2), "00 [--]-- -- --");
 }
 
 #[test]
@@ -235,7 +225,7 @@ fn the_log_scrolls_to_keep_the_picked_item_visible() {
         ))
     });
     app.report(Report::warning("IMPORTED").with_items(items.collect()));
-    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusNext);
 
     for _ in 0..31 {
         app.apply(DOWN);
@@ -256,22 +246,24 @@ fn project_with_a_located_phrase() -> Project {
 fn enter_on_an_item_jumps_to_its_location_and_the_panes_stay_usable() {
     let mut app = App::with_project(project_with_a_located_phrase());
     let location = SongPlace {
-        song_row: 1,
+        chain_row: ChainRowPlace {
+            song_row: 1,
+            entry: 2,
+        },
         track: 2,
-        chain_row: 2,
-        step: 5,
+        step_index: 5,
     };
     app.report(Report::failure("EXPORT FAILED").with_items(vec![
             LogItem::new(Severity::Failure, "T3 ROW 01 STEP 05: ABOVE D#5")
                 .with_hint("ENTER: GO THERE")
                 .at(location),
         ]));
-    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusNext);
 
     app.apply(Action::Confirm);
 
-    assert_eq!(app.chain_under_cursor(), Some(ChainId::new(4)));
-    assert_eq!(app.phrase_under_cursor(), Some(PhraseId::new(7)));
+    assert_eq!(app.shown_chain_id(), Some(ChainId::new(4)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(7)));
     assert!(app.grid().text_dump().contains("05[...]"));
     assert_eq!(right_slot(&app, 0), "LOG");
 
@@ -283,7 +275,7 @@ fn enter_on_an_item_jumps_to_its_location_and_the_panes_stay_usable() {
 fn enter_on_an_item_with_no_location_stays_in_the_log() {
     let mut app = App::new();
     app.report(Report::warning("IMPORTED").with_items(vec![item("ONE"), item("TWO")]));
-    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusNext);
 
     app.apply(Action::Confirm);
 

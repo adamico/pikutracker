@@ -1,11 +1,14 @@
-use pikutracker_core::app::{Action, App};
+mod support;
+
+use pikutracker_core::app::{Action, App, layout};
 use pikutracker_core::player::Player;
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
 use pikutracker_core::screen::palette::Colour;
 use pikutracker_core::synth::{SAMPLE_RATE, SAMPLES_PER_TICK};
+use support::pane_text;
 
 const PLAY_SONG: Action = Action::PlaySongFromCursor;
-const TAB: Action = Action::FocusNext;
+const SHIFT_TAB: Action = Action::FocusPrevious;
 const SPACE: Action = Action::PlayFocusedPane;
 
 const SPEED: i32 = 8;
@@ -84,12 +87,8 @@ fn assert_near(actual: f32, expected: f32) {
 }
 
 fn headers(app: &App) -> String {
-    app.grid()
-        .text_dump()
-        .lines()
-        .nth(TRACK_HEADER_ROW)
-        .unwrap()[4..28]
-        .trim_end()
+    pane_text(app, layout::SONG, TRACK_HEADER_ROW)
+        .trim_start()
         .to_owned()
 }
 
@@ -216,7 +215,7 @@ fn a_mute_during_playback_is_heard_without_changing_the_timing() {
 fn the_chain_pane_plays_a_muted_track_all_the_same() {
     let samples = hear(
         two_tracks(),
-        &[Action::Mute { track_number: 1 }, TAB, SPACE],
+        &[Action::Mute { track_number: 1 }, SHIFT_TAB, SPACE],
         2,
     );
 
@@ -227,7 +226,12 @@ fn the_chain_pane_plays_a_muted_track_all_the_same() {
 fn the_phrase_pane_plays_a_muted_track_all_the_same() {
     let samples = hear(
         two_tracks(),
-        &[Action::Mute { track_number: 1 }, TAB, TAB, SPACE],
+        &[
+            Action::Mute { track_number: 1 },
+            SHIFT_TAB,
+            SHIFT_TAB,
+            SPACE,
+        ],
         2,
     );
 
@@ -237,12 +241,12 @@ fn the_phrase_pane_plays_a_muted_track_all_the_same() {
 #[test]
 fn track_headers_mark_muted_and_soloed_tracks() {
     let mut app = App::with_project(two_tracks());
-    assert_eq!(headers(&app), "T1 T2 T3 T4 T5 T6 T7 T8");
+    assert_eq!(headers(&app), "T1 T2 T3 T4");
 
     app.apply(Action::Mute { track_number: 2 });
     app.apply(Action::Solo { track_number: 3 });
 
-    assert_eq!(headers(&app), "T1 M2 S3 T4 T5 T6 T7 T8");
+    assert_eq!(headers(&app), "T1 M2 S3 T4");
 }
 
 #[test]
@@ -252,7 +256,10 @@ fn a_muted_track_is_dimmed_on_its_header() {
     app.apply(Action::Mute { track_number: 1 });
 
     assert_eq!(
-        app.grid().cell(4, TRACK_HEADER_ROW).style.fg,
+        app.grid()
+            .cell(layout::SONG.column + 4, layout::SONG.row + TRACK_HEADER_ROW)
+            .style
+            .fg,
         Colour::DarkGrey
     );
 }
@@ -264,7 +271,7 @@ fn a_track_both_muted_and_soloed_shows_as_soloed() {
     app.apply(Action::Mute { track_number: 1 });
     app.apply(Action::Solo { track_number: 1 });
 
-    assert_eq!(headers(&app), "S1 T2 T3 T4 T5 T6 T7 T8");
+    assert_eq!(headers(&app), "S1 T2 T3 T4");
 }
 
 #[test]

@@ -1,16 +1,14 @@
 mod instruments;
 mod rebuild;
 
-use crate::cart::{Cart, SLOTS};
+use crate::cart::{Cart, Pattern, SLOTS};
 use crate::project::{
-    Chain, ChainEntry, ChainId, Claim, EXPORT_CHANNELS, Phrase, PhraseId, Project, SongPlace,
-    TargetCart,
+    Chain, ChainEntry, ChainId, ChainRowPlace, Claim, Phrase, PhraseId, Project, SongPlace,
+    SongRowEnding, SongRowMarks, TRACKS, TargetCart, custom_instrument_of_slot,
 };
 use crate::wording::counted;
 use instruments::imported_instrument;
-use rebuild::{
-    RebuiltChannel, RebuiltPattern, has_bit_7, instrument_of_slot, loose_phrase, rebuild_pattern,
-};
+use rebuild::{RebuiltChannel, RebuiltPattern, has_bit_7, loose_phrase, rebuild_pattern};
 use std::collections::BTreeSet;
 
 const LAST_SLOT: u8 = SLOTS as u8 - 1;
@@ -42,56 +40,6 @@ impl ImportWarning {
             place: Some(place),
         }
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct CartSong {
-    pub patterns: (u8, u8),
-    pub loop_back_row: Option<usize>,
-}
-
-pub fn songs(cart: &Cart) -> Vec<CartSong> {
-    let mut found = Vec::new();
-    let mut slot = 0;
-    while let Some(first) = (slot..=LAST_SLOT).find(|&slot| !cart.pattern(slot).is_empty()) {
-        let song = song_from(cart, first);
-        found.push(song);
-        match song.patterns.1.checked_add(1) {
-            Some(next) if next <= LAST_SLOT => slot = next,
-            _ => break,
-        }
-    }
-    found
-}
-
-fn song_from(cart: &Cart, first: u8) -> CartSong {
-    let mut last = first;
-    while last < LAST_SLOT
-        && !cart.pattern(last).stop()
-        && !cart.pattern(last).loop_back()
-        && !cart.pattern(last + 1).is_empty()
-    {
-        last += 1;
-    }
-    let ending = cart.pattern(last);
-    let loop_row = (ending.loop_back() && !ending.stop())
-        .then(|| {
-            loop_back_target(cart, last)
-                .checked_sub(first)
-                .map(usize::from)
-        })
-        .flatten();
-    CartSong {
-        patterns: (first, last),
-        loop_back_row: loop_row,
-    }
-}
-
-fn loop_back_target(cart: &Cart, loop_back: u8) -> u8 {
-    (0..=loop_back)
-        .rev()
-        .find(|&slot| cart.pattern(slot).loop_start())
-        .unwrap_or(0)
 }
 
 #[derive(Default)]
@@ -128,22 +76,20 @@ impl SharedItems {
     }
 }
 
-pub fn import(cart: &Cart, cart_path: &str) -> ImportedCart {
-    import_song(cart, cart_path, songs(cart).first().copied())
+fn music_patterns(cart: &Cart) -> Option<(u8, u8)> {
+    let mut non_empty = (0..=LAST_SLOT).filter(|&slot| !cart.pattern(slot).is_empty());
+    let first = non_empty.next()?;
+    Some((first, non_empty.next_back().unwrap_or(first)))
 }
 
-pub fn import_song(cart: &Cart, cart_path: &str, song: Option<CartSong>) -> ImportedCart {
+pub fn import(cart: &Cart, cart_path: &str) -> ImportedCart {
     let mut project = Project::new();
-    for channel in 0..EXPORT_CHANNELS {
-        project.set_export_track(channel, Some(channel as u8 + 1));
-    }
-    project.set_song_loop_row(None);
 
     let mut warnings = Vec::new();
     let mut claim = Claim::default();
     let mut shared = SharedItems::default();
     let mut instruments = BTreeSet::new();
-    if let Some(song) = song {
+    if let Some(patterns) = music_patterns(cart) {
         let builder = SongBuilder::new(
             cart,
             &mut project,
@@ -151,12 +97,12 @@ pub fn import_song(cart: &Cart, cart_path: &str, song: Option<CartSong>) -> Impo
             &mut shared,
             &mut instruments,
         );
-        claim = builder.build(song);
+        claim = builder.build(patterns);
     }
     let loose = LooseSfx::of(cart, &claim, &mut instruments);
     loose.keep(&mut project, &mut shared, &mut warnings);
     for slot in instruments {
-        let id = instrument_of_slot(slot);
+        let id = custom_instrument_of_slot(slot);
         project.set_custom_instrument(id, Some(imported_instrument(cart, slot)));
     }
 
@@ -236,7 +182,7 @@ fn lost_step_warning(
     phrase: Option<(PhraseId, usize)>,
 ) -> ImportWarning {
     let track = track_name(place.track);
-    let (lost, step) = match phrase {
+    let (lost, step_index) = match phrase {
         Some((id, length)) => (
             format!("{track} PHRASE {:02X} LOST ITS LAST STEP.", id.number()),
             length - 1,
@@ -245,13 +191,30 @@ fn lost_step_warning(
     };
     let ends = if is_last_row { "ENDS" } else { "SPLITS" };
     ImportWarning::at(
-        SongPlace { step, ..place },
+        SongPlace {
+            step_index,
+            ..place
+        },
         format!("{} {ends} INSIDE A STEP: {lost}", pattern_name(pattern)),
     )
 }
 
 fn pattern_name(slot: u8) -> String {
     format!("PATTERN {slot:02X}")
+}
+
+fn marks_of(pattern: Pattern) -> SongRowMarks {
+    let ending = if pattern.stop() {
+        Some(SongRowEnding::Stop)
+    } else if pattern.loop_back() {
+        Some(SongRowEnding::LoopBack)
+    } else {
+        None
+    };
+    SongRowMarks {
+        loop_start: pattern.loop_start(),
+        ending,
+    }
 }
 
 fn track_name(track: usize) -> String {
@@ -293,18 +256,21 @@ impl<'a> SongBuilder<'a> {
         }
     }
 
-    fn build(mut self, song: CartSong) -> Claim {
-        let (first, last) = song.patterns;
+    fn build(mut self, patterns: (u8, u8)) -> Claim {
+        let (first, last) = patterns;
         for (row, slot) in (first..=last).enumerate() {
-            self.add_pattern(row, slot);
+            let pattern = self.cart.pattern(slot);
+            if !pattern.is_empty() {
+                self.add_pattern(row, slot);
+            }
+            self.project.set_song_row_marks(row, marks_of(pattern));
         }
-        self.project.set_song_loop_row(song.loop_back_row);
-        self.warn_about_the_whole_song(song);
+        self.warn_about_the_whole_song(patterns);
         let mut claimed = self.played;
         claimed.extend(self.instruments.iter());
         Claim {
             sfx: claimed.into_iter().collect(),
-            first_and_last_pattern: Some(song.patterns),
+            first_and_last_pattern: Some(patterns),
         }
     }
 
@@ -313,7 +279,7 @@ impl<'a> SongBuilder<'a> {
         let rebuilt = rebuild_pattern(self.cart, pattern);
         self.chain_rows += rebuilt.chain_rows.len();
         if rebuilt.only_bit_7 {
-            let track = (0..EXPORT_CHANNELS).find(|&track| pattern.channel(track).is_some());
+            let track = (0..TRACKS).find(|&track| pattern.channel(track).is_some());
             self.warnings.push(ImportWarning {
                 text: format!(
                     "{} HOLDS ONLY BIT 7 SFX: THE CART STALLS HERE, THE EXPORTED SONG PLAYS \
@@ -321,14 +287,16 @@ impl<'a> SongBuilder<'a> {
                     pattern_name(slot)
                 ),
                 place: track.map(|track| SongPlace {
-                    song_row: row,
+                    chain_row: ChainRowPlace {
+                        song_row: row,
+                        entry: 0,
+                    },
                     track,
-                    chain_row: 0,
-                    step: 0,
+                    step_index: 0,
                 }),
             });
         }
-        for track in 0..EXPORT_CHANNELS {
+        for track in 0..TRACKS {
             let mut chain = Chain::default();
             if let Some(played) = pattern.channel(track) {
                 self.played.insert(played);
@@ -342,10 +310,9 @@ impl<'a> SongBuilder<'a> {
 
     fn warn_about_sfx(&mut self, played: u8, song_row: usize, track: usize) {
         let place = SongPlace {
-            song_row,
+            chain_row: ChainRowPlace { song_row, entry: 0 },
             track,
-            chain_row: 0,
-            step: 0,
+            step_index: 0,
         };
         let sfx = self.cart.sfx(played);
         if sfx.speed() == 0 && self.spd_0_warned.insert(played) {
@@ -379,16 +346,18 @@ impl<'a> SongBuilder<'a> {
                 continue;
             };
             let place = SongPlace {
-                song_row,
+                chain_row: ChainRowPlace { song_row, entry: k },
                 track,
-                chain_row: k,
-                step: 0,
+                step_index: 0,
             };
             let phrase = self.place_entry(&mut chain, k, channel);
             let arpeggio_changed = channel.entry.as_ref().and_then(|e| e.arpeggio_changed);
             if let Some(step) = arpeggio_changed {
                 self.warnings.push(ImportWarning::at(
-                    SongPlace { step, ..place },
+                    SongPlace {
+                        step_index: step,
+                        ..place
+                    },
                     format!(
                         "{} {} STEP {step:02X} PLAYS A DIFFERENT ARPEGGIO AFTER IMPORT.",
                         pattern_name(slot),
@@ -435,13 +404,13 @@ impl<'a> SongBuilder<'a> {
         Some((id, entry.phrase.length()))
     }
 
-    fn warn_about_the_whole_song(&mut self, song: CartSong) {
+    fn warn_about_the_whole_song(&mut self, patterns: (u8, u8)) {
         if self.out_of_phrases {
             self.warnings.push(ImportWarning::general(format!(
                 "SONG NEEDS MORE THAN {MAX_PHRASES} PHRASES: SOME ENTRIES STAY EMPTY."
             )));
         }
-        let claimed_patterns = usize::from(song.patterns.1 - song.patterns.0) + 1;
+        let claimed_patterns = usize::from(patterns.1 - patterns.0) + 1;
         let claimed_sfx = self.played.len();
         let needed_sfx = self.shared.phrases.len();
         if self.chain_rows > claimed_patterns || needed_sfx > claimed_sfx {

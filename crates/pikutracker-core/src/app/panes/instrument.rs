@@ -1,9 +1,9 @@
-use super::phrase::{STEP_CELLS, StepCell, step_texts};
+use super::phrase::{STEP_CELLS, STEP_HEADING, StepCell, step_texts};
 use super::{HEADING, VALUE, draw_row_label, draw_styled_value, draw_title, stepped, typed_value};
 use crate::app::{Action, Direction, KeyContext};
 use crate::project::{
     CustomInstrument, Filters, InstrumentSound, MAX_FILTER_LEVEL, MAX_INSTRUMENT_NAME, MAX_STEPS,
-    Project, SfxInstrument, Step, WAVEFORM_SAMPLES, WaveformInstrument,
+    Project, SEMITONES_PER_OCTAVE, SfxInstrument, Step, WAVEFORM_SAMPLES, WaveformInstrument,
 };
 use crate::screen::grid::Grid;
 
@@ -19,7 +19,6 @@ const VALUE_COLUMN: usize = 5;
 const EMPTY_NAME: char = '.';
 
 const MAX_BUILT_IN_INSTRUMENT: i32 = 7;
-const SEMITONES_PER_OCTAVE: i32 = 12;
 const COARSE_SPEED: i32 = 16;
 const COARSE_LENGTH: i32 = 4;
 const COARSE_SAMPLE: i32 = 16;
@@ -216,12 +215,7 @@ impl InstrumentView {
         let field = self.field(&rows(&instrument.sound));
         let two_digits = matches!(
             field,
-            Field::Speed
-                | Field::Length
-                | Field::LoopStart
-                | Field::LoopEnd
-                | Field::Sample(_)
-                | Field::Step(_, StepCell::Instrument)
+            Field::Speed | Field::Length | Field::LoopStart | Field::LoopEnd | Field::Sample(_)
         );
         if two_digits {
             let value = typed_value(&mut self.first_digit, digit);
@@ -324,12 +318,12 @@ impl InstrumentView {
 
     pub fn draw(&self, grid: &mut Grid, project: &Project) {
         let instrument = self.shown(project);
-        draw_title(grid, 0, 0, &format!("INSTRUMENT {:02X}", self.id), true);
+        draw_title(grid, 0, 0, &format!("INSTRUMENT {:X}", self.id), true);
         let labels: Vec<(usize, &str)> = match &instrument.sound {
             InstrumentSound::Sfx(_) => vec![
                 (SETTINGS_ROW, "SPD     LEN     LOOP    TO"),
                 (FILTERS_ROW, "NZ    BZ    DT    RV    DP"),
-                (STEP_HEADING_ROW, "   NOT IN V F"),
+                (STEP_HEADING_ROW, STEP_HEADING),
             ],
             InstrumentSound::Waveform(_) => {
                 vec![(SETTINGS_ROW, "BASS"), (FILTERS_ROW, "DT    RV    DP")]
