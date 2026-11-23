@@ -68,7 +68,7 @@ impl App {
                 self.stop_following();
                 self.selection_start = Some(cell);
             }
-            None if self.focus == Focus::Phrase => self.remark = Some(NO_STEP_HERE),
+            None if self.focus == Focus::Phrase => self.remark = Some(NO_STEP_HERE.into()),
             None => {}
         }
     }
@@ -82,7 +82,7 @@ impl App {
     fn edit_selected_chain(&mut self, edit: impl FnOnce(&ChainPane, &mut Chain)) {
         match self.shown_chain_id() {
             Some(id) => edit(&self.chain, self.project.chain_mut(id)),
-            None => self.remark = Some(NO_CHAIN_HERE),
+            None => self.remark = Some(NO_CHAIN_HERE.into()),
         }
     }
 
@@ -159,7 +159,7 @@ impl App {
             Focus::Song => Some(Clipboard::Song(self.song.copy(&self.project, cells?))),
             Focus::Chain => {
                 let Some(id) = self.shown_chain_id() else {
-                    self.remark = Some(NO_CHAIN_HERE);
+                    self.remark = Some(NO_CHAIN_HERE.into());
                     return None;
                 };
                 let cells = cells?;
@@ -170,11 +170,11 @@ impl App {
             }
             Focus::Phrase => {
                 let Some(id) = self.shown_phrase_id() else {
-                    self.remark = Some(NO_PHRASE_HERE);
+                    self.remark = Some(NO_PHRASE_HERE.into());
                     return None;
                 };
                 let Some(cells) = cells else {
-                    self.remark = Some(NO_STEP_HERE);
+                    self.remark = Some(NO_STEP_HERE.into());
                     return None;
                 };
                 Some(Clipboard::Phrase {
@@ -206,7 +206,7 @@ impl App {
             return;
         }
         let Some(clipboard) = self.clipboard.clone() else {
-            self.remark = Some(NOTHING_TO_PASTE);
+            self.remark = Some(NOTHING_TO_PASTE.into());
             return;
         };
         let lost = match (&clipboard, self.focus) {
@@ -242,7 +242,7 @@ impl App {
         rows: &[Option<ChainEntry>],
     ) -> Option<usize> {
         let Some(id) = self.shown_chain_id() else {
-            self.remark = Some(NO_CHAIN_HERE);
+            self.remark = Some(NO_CHAIN_HERE.into());
             return None;
         };
         Some(self.chain.paste(self.project.chain_mut(id), columns, rows))
@@ -254,11 +254,11 @@ impl App {
         rows: &[Step],
     ) -> Option<usize> {
         let Some(id) = self.shown_phrase_id() else {
-            self.remark = Some(NO_PHRASE_HERE);
+            self.remark = Some(NO_PHRASE_HERE.into());
             return None;
         };
         if self.phrase.cell().is_none() {
-            self.remark = Some(NO_STEP_HERE);
+            self.remark = Some(NO_STEP_HERE.into());
             return None;
         }
         Some(

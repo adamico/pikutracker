@@ -239,8 +239,15 @@ impl PhrasePane {
     }
 
     pub fn is_on_the_last_instrument(&self, phrase: &Phrase) -> bool {
-        self.step_cell() == Some(StepCell::Instrument)
-            && phrase.step(self.step).instrument() == LAST_CUSTOM_INSTRUMENT
+        self.edited_instrument(phrase) == Some(LAST_CUSTOM_INSTRUMENT)
+    }
+
+    pub fn edited_instrument(&self, phrase: &Phrase) -> Option<u8> {
+        if self.pen_field() == Some(PenField::Instrument) {
+            return Some(self.pen.instrument());
+        }
+        (self.step_cell() == Some(StepCell::Instrument))
+            .then(|| phrase.step(self.step).instrument())
     }
 
     pub fn pen(&self) -> Pen {

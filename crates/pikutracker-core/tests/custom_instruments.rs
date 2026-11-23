@@ -185,6 +185,77 @@ fn nudging_a_step_instrument_past_f_stays_on_f_with_a_remark() {
     assert_eq!(support::status_line(&app), CUSTOM_INSTRUMENTS_END_AT_F);
 }
 
+fn on_the_pen_instrument() -> App {
+    phrase_app(&[UP, UP, RIGHT])
+}
+
+#[test]
+fn nudging_the_pen_instrument_past_f_stays_on_f_with_a_remark() {
+    let mut app = on_the_pen_instrument();
+    apply(&mut app, &[Action::HexDigit(0x0F), NUDGE_UP]);
+
+    assert_eq!(support::pane_text(&app, layout::PHRASE, 4), "OCT 2  INS[F]");
+    assert_eq!(support::status_line(&app), CUSTOM_INSTRUMENTS_END_AT_F);
+}
+
+#[test]
+fn setting_a_step_to_an_undefined_custom_instrument_keeps_it_with_a_remark() {
+    let app = on_instrument(0x0A);
+
+    assert_eq!(first_step(&app).instrument(), 0x0A);
+    assert_eq!(
+        support::status_line(&app),
+        "CUSTOM INSTRUMENT A IS NOT DEFINED"
+    );
+}
+
+#[test]
+fn nudging_a_step_onto_an_undefined_custom_instrument_keeps_it_with_a_remark() {
+    let mut app = on_instrument(0x09);
+    app.apply(NUDGE_UP);
+
+    assert_eq!(first_step(&app).instrument(), 0x0A);
+    assert_eq!(
+        support::status_line(&app),
+        "CUSTOM INSTRUMENT A IS NOT DEFINED"
+    );
+}
+
+#[test]
+fn setting_the_pen_to_an_undefined_custom_instrument_keeps_it_with_a_remark() {
+    let mut app = on_the_pen_instrument();
+    app.apply(Action::HexDigit(0x0C));
+
+    assert_eq!(support::pane_text(&app, layout::PHRASE, 4), "OCT 2  INS[C]");
+    assert_eq!(
+        support::status_line(&app),
+        "CUSTOM INSTRUMENT C IS NOT DEFINED"
+    );
+}
+
+#[test]
+fn setting_a_step_to_a_defined_custom_instrument_needs_no_remark() {
+    let mut project = Project::new();
+    project.set_custom_instrument(0x0A, Some(sfx_instrument()));
+    let mut app = App::with_project(project);
+    apply(
+        &mut app,
+        &[
+            Action::HexDigit(0),
+            Action::FocusPrevious,
+            Action::HexDigit(0),
+            Action::FocusPrevious,
+            C_KEY,
+            UP,
+            RIGHT,
+            Action::HexDigit(0x0A),
+        ],
+    );
+
+    assert_eq!(first_step(&app).instrument(), 0x0A);
+    assert!(!support::status_line(&app).contains("NOT DEFINED"));
+}
+
 #[test]
 fn jumping_past_instrument_f_stays_on_f_with_a_remark() {
     let mut app = instrument_view(0x0F);

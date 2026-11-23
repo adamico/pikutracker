@@ -53,6 +53,7 @@ use panes::song::SongPane;
 use selection::CellPosition;
 use shown::{CursorPlaces, Shown};
 use status_line::StatusLine;
+use std::borrow::Cow;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -99,7 +100,7 @@ pub struct App {
     playhead: Option<Playhead>,
     follow: bool,
     previewing: bool,
-    remark: Option<&'static str>,
+    remark: Option<Cow<'static, str>>,
     notice: Option<Notice>,
     question: Option<Question>,
     speed_entry: Option<SpeedEntry>,
@@ -349,13 +350,13 @@ impl App {
 
     fn toggle_follow(&mut self) {
         self.follow = !self.follow;
-        self.remark = Some(if self.follow { FOLLOW_ON } else { FOLLOW_OFF });
+        self.remark = Some(if self.follow { FOLLOW_ON } else { FOLLOW_OFF }.into());
     }
 
     fn stop_following(&mut self) {
         if self.follow {
             self.follow = false;
-            self.remark = Some(FOLLOW_OFF);
+            self.remark = Some(FOLLOW_OFF.into());
         }
     }
 
@@ -422,7 +423,7 @@ impl App {
     fn undo(&mut self) {
         match self.history.undo(&mut self.project) {
             Some(place) => self.return_to(place),
-            None => self.remark = Some(NOTHING_TO_UNDO),
+            None => self.remark = Some(NOTHING_TO_UNDO.into()),
         }
         self.show_claim_in_cart_view();
     }
@@ -430,7 +431,7 @@ impl App {
     fn redo(&mut self) {
         match self.history.redo(&mut self.project) {
             Some(place) => self.return_to(place),
-            None => self.remark = Some(NOTHING_TO_REDO),
+            None => self.remark = Some(NOTHING_TO_REDO.into()),
         }
         self.show_claim_in_cart_view();
     }
@@ -639,7 +640,7 @@ impl App {
 
     fn open_instrument_view(&mut self, instrument: u8) {
         if instrument < FIRST_CUSTOM_INSTRUMENT {
-            self.remark = Some(BUILT_IN_INSTRUMENT);
+            self.remark = Some(BUILT_IN_INSTRUMENT.into());
             return;
         }
         self.selection_start = None;
@@ -672,7 +673,7 @@ impl App {
             Action::OctaveUp => self.phrase.nudge_octave(true),
             Action::OctaveDown => self.phrase.nudge_octave(false),
             Action::Jump(Direction::Right) if view.id() == LAST_CUSTOM_INSTRUMENT => {
-                self.remark = Some(CUSTOM_INSTRUMENTS_END_AT_F);
+                self.remark = Some(CUSTOM_INSTRUMENTS_END_AT_F.into());
             }
             Action::Jump(direction) => {
                 let id = match direction {
@@ -718,9 +719,26 @@ impl App {
         match self.focus {
             Focus::Song => self.song.type_digit(&mut self.project, digit),
             Focus::Chain => self.edit_chain(|pane, chain| pane.type_digit(chain, digit)),
-            Focus::Phrase if self.phrase.is_on_the_pen() => self.phrase.type_pen_digit(digit),
-            Focus::Phrase => self.edit_phrase(|pane, phrase| pane.type_digit(phrase, digit)),
+            Focus::Phrase if self.phrase.is_on_the_pen() => {
+                self.phrase.type_pen_digit(digit);
+                self.remark_an_undefined_instrument();
+            }
+            Focus::Phrase => {
+                self.edit_phrase(|pane, phrase| pane.type_digit(phrase, digit));
+                self.remark_an_undefined_instrument();
+            }
             Focus::RightSlot => {}
+        }
+    }
+
+    fn remark_an_undefined_instrument(&mut self) {
+        let Some(instrument) = self.phrase.edited_instrument(&self.shown_phrase()) else {
+            return;
+        };
+        let undefined = instrument >= FIRST_CUSTOM_INSTRUMENT
+            && self.project.custom_instrument(instrument).is_none();
+        if undefined {
+            self.remark = Some(format!("CUSTOM INSTRUMENT {instrument:X} IS NOT DEFINED").into());
         }
     }
 
@@ -732,29 +750,32 @@ impl App {
         match self.focus {
             Focus::Song => self.song.nudge(&mut self.project, up, coarse),
             Focus::Chain => self.edit_chain(|pane, chain| pane.nudge(chain, up, coarse)),
-            Focus::Phrase if self.phrase.is_on_the_pen() => self.phrase.nudge_pen(up),
             Focus::Phrase if up && self.goes_past_the_last_instrument() => {
-                self.remark = Some(CUSTOM_INSTRUMENTS_END_AT_F);
+                self.remark = Some(CUSTOM_INSTRUMENTS_END_AT_F.into());
             }
-            Focus::Phrase => self.edit_phrase(|pane, phrase| pane.nudge(phrase, up, coarse)),
+            Focus::Phrase if self.phrase.is_on_the_pen() => {
+                self.phrase.nudge_pen(up);
+                self.remark_an_undefined_instrument();
+            }
+            Focus::Phrase => {
+                self.edit_phrase(|pane, phrase| pane.nudge(phrase, up, coarse));
+                self.remark_an_undefined_instrument();
+            }
             Focus::RightSlot => {}
         }
     }
 
     fn goes_past_the_last_instrument(&self) -> bool {
-        self.shown_phrase_id().is_some_and(|id| {
-            self.phrase
-                .is_on_the_last_instrument(self.project.phrase(id))
-        })
+        self.phrase.is_on_the_last_instrument(&self.shown_phrase())
     }
 
     fn edit_chain(&mut self, edit: impl FnOnce(&mut ChainPane, &mut Chain)) {
         let Some(id) = self.shown_chain_id() else {
-            self.remark = Some(NO_CHAIN_HERE);
+            self.remark = Some(NO_CHAIN_HERE.into());
             return;
         };
         if self.entry_under_chain_cursor().is_none() && !self.chain.edits_empty_entries() {
-            self.remark = Some(NO_PHRASE_HERE);
+            self.remark = Some(NO_PHRASE_HERE.into());
             return;
         }
         edit(&mut self.chain, self.project.chain_mut(id));
@@ -763,7 +784,7 @@ impl App {
     fn edit_phrase(&mut self, edit: impl FnOnce(&mut PhrasePane, &mut Phrase)) {
         match self.shown_phrase_id() {
             Some(id) => edit(&mut self.phrase, self.project.phrase_mut(id)),
-            None => self.remark = Some(NO_PHRASE_HERE),
+            None => self.remark = Some(NO_PHRASE_HERE.into()),
         }
     }
 
@@ -801,7 +822,7 @@ impl App {
     fn play_song(&mut self) {
         let from_row = self.song.row();
         if self.project.song_row_is_empty(from_row) {
-            self.remark = Some(NOTHING_TO_PLAY);
+            self.remark = Some(NOTHING_TO_PLAY.into());
             return;
         }
         let project = self.project_for_player();
@@ -810,7 +831,7 @@ impl App {
 
     fn play_chain(&mut self) {
         let Some(chain) = self.shown_chain_id().filter(|_| self.shown_chain_sounds()) else {
-            self.remark = Some(NOTHING_TO_PLAY);
+            self.remark = Some(NOTHING_TO_PLAY.into());
             return;
         };
         let in_song_row = self.chain_in_song_row_shown();
@@ -846,7 +867,7 @@ impl App {
             .shown_phrase_id()
             .filter(|id| !self.project.phrase(*id).is_silent())
         else {
-            self.remark = Some(NOTHING_TO_PLAY);
+            self.remark = Some(NOTHING_TO_PLAY.into());
             return;
         };
         let project = self.project_for_player();
@@ -1058,7 +1079,7 @@ impl App {
         if let Some(notice) = notice.filter(|notice| notice.is_persistent()) {
             return StatusLine::Notice(notice);
         }
-        if let Some(remark) = self.remark {
+        if let Some(remark) = &self.remark {
             return StatusLine::Remark(remark);
         }
         if let Some(notice) = notice {
