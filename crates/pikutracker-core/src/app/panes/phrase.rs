@@ -1,26 +1,28 @@
 use super::{
-    DIMMED, EMPTY, HEADING, LOOP_MARK, SELECTED, TITLE_NUMBER_WIDTH, VALUE, draw_numbered_title,
-    draw_out_of_range_flag, draw_row_label, draw_styled_value, nudged_id, stepped, title_style,
-    typed_value,
+    DIMMED, EFFECT_NAMES, EMPTY, HEADING, LOOP_MARK, PEN_LABEL, SELECTED, VALUE,
+    draw_numbered_title, draw_out_of_range_flag, draw_row_label, draw_styled_value, nudged_id,
+    stepped, typed_value,
 };
 use crate::app::layout::Area;
 use crate::app::selection::{CellPosition, CellRange};
 use crate::app::{Direction, KeyContext};
+use crate::pen::Pen;
 use crate::project::{
-    FIRST_CUSTOM_INSTRUMENT, LAST_CUSTOM_INSTRUMENT, MAX_STEPS, NOTE_NAMES, Phrase, PhraseId, Step,
+    FIRST_CUSTOM_INSTRUMENT, LAST_CUSTOM_INSTRUMENT, MAX_STEPS, NOTE_NAMES, Phrase, PhraseId,
+    SEMITONES_PER_OCTAVE, Step,
 };
 use crate::screen::grid::Grid;
-use crate::settings::{DEFAULT_OCTAVE, MAX_OCTAVE};
 use std::ops::RangeInclusive;
 
 const TITLE_NAME: &str = "PHRASE";
 const FIRST_HEADER_ROW: usize = 1;
+const FIRST_PEN_ROW: usize = FIRST_HEADER_ROW + HEADER_LABELS.len();
 const STEP_HEADING_ROW: usize = FIRST_HEADER_ROW + HEADER_CELLS.len();
 const FIRST_STEP_ROW: usize = STEP_HEADING_ROW + 1;
 const OUT_OF_RANGE_COLUMN: usize = 20;
 const BPM_COLUMN: usize = 20;
+const PEN_NAME_COLUMN: usize = 13;
 
-const SEMITONES_PER_OCTAVE: i32 = 12;
 const COARSE_SPEED: i32 = 16;
 const COARSE_LOOP: i32 = 4;
 const LOOP_MARK_COLUMN: usize = 2;
@@ -52,9 +54,18 @@ enum HeaderCell {
     Detune,
     Reverb,
     Dampen,
+    Pen(PenCell),
 }
 
-const HEADER_CELLS: [&[(HeaderCell, usize)]; 3] = [
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PenCell {
+    Octave,
+    Instrument,
+    Volume,
+    Effect,
+}
+
+const HEADER_CELLS: [&[(HeaderCell, usize)]; 5] = [
     &[
         (HeaderCell::Speed, 4),
         (HeaderCell::LoopStart, 13),
@@ -66,6 +77,14 @@ const HEADER_CELLS: [&[(HeaderCell, usize)]; 3] = [
         (HeaderCell::Reverb, 17),
         (HeaderCell::Dampen, 27),
     ],
+    &[
+        (HeaderCell::Pen(PenCell::Octave), 4),
+        (HeaderCell::Pen(PenCell::Instrument), 11),
+    ],
+    &[
+        (HeaderCell::Pen(PenCell::Volume), 4),
+        (HeaderCell::Pen(PenCell::Effect), 11),
+    ],
 ];
 
 const HEADER_LABELS: [&[(&str, usize)]; 3] = [
@@ -74,39 +93,25 @@ const HEADER_LABELS: [&[(&str, usize)]; 3] = [
     &[("DETUNE", 0), ("REVERB", 10), ("DAMPEN", 20)],
 ];
 
+const PEN_LABELS: [&[(&str, usize)]; 2] = [&[("OCT", 0), ("INS", 7)], &[("VOL", 0), ("FX", 7)]];
+
 #[derive(Clone, Copy, Debug)]
 pub struct PhraseView<'a> {
     pub id: Option<PhraseId>,
     pub phrase: &'a Phrase,
     pub transpose: i8,
     pub playing_step: Option<usize>,
+    pub pen_instrument_name: Option<&'a str>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct PhrasePane {
     step: usize,
     column: usize,
     header_row: Option<usize>,
     on_title: bool,
-    octave: u8,
-    instrument: u8,
-    volume: u8,
+    pen: Pen,
     first_digit: Option<u8>,
-}
-
-impl Default for PhrasePane {
-    fn default() -> Self {
-        Self {
-            step: 0,
-            column: 0,
-            header_row: None,
-            on_title: false,
-            octave: DEFAULT_OCTAVE,
-            instrument: 2,
-            volume: 5,
-            first_digit: None,
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -226,11 +231,7 @@ impl PhrasePane {
         if self.step_cell() != Some(StepCell::Pitch) {
             return;
         }
-        let pitch = i32::from(self.octave) * SEMITONES_PER_OCTAVE + i32::from(piano_key);
-        let step = phrase.step_mut(self.step);
-        step.set_pitch(pitch);
-        step.set_instrument(i32::from(self.instrument));
-        step.set_volume(i32::from(self.volume));
+        self.pen.write_note(phrase.step_mut(self.step), piano_key);
         self.step = stepped(self.step, 1, MAX_STEPS);
     }
 
@@ -238,7 +239,7 @@ impl PhrasePane {
         (self.step_cell() == Some(StepCell::Instrument)).then(|| {
             let step = phrase.step(self.step);
             if step.is_silent() {
-                self.instrument
+                self.pen.instrument()
             } else {
                 step.instrument()
             }
@@ -250,16 +251,52 @@ impl PhrasePane {
             && phrase.step(self.step).instrument() == LAST_CUSTOM_INSTRUMENT
     }
 
-    pub fn octave(&self) -> u8 {
-        self.octave
+    pub fn pen(&self) -> Pen {
+        self.pen
     }
 
-    pub fn set_octave(&mut self, octave: u8) {
-        self.octave = octave.min(MAX_OCTAVE);
+    pub fn set_pen(&mut self, pen: Pen) {
+        self.pen = pen;
     }
 
-    pub fn change_octave(&mut self, delta: i8) {
-        self.octave = self.octave.saturating_add_signed(delta).min(MAX_OCTAVE);
+    pub fn change_octave(&mut self, delta: i32) {
+        self.pen.change_octave(delta);
+    }
+
+    pub fn is_on_the_pen(&self) -> bool {
+        self.pen_cell().is_some()
+    }
+
+    fn pen_cell(&self) -> Option<PenCell> {
+        match self.header_cell()? {
+            HeaderCell::Pen(cell) => Some(cell),
+            _ => None,
+        }
+    }
+
+    pub fn type_pen_digit(&mut self, digit: u8) {
+        self.set_pen_cell(i32::from(digit));
+    }
+
+    pub fn nudge_pen(&mut self, up: bool) {
+        let value = match self.pen_cell() {
+            Some(PenCell::Octave) => self.pen.octave(),
+            Some(PenCell::Instrument) => self.pen.instrument(),
+            Some(PenCell::Volume) => self.pen.volume(),
+            Some(PenCell::Effect) => self.pen.effect(),
+            None => return,
+        };
+        self.set_pen_cell(i32::from(value) + if up { 1 } else { -1 });
+    }
+
+    fn set_pen_cell(&mut self, value: i32) {
+        match self.pen_cell() {
+            Some(PenCell::Octave) => self.pen.set_octave(value),
+            Some(PenCell::Instrument) => self.pen.set_instrument(value),
+            Some(PenCell::Volume) => self.pen.set_volume(value),
+            Some(PenCell::Effect) => self.pen.set_effect(value),
+            None => {}
+        }
     }
 
     pub fn finish_typing(&mut self) {
@@ -317,7 +354,7 @@ impl PhrasePane {
             (_, Some(HeaderCell::Detune)) => i32::from(filters.detune()),
             (_, Some(HeaderCell::Reverb)) => i32::from(filters.reverb()),
             (_, Some(HeaderCell::Dampen)) => i32::from(filters.dampen()),
-            (None, None) => 0,
+            (_, Some(HeaderCell::Pen(_))) | (None, None) => 0,
         }
     }
 
@@ -334,7 +371,7 @@ impl PhrasePane {
             Some(HeaderCell::Detune) => phrase.filters_mut().set_detune(value),
             Some(HeaderCell::Reverb) => phrase.filters_mut().set_reverb(value),
             Some(HeaderCell::Dampen) => phrase.filters_mut().set_dampen(value),
-            None => {}
+            Some(HeaderCell::Pen(_)) | None => {}
         }
     }
 
@@ -344,13 +381,16 @@ impl PhrasePane {
             StepCell::Pitch => step.set_pitch(value),
             StepCell::Instrument => {
                 step.set_instrument(value);
-                self.instrument = step.instrument();
+                self.pen.set_instrument(i32::from(step.instrument()));
             }
             StepCell::Volume => {
                 step.set_volume(value);
-                self.volume = step.volume();
+                self.pen.set_volume(i32::from(step.volume()));
             }
-            StepCell::Effect => step.set_effect(value),
+            StepCell::Effect => {
+                step.set_effect(value);
+                self.pen.set_effect(i32::from(step.effect()));
+            }
         }
     }
 
@@ -427,14 +467,13 @@ impl PhrasePane {
             phrase,
             transpose,
             playing_step,
+            pen_instrument_name,
         } = view;
         let number = id.map(PhraseId::number);
         let on_number = focused && self.on_title;
         draw_numbered_title(grid, area, TITLE_NAME, number, focused, on_number);
-        let octave = format!("  OCT {}", self.octave);
-        let octave_column = area.column + TITLE_NAME.len() + 1 + TITLE_NUMBER_WIDTH + 1;
-        grid.put(octave_column, area.row, &octave, title_style(focused));
         self.draw_header(grid, area, focused, phrase);
+        self.draw_pen_names(grid, area, pen_instrument_name);
         grid.put(
             area.column,
             area.row + STEP_HEADING_ROW,
@@ -482,6 +521,12 @@ impl PhrasePane {
                 grid.put(area.column + offset, screen_row, label, HEADING);
             }
         }
+        for (row, labels) in PEN_LABELS.iter().enumerate() {
+            for (label, offset) in *labels {
+                let screen_row = area.row + FIRST_PEN_ROW + row;
+                grid.put(area.column + offset, screen_row, label, PEN_LABEL);
+            }
+        }
         let bpm = format!("BPM {}", phrase.bpm());
         let bpm_row = area.row + FIRST_HEADER_ROW;
         grid.put(area.column + BPM_COLUMN, bpm_row, &bpm, HEADING);
@@ -497,6 +542,10 @@ impl PhrasePane {
                     HeaderCell::Detune => filters.detune().to_string(),
                     HeaderCell::Reverb => filters.reverb().to_string(),
                     HeaderCell::Dampen => filters.dampen().to_string(),
+                    HeaderCell::Pen(PenCell::Octave) => self.pen.octave().to_string(),
+                    HeaderCell::Pen(PenCell::Instrument) => format!("{:X}", self.pen.instrument()),
+                    HeaderCell::Pen(PenCell::Volume) => self.pen.volume().to_string(),
+                    HeaderCell::Pen(PenCell::Effect) => self.pen.effect().to_string(),
                 };
                 let is_cursor = focused
                     && self.header_cell().is_some()
@@ -513,6 +562,15 @@ impl PhrasePane {
                 );
             }
         }
+    }
+
+    fn draw_pen_names(&self, grid: &mut Grid, area: Area, instrument_name: Option<&str>) {
+        let column = area.column + PEN_NAME_COLUMN;
+        if let Some(name) = instrument_name {
+            grid.put(column, area.row + FIRST_PEN_ROW, name, PEN_LABEL);
+        }
+        let effect = EFFECT_NAMES[usize::from(self.pen.effect())];
+        grid.put(column, area.row + FIRST_PEN_ROW + 1, effect, PEN_LABEL);
     }
 }
 

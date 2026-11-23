@@ -13,8 +13,8 @@ const TAB: Action = Action::FocusNext;
 const BACK: Action = Action::FocusPrevious;
 const SPACE: Action = Action::PlayFocusedPane;
 
-const PHRASE_SETTINGS_ROWS: usize = 3;
-const FIRST_STEP_LINE: usize = 5;
+const PHRASE_HEADER_ROWS: usize = 5;
+const FIRST_STEP_LINE: usize = 7;
 
 fn number(value: u8) -> [Action; 2] {
     [Action::HexDigit(value >> 4), Action::HexDigit(value & 0xF)]
@@ -58,7 +58,7 @@ fn to_the_chain_title() -> Vec<Action> {
 }
 
 fn to_the_phrase_title() -> Vec<Action> {
-    [&[TAB, TAB][..], &[UP; PHRASE_SETTINGS_ROWS + 1]].concat()
+    [&[TAB, TAB][..], &[UP; PHRASE_HEADER_ROWS + 1]].concat()
 }
 
 #[test]
@@ -152,7 +152,7 @@ fn a_note_goes_into_the_phrase_opened_by_number_and_undo_returns_to_it() {
 
     apply(
         &mut app,
-        &[DOWN, DOWN, DOWN, DOWN, DOWN, Action::PianoKey(0)],
+        &[&[DOWN; PHRASE_HEADER_ROWS + 2][..], &[Action::PianoKey(0)]].concat(),
     );
     assert_eq!(app.project().phrase(PhraseId::new(5)).step(1).pitch(), 24);
     assert_eq!(
