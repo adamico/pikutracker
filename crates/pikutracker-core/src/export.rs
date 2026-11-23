@@ -3,8 +3,8 @@ use crate::cart::{
     SLOTS, SPEED_BYTE, WAVEFORM_INSTRUMENT_BIT, note_word,
 };
 use crate::project::{
-    ChainEntry, Claim, CustomInstrument, Filters, InstrumentSound, MAX_PITCH, MAX_STEPS, Phrase,
-    Project, SongRowEnding, SongRowMarks, TRACKS, custom_instrument_of_slot,
+    ChainEntry, ChainRowPlace, Claim, CustomInstrument, Filters, InstrumentSound, MAX_PITCH,
+    MAX_STEPS, Phrase, Project, SongRowEnding, SongRowMarks, TRACKS, custom_instrument_of_slot,
     slot_of_custom_instrument,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -233,7 +233,7 @@ pub fn needs(project: &Project) -> ExportNeeds {
 #[derive(Clone, Copy)]
 struct SongPattern {
     song_row: usize,
-    chain_row: Option<usize>,
+    chain_row: Option<ChainRowPlace>,
     marks: SongRowMarks,
 }
 
@@ -247,8 +247,10 @@ fn song_patterns(project: &Project) -> Vec<SongPattern> {
 }
 
 fn song_row_patterns(project: &Project, song_row: usize) -> Vec<SongPattern> {
-    let mut chain_rows: Vec<Option<usize>> =
-        project.played_chain_rows(song_row).map(Some).collect();
+    let mut chain_rows: Vec<Option<ChainRowPlace>> = project
+        .played_chain_rows(song_row)
+        .map(|entry| Some(ChainRowPlace { song_row, entry }))
+        .collect();
     if chain_rows.is_empty() {
         chain_rows.push(None);
     }
@@ -275,10 +277,7 @@ fn compile_song(
 ) -> CompiledSong {
     let rows: Vec<Option<ExportedChainRow>> = song_patterns
         .iter()
-        .map(|place| {
-            let chain_row = place.chain_row?;
-            Some(ExportedChainRow::of(project, place.song_row, chain_row))
-        })
+        .map(|place| Some(ExportedChainRow::of(project, place.chain_row?)))
         .collect();
     let mut song = CompiledSong {
         instruments: rows
@@ -300,7 +299,6 @@ fn compile_song(
             song.patterns.push(pattern);
             continue;
         };
-        let song_row = place.song_row;
         for (track, played) in row.entries.iter().enumerate() {
             let Some(entry) = *played else {
                 continue;
@@ -311,8 +309,8 @@ fn compile_song(
                     phrase: entry.phrase().number(),
                     step,
                     track,
-                    song_row,
-                    chain_row,
+                    song_row: chain_row.song_row,
+                    chain_row: chain_row.entry,
                 });
             }
             let ending = row.ending(project, track);
@@ -333,10 +331,10 @@ struct ExportedChainRow {
 }
 
 impl ExportedChainRow {
-    fn of(project: &Project, song_row: usize, chain_row: usize) -> Self {
-        let entries =
-            std::array::from_fn(|track| project.chain_row_entry(song_row, track, chain_row));
-        let ticks = project.chain_row_ticks(song_row, chain_row);
+    fn of(project: &Project, place: ChainRowPlace) -> Self {
+        let ChainRowPlace { song_row, entry } = place;
+        let entries = std::array::from_fn(|track| project.chain_row_entry(song_row, track, entry));
+        let ticks = project.chain_row_ticks(song_row, entry);
         let loops = |entry: &ChainEntry| project.phrase(entry.phrase()).loops();
         let all_loop = entries.iter().flatten().all(loops);
         let length_track = entries

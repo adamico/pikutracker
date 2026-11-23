@@ -3,8 +3,8 @@ mod rebuild;
 
 use crate::cart::{Cart, Pattern, SLOTS};
 use crate::project::{
-    Chain, ChainEntry, ChainId, Claim, Phrase, PhraseId, Project, SongPlace, SongRowEnding,
-    SongRowMarks, TRACKS, TargetCart, custom_instrument_of_slot,
+    Chain, ChainEntry, ChainId, ChainRowPlace, Claim, Phrase, PhraseId, Project, SongPlace,
+    SongRowEnding, SongRowMarks, TRACKS, TargetCart, custom_instrument_of_slot,
 };
 use crate::wording::counted;
 use instruments::imported_instrument;
@@ -182,7 +182,7 @@ fn lost_step_warning(
     phrase: Option<(PhraseId, usize)>,
 ) -> ImportWarning {
     let track = track_name(place.track);
-    let (lost, step) = match phrase {
+    let (lost, step_index) = match phrase {
         Some((id, length)) => (
             format!("{track} PHRASE {:02X} LOST ITS LAST STEP.", id.number()),
             length - 1,
@@ -191,7 +191,10 @@ fn lost_step_warning(
     };
     let ends = if is_last_row { "ENDS" } else { "SPLITS" };
     ImportWarning::at(
-        SongPlace { step, ..place },
+        SongPlace {
+            step_index,
+            ..place
+        },
         format!("{} {ends} INSIDE A STEP: {lost}", pattern_name(pattern)),
     )
 }
@@ -284,10 +287,12 @@ impl<'a> SongBuilder<'a> {
                     pattern_name(slot)
                 ),
                 place: track.map(|track| SongPlace {
-                    song_row: row,
+                    chain_row: ChainRowPlace {
+                        song_row: row,
+                        entry: 0,
+                    },
                     track,
-                    chain_row: 0,
-                    step: 0,
+                    step_index: 0,
                 }),
             });
         }
@@ -305,10 +310,9 @@ impl<'a> SongBuilder<'a> {
 
     fn warn_about_sfx(&mut self, played: u8, song_row: usize, track: usize) {
         let place = SongPlace {
-            song_row,
+            chain_row: ChainRowPlace { song_row, entry: 0 },
             track,
-            chain_row: 0,
-            step: 0,
+            step_index: 0,
         };
         let sfx = self.cart.sfx(played);
         if sfx.speed() == 0 && self.spd_0_warned.insert(played) {
@@ -342,16 +346,18 @@ impl<'a> SongBuilder<'a> {
                 continue;
             };
             let place = SongPlace {
-                song_row,
+                chain_row: ChainRowPlace { song_row, entry: k },
                 track,
-                chain_row: k,
-                step: 0,
+                step_index: 0,
             };
             let phrase = self.place_entry(&mut chain, k, channel);
             let arpeggio_changed = channel.entry.as_ref().and_then(|e| e.arpeggio_changed);
             if let Some(step) = arpeggio_changed {
                 self.warnings.push(ImportWarning::at(
-                    SongPlace { step, ..place },
+                    SongPlace {
+                        step_index: step,
+                        ..place
+                    },
                     format!(
                         "{} {} STEP {step:02X} PLAYS A DIFFERENT ARPEGGIO AFTER IMPORT.",
                         pattern_name(slot),

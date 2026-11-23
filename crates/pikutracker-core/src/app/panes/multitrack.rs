@@ -5,7 +5,7 @@ use super::{
 };
 use crate::app::Direction;
 use crate::app::layout::Area;
-use crate::multitrack::{Line, TimedStep, Timeline};
+use crate::multitrack::{MultitrackLine, TimedStep, Timeline};
 use crate::project::{Project, Step, TRACKS};
 use crate::screen::grid::{Grid, Style};
 
@@ -30,10 +30,6 @@ pub struct MultitrackView<'a> {
 }
 
 impl MultitrackPane {
-    pub fn track(&self) -> usize {
-        self.track
-    }
-
     pub fn step<'a>(&self, timeline: &'a Timeline) -> Option<&'a TimedStep> {
         timeline.step_sounding_at(self.track, self.tick)
     }
@@ -78,7 +74,7 @@ impl MultitrackPane {
             .map_or(tick, |step| step.start);
     }
 
-    fn line(&self, lines: &[Line]) -> usize {
+    fn line(&self, lines: &[MultitrackLine]) -> usize {
         lines
             .partition_point(|line| line.tick <= self.tick)
             .saturating_sub(1)
@@ -95,7 +91,7 @@ impl MultitrackPane {
         let song_row = lines
             .get(line)
             .and_then(|line| view.timeline.chain_row_at(line.tick))
-            .map_or(0, |span| span.song_row);
+            .map_or(0, |span| span.place.song_row);
         let title = format!("MULTITRACK  ROW {song_row:02X}");
         draw_title(grid, area.column, area.row, &title, focused);
         for track in 0..TRACKS {

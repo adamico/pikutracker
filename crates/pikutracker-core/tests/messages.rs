@@ -2,8 +2,8 @@ mod support;
 
 use pikutracker_core::app::layout;
 use pikutracker_core::app::{Action, App, Direction, LogItem, Report, Severity};
-use pikutracker_core::project::SongPlace;
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
+use pikutracker_core::project::{ChainRowPlace, SongPlace};
 use pikutracker_core::screen::palette::Colour;
 use std::time::Duration;
 use support::{pane_text, status_line};
@@ -246,10 +246,12 @@ fn project_with_a_located_phrase() -> Project {
 fn enter_on_an_item_jumps_to_its_location_and_the_panes_stay_usable() {
     let mut app = App::with_project(project_with_a_located_phrase());
     let location = SongPlace {
-        song_row: 1,
+        chain_row: ChainRowPlace {
+            song_row: 1,
+            entry: 2,
+        },
         track: 2,
-        chain_row: 2,
-        step: 5,
+        step_index: 5,
     };
     app.report(Report::failure("EXPORT FAILED").with_items(vec![
             LogItem::new(Severity::Failure, "T3 ROW 01 STEP 05: ABOVE D#5")

@@ -205,9 +205,9 @@ impl App {
     }
 
     fn show_song_place(&mut self, place: SongPlace) {
-        self.song.jump_to(place.song_row, place.track);
-        self.chain.jump_to(place.chain_row);
-        self.phrase.jump_to(place.step);
+        self.song.jump_to(place.chain_row.song_row, place.track);
+        self.chain.jump_to(place.chain_row.entry);
+        self.phrase.jump_to(place.step_index);
         self.show_what_the_cursors_point_at();
     }
 
@@ -326,9 +326,9 @@ impl App {
         let Some(playhead) = self.playhead else {
             return;
         };
-        if let Some((row, k)) = playhead.chain_row {
-            self.song.follow(row);
-            self.chain.follow(k);
+        if let Some(place) = playhead.chain_row {
+            self.song.follow(place.song_row);
+            self.chain.follow(place.entry);
         }
         if let Some(place) = playhead.chain_alone {
             self.shown.open_chain(place.chain);
@@ -916,21 +916,18 @@ impl App {
     }
 
     fn show_what_the_multitrack_cursor_points_at(&mut self, timeline: &Timeline) {
-        let track = self.multitrack.track();
         let Some(step) = self.multitrack.step(timeline) else {
             return;
         };
         let place = step.place;
-        self.show_song_place(SongPlace {
-            song_row: place.song_row,
-            track,
-            chain_row: place.chain_row,
-            step: place.step,
-        });
-        if let Some(chain) = self.project.song_cell(place.song_row, track) {
+        self.show_song_place(place);
+        if let Some(chain) = self
+            .project
+            .song_cell(place.chain_row.song_row, place.track)
+        {
             self.shown.open_chain(chain);
         }
-        self.shown.open_phrase(place.phrase);
+        self.shown.open_phrase(step.phrase);
     }
 
     fn shows_multitrack(&self) -> bool {
@@ -943,9 +940,9 @@ impl App {
         if let Some(place) = playhead.chain_alone {
             return (place.chain == shown).then_some(place.entry);
         }
-        let (row, k) = playhead.chain_row?;
-        let in_song_row = row == self.song.row() && self.chain_in_song_row_shown();
-        in_song_row.then_some(k)
+        let place = playhead.chain_row?;
+        let in_song_row = place.song_row == self.song.row() && self.chain_in_song_row_shown();
+        in_song_row.then_some(place.entry)
     }
 
     fn chain_in_song_row_shown(&self) -> bool {
@@ -1081,8 +1078,7 @@ impl App {
 }
 
 fn playhead_tick(timeline: &Timeline, playhead: &Playhead) -> Option<u32> {
-    let (song_row, chain_row) = playhead.chain_row?;
-    timeline.tick_of(song_row, chain_row, playhead.chain_row_tick)
+    timeline.tick_of(playhead.chain_row?, playhead.chain_row_tick)
 }
 
 fn next_held_index(

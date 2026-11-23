@@ -482,11 +482,16 @@ pub struct TargetCart {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SongPlace {
+pub struct ChainRowPlace {
     pub song_row: usize,
+    pub entry: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SongPlace {
+    pub chain_row: ChainRowPlace,
     pub track: usize,
-    pub chain_row: usize,
-    pub step: usize,
+    pub step_index: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
