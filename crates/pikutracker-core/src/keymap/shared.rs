@@ -111,11 +111,6 @@ pub(super) fn typed_characters() -> Vec<Binding> {
         (KeyContext::ClaimText, Key::Backspace, Action::Backspace),
         (KeyContext::ClaimText, Key::Char('-'), Action::TypeChar('-')),
         (KeyContext::ClaimText, Key::Char('='), Action::SuggestClaim),
-        (
-            KeyContext::SongPicker,
-            Key::Char('p'),
-            Action::PlayFocusedPane,
-        ),
     ]
     .map(|(context, key, action)| in_context(context, key, action));
     digits.chain(others).collect()
