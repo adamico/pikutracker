@@ -1,6 +1,6 @@
 use crate::project::{
-    CHAIN_ENTRIES, ChainEntry, FIRST_CUSTOM_INSTRUMENT, Filters, InstrumentSound, MAX_STEPS,
-    Phrase, PhraseId, Project, SfxInstrument, Step, TRACKS, WaveformInstrument,
+    ChainEntry, FIRST_CUSTOM_INSTRUMENT, Filters, InstrumentSound, MAX_STEPS, Phrase, PhraseId,
+    Project, SfxInstrument, Step, TRACKS, WaveformInstrument,
 };
 use crate::synth::{
     Instrument, Instruments, Note, SAMPLE_RATE, SAMPLES_PER_TICK, Sound, Voice, Waveform,
@@ -249,16 +249,13 @@ impl Playback {
                 .or_else(|| first_chain_row(project, self.row, 0))
                 .map(|k| (self.row, k)),
             Route::Song => {
-                let emptied = project.song_row_is_empty(self.row);
-                if let Some(k) = later_in_row.filter(|_| !emptied) {
+                if let Some(k) = later_in_row {
                     return Some((self.row, k));
                 }
-                let next_row = self.row + 1;
-                let row = if emptied || project.song_row_is_empty(next_row) {
-                    project.song_loop_row()?
-                } else {
-                    next_row
-                };
+                if project.song_row_is_empty(self.row) {
+                    return None;
+                }
+                let row = project.song_row_after(self.row)?;
                 Some((row, first_chain_row(project, row, 0)?))
             }
         }
@@ -332,7 +329,7 @@ impl Playback {
 }
 
 fn first_chain_row(project: &Project, row: usize, from: usize) -> Option<usize> {
-    (from..CHAIN_ENTRIES).find(|&k| project.chain_row_ticks(row, k) > 0)
+    project.played_chain_rows(row).find(|&k| k >= from)
 }
 
 #[derive(Clone, Debug)]

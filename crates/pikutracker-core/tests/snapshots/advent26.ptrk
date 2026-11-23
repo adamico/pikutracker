@@ -1,7 +1,6 @@
 (
     version: 1,
     default_speed: 16,
-    song_loop_row: Some(1),
     target_cart: Some((
         path: "advent26.p8",
         claim: (
@@ -33,6 +32,7 @@
         (
             row: 1,
             tracks: "03 04 02 02",
+            loop_start: true,
         ),
         (
             row: 2,
@@ -53,6 +53,7 @@
         (
             row: 6,
             tracks: "0A 0B 02 02",
+            ending: Some(LoopBack),
         ),
     ],
     chains: [

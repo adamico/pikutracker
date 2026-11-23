@@ -3,7 +3,8 @@ use pikutracker_core::cart::Cart;
 use pikutracker_core::export::{export, needs};
 use pikutracker_core::project::{
     Chain, ChainEntry, ChainId, Claim, CustomInstrument, FIRST_CUSTOM_INSTRUMENT, InstrumentSound,
-    PhraseId, Project, SfxInstrument, Step, TargetCart, WaveformInstrument,
+    PhraseId, Project, SfxInstrument, SongRowEnding, SongRowMarks, Step, TargetCart,
+    WaveformInstrument,
 };
 use sha1::{Digest, Sha1};
 use std::collections::BTreeSet;
@@ -121,8 +122,18 @@ fn random_project(rng: &mut Rng) -> (Project, Needs) {
             project.set_song_cell(row, usize::from(*track) - 1, Some(id));
         }
     }
-    let loop_row = rng.chance(50).then(|| rng.below(song_rows));
-    project.set_song_loop_row(loop_row);
+    for row in 0..song_rows {
+        let ending = [
+            None,
+            Some(SongRowEnding::LoopBack),
+            Some(SongRowEnding::Stop),
+        ];
+        let marks = SongRowMarks {
+            loop_start: rng.chance(25),
+            ending: ending[rng.below(ending.len())],
+        };
+        project.set_song_row_marks(row, marks);
+    }
     let needs = Needs {
         sfx: usize::from(next_phrase) + instruments,
         instruments,

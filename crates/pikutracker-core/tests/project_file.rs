@@ -1,6 +1,6 @@
 use pikutracker_core::project::{
     ChainEntry, ChainId, Claim, CustomInstrument, Filters, InstrumentSound, PhraseId, Project,
-    SfxInstrument, Step, TargetCart, WaveformInstrument,
+    SfxInstrument, SongRowEnding, SongRowMarks, Step, TargetCart, WaveformInstrument,
 };
 use pikutracker_core::project_file::{self, FORMAT_VERSION, Migration, ProjectFileError};
 
@@ -13,7 +13,27 @@ fn step(pitch: u8, instrument: u8, volume: u8, effect: u8) -> Step {
 fn fixture_project() -> Project {
     let mut project = Project::new();
     project.set_default_speed(12);
-    project.set_song_loop_row(Some(1));
+    project.set_song_row_marks(
+        0,
+        SongRowMarks {
+            loop_start: true,
+            ending: None,
+        },
+    );
+    project.set_song_row_marks(
+        1,
+        SongRowMarks {
+            loop_start: false,
+            ending: Some(SongRowEnding::LoopBack),
+        },
+    );
+    project.set_song_row_marks(
+        2,
+        SongRowMarks {
+            loop_start: true,
+            ending: Some(SongRowEnding::Stop),
+        },
+    );
     project.set_target_cart(Some(TargetCart {
         path: "../carts/game.p8".to_owned(),
         claim: Claim {
@@ -216,8 +236,18 @@ fn random_step(random: &mut SeededRandom) -> Step {
 fn random_project(random: &mut SeededRandom) -> Project {
     let mut project = Project::new();
     project.set_default_speed(i32::from(random.below(255)) + 1);
-    let loop_row = random.flip().then(|| usize::from(random.below(256)));
-    project.set_song_loop_row(loop_row);
+    for _ in 0..4 {
+        let ending = [
+            None,
+            Some(SongRowEnding::LoopBack),
+            Some(SongRowEnding::Stop),
+        ];
+        let marks = SongRowMarks {
+            loop_start: random.flip(),
+            ending: ending[usize::from(random.below(3))],
+        };
+        project.set_song_row_marks(usize::from(random.below(256)), marks);
+    }
     for _ in 0..40 {
         let row = usize::from(random.below(256));
         let track = usize::from(random.below(4));
@@ -356,7 +386,6 @@ fn values_outside_their_limits_are_refused() {
             "detune: 3,\n            reverb: 2",
         ),
         ("default_speed: 12", "default_speed: 0"),
-        ("song_loop_row: Some(1)", "song_loop_row: Some(256)"),
         ("[3, 4, 50]", "[3, 4, 64]"),
         ("(first: 24, last: 29)", "(first: 30, last: 29)"),
         ("(first: 24, last: 29)", "(first: 24, last: 64)"),

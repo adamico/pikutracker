@@ -1,8 +1,8 @@
 use crate::project::{
     CART_SLOTS, CHAIN_ENTRIES, ChainEntry, ChainId, Claim, CustomInstrument, Filters,
     InstrumentSound, MAX_FILTER_LEVEL, MAX_INSTRUMENT_NAME, MAX_STEPS, NOTE_NAMES, Phrase,
-    PhraseId, Project, SONG_ROWS, SfxInstrument, Step, TRACKS, TargetCart, WAVEFORM_SAMPLES,
-    WaveformInstrument, slot_of_custom_instrument,
+    PhraseId, Project, SONG_ROWS, SfxInstrument, SongRowEnding, SongRowMarks, Step, TRACKS,
+    TargetCart, WAVEFORM_SAMPLES, WaveformInstrument, slot_of_custom_instrument,
 };
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
@@ -97,7 +97,6 @@ struct VersionHeader {
 struct ProjectDocument {
     version: u32,
     default_speed: u8,
-    song_loop_row: Option<u16>,
     target_cart: Option<TargetCartDocument>,
     song: Vec<SongRowDocument>,
     chains: Vec<ChainDocument>,
@@ -128,6 +127,37 @@ struct PatternRangeDocument {
 struct SongRowDocument {
     row: u16,
     tracks: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    loop_start: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ending: Option<EndingDocument>,
+}
+
+#[derive(Serialize, Deserialize)]
+enum EndingDocument {
+    LoopBack,
+    Stop,
+}
+
+impl EndingDocument {
+    const fn of(ending: SongRowEnding) -> Self {
+        match ending {
+            SongRowEnding::LoopBack => Self::LoopBack,
+            SongRowEnding::Stop => Self::Stop,
+        }
+    }
+
+    const fn ending(&self) -> SongRowEnding {
+        match self {
+            Self::LoopBack => SongRowEnding::LoopBack,
+            Self::Stop => SongRowEnding::Stop,
+        }
+    }
+}
+
+#[expect(clippy::trivially_copy_pass_by_ref)]
+const fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Serialize, Deserialize)]
@@ -212,7 +242,6 @@ impl ProjectDocument {
         Self {
             version: FORMAT_VERSION,
             default_speed: project.default_speed(),
-            song_loop_row: project.song_loop_row().map(|row| row as u16),
             target_cart: project.target_cart().map(TargetCartDocument::from_cart),
             song,
             chains,
@@ -225,14 +254,6 @@ impl ProjectDocument {
         let mut project = Project::new();
         require(self.default_speed >= 1, "DEFAULT SPEED IS 0")?;
         project.set_default_speed(i32::from(self.default_speed));
-
-        if let Some(row) = self.song_loop_row {
-            require(
-                usize::from(row) < SONG_ROWS,
-                "SONG LOOP ROW IS OUT OF RANGE",
-            )?;
-        }
-        project.set_song_loop_row(self.song_loop_row.map(usize::from));
 
         project.set_target_cart(
             self.target_cart
@@ -306,8 +327,12 @@ impl SongRowDocument {
         let cells: Vec<Option<ChainId>> = (0..TRACKS)
             .map(|track| project.song_cell(row, track))
             .collect();
-        cells.iter().any(Option::is_some).then(|| Self {
+        let marks = project.song_row_marks(row);
+        let has_marks = marks != SongRowMarks::default();
+        (has_marks || cells.iter().any(Option::is_some)).then(|| Self {
             row: row as u16,
+            loop_start: marks.loop_start,
+            ending: marks.ending.map(EndingDocument::of),
             tracks: cells
                 .iter()
                 .map(|cell| {
@@ -336,6 +361,13 @@ impl SongRowDocument {
             };
             project.set_song_cell(row, track, chain);
         }
+        project.set_song_row_marks(
+            row,
+            SongRowMarks {
+                loop_start: self.loop_start,
+                ending: self.ending.as_ref().map(EndingDocument::ending),
+            },
+        );
         Ok(())
     }
 }

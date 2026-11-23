@@ -27,7 +27,9 @@ use crate::keymap::{Key, KeyPress, Keyboard};
 use crate::midi_import::MidiTable;
 use crate::player::{AudioRequest, PlaybackReport, Playhead, SCOPE_COLUMNS, TrackMix};
 use crate::project::{CHAIN_ENTRIES, FIRST_CUSTOM_INSTRUMENT, LAST_CUSTOM_INSTRUMENT, SONG_ROWS};
-use crate::project::{Chain, ChainEntry, ChainId, Phrase, PhraseId, Project, Step};
+use crate::project::{
+    Chain, ChainEntry, ChainId, Phrase, PhraseId, Project, SongRowEnding, SongRowMarks, Step,
+};
 use crate::screen::grid::Grid;
 use crate::settings::AppState;
 use cell_edits::Clipboard;
@@ -513,7 +515,16 @@ impl App {
             }
             Action::OctaveUp => self.phrase.change_octave(1),
             Action::OctaveDown => self.phrase.change_octave(-1),
-            Action::ToggleSongLoopRow => self.song.toggle_loop_row(&mut self.project),
+            Action::ToggleLoopStart => {
+                self.song
+                    .change_marks(&mut self.project, SongRowMarks::toggle_loop_start);
+            }
+            Action::ToggleLoopBack => self.song.change_marks(&mut self.project, |marks| {
+                marks.toggle_ending(SongRowEnding::LoopBack);
+            }),
+            Action::ToggleStop => self.song.change_marks(&mut self.project, |marks| {
+                marks.toggle_ending(SongRowEnding::Stop);
+            }),
             Action::Clear => self.clear_cells(),
             Action::PianoKey(key) if self.focus == Focus::Phrase => {
                 self.edit_phrase(|pane, phrase| pane.enter_note(phrase, key));

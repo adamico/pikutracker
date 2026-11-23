@@ -211,9 +211,7 @@ fn a_report_says_whether_the_screen_needs_drawing_again() {
 
 #[test]
 fn a_finished_play_is_reported_to_the_app() {
-    let mut project = song();
-    project.set_song_loop_row(None);
-    let mut app = App::with_project(project);
+    let mut app = App::with_project(song());
     let mut player = Player::new();
     app.apply(PLAY_SONG);
     play_on(&mut app, &mut player, 9);

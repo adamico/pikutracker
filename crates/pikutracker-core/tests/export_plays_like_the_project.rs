@@ -4,7 +4,7 @@ use pikutracker_core::cart::Cart;
 use pikutracker_core::export::export;
 use pikutracker_core::project::{
     Chain, ChainEntry, ChainId, Claim, CustomInstrument, InstrumentSound, PhraseId, Project,
-    SfxInstrument, Step, TRACKS, WaveformInstrument,
+    SfxInstrument, SongRowEnding, SongRowMarks, Step, TRACKS, WaveformInstrument,
 };
 use pikutracker_core::synth::SAMPLES_PER_TICK;
 use support::{HEADER, assert_same_samples, render_music, render_song};
@@ -96,7 +96,6 @@ fn instrumented_project() -> Project {
             sound: InstrumentSound::Waveform(wave),
         }),
     );
-    project.set_song_loop_row(None);
     project
 }
 
@@ -260,11 +259,77 @@ fn a_looping_song_plays_the_same_after_export() {
             [plays(2), plays(0), None, None],
         ],
     );
-    project.set_song_loop_row(Some(1));
+    mark(&mut project, 1, true, Some(SongRowEnding::LoopBack));
 
     let song_row_0_ticks = 96;
     let song_row_1_ticks = 96 + 48;
     assert_exports_sample_for_sample(&project, song_row_0_ticks + 3 * song_row_1_ticks);
+}
+
+fn mark(project: &mut Project, row: usize, loop_start: bool, ending: Option<SongRowEnding>) {
+    project.set_song_row_marks(row, SongRowMarks { loop_start, ending });
+}
+
+fn three_row_song() -> Project {
+    let mut project = instrumented_project();
+    write_phrase(&mut project, 0, 8, 6, &[0, SFX_INSTRUMENT]);
+    write_phrase(&mut project, 1, 16, 6, &[2, 4]);
+    write_phrase(&mut project, 2, 4, 6, &[WAVEFORM_INSTRUMENT]);
+    loop_from(&mut project, 2, 0);
+    place_song_row(&mut project, 0, &[[plays(1), None, None, None]]);
+    place_song_row(
+        &mut project,
+        1,
+        &[
+            [plays(0), plays(1), None, None],
+            [plays(2), plays(0), None, None],
+        ],
+    );
+    place_song_row(&mut project, 2, &[[plays(0), None, plays(2), None]]);
+    project
+}
+
+const THREE_ROW_TICKS: [usize; 3] = [96, 96 + 48, 48];
+
+#[test]
+fn a_loop_back_to_a_loop_start_plays_the_same_after_export() {
+    let mut project = three_row_song();
+    mark(&mut project, 1, true, None);
+    mark(&mut project, 2, false, Some(SongRowEnding::LoopBack));
+
+    let [row_0, row_1, row_2] = THREE_ROW_TICKS;
+    assert_exports_sample_for_sample(&project, row_0 + 3 * (row_1 + row_2));
+}
+
+#[test]
+fn a_loop_back_with_no_loop_start_plays_the_same_after_export() {
+    let mut project = three_row_song();
+    mark(&mut project, 1, false, Some(SongRowEnding::LoopBack));
+
+    let [row_0, row_1, _] = THREE_ROW_TICKS;
+    assert_exports_sample_for_sample(&project, 3 * (row_0 + row_1));
+}
+
+#[test]
+fn a_stop_plays_the_same_after_export() {
+    let mut project = three_row_song();
+    mark(&mut project, 1, true, Some(SongRowEnding::Stop));
+    mark(&mut project, 2, false, Some(SongRowEnding::LoopBack));
+
+    let [row_0, row_1, _] = THREE_ROW_TICKS;
+    assert_exports_sample_for_sample(&project, row_0 + row_1);
+}
+
+#[test]
+fn an_empty_song_row_ends_the_song_the_same_after_export() {
+    let mut project = three_row_song();
+    place_song_row(&mut project, 3, &[[plays(1), None, None, None]]);
+    for track in 0..TRACKS {
+        project.set_song_cell(2, track, None);
+    }
+
+    let [row_0, row_1, _] = THREE_ROW_TICKS;
+    assert_exports_sample_for_sample(&project, row_0 + row_1);
 }
 
 #[test]

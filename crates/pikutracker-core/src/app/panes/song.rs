@@ -1,12 +1,12 @@
 use super::{
-    EMPTY, HEADING, SELECTED, VALUE, draw_row_label, draw_styled_value, draw_title, id_text,
-    nudged_id, stepped, typed_value,
+    EMPTY, HEADING, LOOP_MARK, SELECTED, VALUE, draw_row_label, draw_styled_value, draw_title,
+    id_text, nudged_id, stepped, typed_value,
 };
 use crate::app::Direction;
 use crate::app::layout::Area;
 use crate::app::selection::{CellPosition, CellRange};
 use crate::player::{Playhead, TrackMix};
-use crate::project::{ChainId, Project, SONG_ROWS, TRACKS};
+use crate::project::{ChainId, Project, SONG_ROWS, SongRowEnding, SongRowMarks, TRACKS};
 use crate::screen::grid::{Grid, Style};
 use crate::screen::palette::Colour;
 
@@ -15,8 +15,20 @@ const PLAYING_BAR: Colour = Colour::DarkGreen;
 const WAITING_BAR: Colour = Colour::DarkGrey;
 
 const HEADER_ROWS: usize = 2;
+const MARK_COLUMN: usize = 2;
 const FIRST_TRACK_COLUMN: usize = 4;
 const TRACK_WIDTH: usize = 3;
+
+const fn mark_text(marks: SongRowMarks) -> &'static str {
+    match (marks.loop_start, marks.ending) {
+        (false, None) => "",
+        (true, None) => ">",
+        (false, Some(SongRowEnding::LoopBack)) => "<",
+        (false, Some(SongRowEnding::Stop)) => "|",
+        (true, Some(SongRowEnding::LoopBack)) => "=",
+        (true, Some(SongRowEnding::Stop)) => "/",
+    }
+}
 
 fn track_header(track_mix: &TrackMix, track: usize) -> (char, Style) {
     if track_mix.is_soloed(track) {
@@ -177,9 +189,10 @@ impl SongPane {
         }
     }
 
-    pub fn toggle_loop_row(&self, project: &mut Project) {
-        let row = (project.song_loop_row() != Some(self.row)).then_some(self.row);
-        project.set_song_loop_row(row);
+    pub fn change_marks(&self, project: &mut Project, change: impl FnOnce(&mut SongRowMarks)) {
+        let mut marks = project.song_row_marks(self.row);
+        change(&mut marks);
+        project.set_song_row_marks(self.row, marks);
     }
 
     pub fn draw(
@@ -194,11 +207,7 @@ impl SongPane {
         let playing_row = playhead
             .and_then(|playhead| playhead.chain_row)
             .map(|(row, _)| row);
-        let loop_row = project
-            .song_loop_row()
-            .map_or_else(|| "--".to_owned(), |row| format!("{row:02X}"));
-        let title = format!("SONG  LOOP {loop_row}");
-        draw_title(grid, area.column, 0, &title, focused);
+        draw_title(grid, area.column, 0, "SONG", focused);
         for track in 0..TRACKS {
             let column = area.column + FIRST_TRACK_COLUMN + track * TRACK_WIDTH;
             let (letter, style) = track_header(track_mix, track);
@@ -218,6 +227,8 @@ impl SongPane {
                 &label,
                 playing_row == Some(song_row),
             );
+            let mark = mark_text(project.song_row_marks(song_row));
+            grid.put(area.column + MARK_COLUMN, row, mark, LOOP_MARK);
             for track in 0..TRACKS {
                 let column = area.column + FIRST_TRACK_COLUMN + track * TRACK_WIDTH;
                 let is_cursor = focused && song_row == self.row && track == self.track;
