@@ -27,8 +27,9 @@
     // A key that starts a hold-chord acts when it is let go, unless the chord was played.
     // Other names include Up, Down, Left, Right, Tab, Space, Enter, Esc, Backspace,
     // Insert, Delete and F1 to F12. Further actions include MoveUp, FocusNext, Confirm,
-    // Cancel, Clear, JumpUp (Alt+Up), Mute1 to Mute8, Solo1 to Solo8, NudgeUp,
-    // NudgeDownCoarse, OctaveUp and ToggleSongLoopRow.
+    // Cancel, Clear, JumpUp (Alt+Up), SelectUp (Shift+Up), SelectJumpUp (Shift+Alt+Up),
+    // StartSelection (no PcTracker key), Mute1 to Mute8, Solo1 to Solo8, NudgeUp (Ctrl+Up),
+    // NudgeDownCoarse (Ctrl+Shift+Down), OctaveUp and ToggleSongLoopRow.
     //
     // Remove the // in front of a line to use it, then change the key. The keys shown
     // are the PcTracker preset's.
@@ -44,7 +45,6 @@
 
         // Editing
         // "NewUnused": "Ctrl+Shift+N",
-        // "StartSelection": "Ctrl+B",
         // "Copy": "Ctrl+C",
         // "Cut": "Ctrl+X",
         // "Paste": "Ctrl+V",

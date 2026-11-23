@@ -6,6 +6,7 @@ const CTRL: Modifiers = Modifiers::CTRL;
 const SHIFT: Modifiers = Modifiers::SHIFT;
 const CTRL_SHIFT: Modifiers = Modifiers::CTRL_SHIFT;
 const ALT: Modifiers = Modifiers::ALT;
+const ALT_SHIFT: Modifiers = Modifiers::ALT_SHIFT;
 
 fn action(key: Key, modifiers: Modifiers) -> Option<Action> {
     Keymap::pc_tracker().action_for(KeyPress::new(key, modifiers))
@@ -37,7 +38,6 @@ fn the_pc_tracker_preset_matches_the_keys_table() {
         (Key::Char('i'), CTRL, Action::Import),
         (Key::Char('e'), CTRL, Action::Export),
         (Key::Char('n'), CTRL_SHIFT, Action::NewUnused),
-        (Key::Char('b'), CTRL, Action::StartSelection),
         (Key::Char('c'), CTRL, Action::Copy),
         (Key::Char('x'), CTRL, Action::Cut),
         (Key::Char('v'), CTRL, Action::Paste),
@@ -127,4 +127,42 @@ fn key_presses_drive_the_headless_app_through_the_preset() {
         .take(13)
         .collect();
     assert_eq!(chain_entry_one, "1[--]---     ");
+}
+
+#[test]
+fn shift_with_the_arrows_selects_and_ctrl_with_up_and_down_nudges() {
+    let directions = [
+        (Key::Up, Direction::Up),
+        (Key::Down, Direction::Down),
+        (Key::Left, Direction::Left),
+        (Key::Right, Direction::Right),
+    ];
+    for (key, direction) in directions {
+        assert_eq!(action(key, SHIFT), Some(Action::Select(direction)));
+        assert_eq!(action(key, ALT_SHIFT), Some(Action::SelectJump(direction)));
+    }
+    let nudges = [
+        (Key::Up, CTRL, true, false),
+        (Key::Down, CTRL, false, false),
+        (Key::Up, CTRL_SHIFT, true, true),
+        (Key::Down, CTRL_SHIFT, false, true),
+    ];
+    for (key, modifiers, up, coarse) in nudges {
+        assert_eq!(action(key, modifiers), Some(Action::Nudge { up, coarse }));
+    }
+}
+
+#[test]
+fn ctrl_b_starts_no_selection() {
+    assert_eq!(action(Key::Char('b'), CTRL), None);
+}
+
+#[test]
+fn selecting_repeats_while_a_key_is_held() {
+    let keymap = Keymap::pc_tracker();
+
+    assert_eq!(
+        keymap.action_for(KeyPress::repeated(Key::Down, SHIFT)),
+        Some(Action::Select(Direction::Down))
+    );
 }

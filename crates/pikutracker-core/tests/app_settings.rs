@@ -445,3 +445,53 @@ fn the_m8_style_preset_drives_the_instrument_view() {
 
     assert!(app.project().custom_instrument(8).is_some());
 }
+
+#[test]
+fn the_m8_style_preset_keeps_a_selection_growing_with_plain_arrows() {
+    use pikutracker_core::app::Direction;
+    let mut app = launch(Some(M8_STYLE), None);
+
+    let presses = [
+        (Key::Char('x'), Modifiers::SHIFT),
+        (Key::Down, NONE),
+        (Key::Right, NONE),
+    ];
+    let actions: Vec<Action> = presses
+        .iter()
+        .flat_map(|&press| keys(&mut app, &[press]))
+        .collect();
+
+    assert_eq!(
+        actions,
+        [
+            Action::StartSelection,
+            Action::Select(Direction::Down),
+            Action::Select(Direction::Right),
+        ]
+    );
+}
+
+#[test]
+fn the_pc_tracker_preset_drops_a_selection_on_a_plain_arrow() {
+    use pikutracker_core::app::Direction;
+    let mut app = launch(None, None);
+
+    let presses = [
+        (Key::Down, Modifiers::SHIFT),
+        (Key::Down, NONE),
+        (Key::Down, NONE),
+    ];
+    let actions: Vec<Action> = presses
+        .iter()
+        .flat_map(|&press| keys(&mut app, &[press]))
+        .collect();
+
+    assert_eq!(
+        actions,
+        [
+            Action::Select(Direction::Down),
+            Action::Move(Direction::Down),
+            Action::Move(Direction::Down),
+        ]
+    );
+}

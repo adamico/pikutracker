@@ -12,6 +12,7 @@ const DOWN: Action = Action::Move(Direction::Down);
 const RIGHT: Action = Action::Move(Direction::Right);
 const TAB: Action = Action::FocusNext;
 const SELECT: Action = Action::StartSelection;
+const SELECT_DOWN: Action = Action::Select(Direction::Down);
 const ROWS_UP: Action = Action::MoveRows { up: true };
 const ROWS_DOWN: Action = Action::MoveRows { up: false };
 
@@ -34,7 +35,7 @@ fn song() -> Project {
 fn selected_song_rows_move_down_and_the_row_below_takes_their_place() {
     let mut app = App::with_project(song());
 
-    apply(&mut app, &[DOWN, SELECT, DOWN, ROWS_DOWN]);
+    apply(&mut app, &[DOWN, SELECT_DOWN, ROWS_DOWN]);
 
     assert_eq!(
         song_column(&app, 0),
@@ -88,7 +89,7 @@ fn last_song_row_filled() -> Project {
 fn the_selection_and_cursor_move_with_the_rows_so_each_press_moves_them_again() {
     let mut app = App::with_project(song());
 
-    apply(&mut app, &[SELECT, DOWN, ROWS_DOWN, ROWS_DOWN]);
+    apply(&mut app, &[SELECT_DOWN, ROWS_DOWN, ROWS_DOWN]);
 
     assert_eq!(
         song_column(&app, 0),
@@ -121,7 +122,7 @@ fn in_the_song_pane_only_the_selected_tracks_cells_move() {
 fn selected_chain_entries_move_up_and_down() {
     let mut app = App::with_project(chain());
 
-    apply(&mut app, &[TAB, DOWN, DOWN, SELECT, DOWN, ROWS_UP]);
+    apply(&mut app, &[TAB, DOWN, DOWN, SELECT_DOWN, ROWS_UP]);
     assert_eq!(
         entry_phrases(&app),
         [Some(0), Some(2), Some(3), Some(1), Some(4)]
@@ -184,8 +185,8 @@ fn at_either_edge_a_press_changes_nothing_adds_no_undo_entry_and_shows_no_remark
 #[test]
 fn each_press_is_one_undo_entry_in_every_pane() {
     let cases = [
-        (song(), vec![DOWN, SELECT, DOWN]),
-        (chain(), vec![TAB, DOWN, SELECT, DOWN]),
+        (song(), vec![DOWN, SELECT_DOWN]),
+        (chain(), vec![TAB, DOWN, SELECT_DOWN]),
         (phrase_of_length_4(), vec![TAB, TAB, DOWN, SELECT]),
     ];
     for (project, moves) in cases {

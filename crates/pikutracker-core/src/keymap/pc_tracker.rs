@@ -1,10 +1,11 @@
 use super::Binding;
 use super::key::Key;
 use super::shared::{
-    self, ALT, CTRL, CTRL_SHIFT, SHIFT, anywhere, common_presses, in_context, nudge,
+    self, ALT, ALT_SHIFT, ARROWS, CTRL, CTRL_SHIFT, SHIFT, anywhere, common_presses, in_context,
+    nudge,
 };
 use super::trigger::{Scope, Trigger};
-use crate::app::{Action, Direction, KeyContext};
+use crate::app::{Action, KeyContext};
 
 const LOWER_OCTAVE_KEYS: &str = "zsxdcvgbhnjm";
 const UPPER_OCTAVE_KEYS: &str = "q2w3er5t6y7u";
@@ -12,7 +13,6 @@ const UPPER_OCTAVE_KEYS: &str = "q2w3er5t6y7u";
 pub(super) fn bindings() -> Vec<Binding> {
     let own = [
         (Key::Char('n'), CTRL_SHIFT, Action::NewUnused),
-        (Key::Char('b'), CTRL, Action::StartSelection),
         (Key::Char('c'), CTRL, Action::Copy),
         (Key::Char('x'), CTRL, Action::Cut),
         (Key::Char('v'), CTRL, Action::Paste),
@@ -21,15 +21,18 @@ pub(super) fn bindings() -> Vec<Binding> {
         (Key::Char('l'), CTRL, Action::ToggleLog),
         (Key::Char('r'), CTRL, Action::ToggleSongLoopRow),
         (Key::Char('t'), ALT, Action::ScaleSpeed),
-        (Key::Up, SHIFT, nudge(true, false)),
-        (Key::Down, SHIFT, nudge(false, false)),
-        (Key::Up, CTRL, nudge(true, true)),
-        (Key::Down, CTRL, nudge(false, true)),
-        (Key::Up, ALT, Action::Jump(Direction::Up)),
-        (Key::Down, ALT, Action::Jump(Direction::Down)),
-        (Key::Left, ALT, Action::Jump(Direction::Left)),
-        (Key::Right, ALT, Action::Jump(Direction::Right)),
+        (Key::Up, CTRL, nudge(true, false)),
+        (Key::Down, CTRL, nudge(false, false)),
+        (Key::Up, CTRL_SHIFT, nudge(true, true)),
+        (Key::Down, CTRL_SHIFT, nudge(false, true)),
     ];
+    let arrows = ARROWS.into_iter().flat_map(|(key, direction)| {
+        [
+            (key, ALT, Action::Jump(direction)),
+            (key, SHIFT, Action::Select(direction)),
+            (key, ALT_SHIFT, Action::SelectJump(direction)),
+        ]
+    });
     let piano = LOWER_OCTAVE_KEYS.chars().chain(UPPER_OCTAVE_KEYS.chars());
     let midi_import = [
         (Key::Space, Action::ToggleVoice),
@@ -46,7 +49,7 @@ pub(super) fn bindings() -> Vec<Binding> {
         trigger: Trigger::Press(key, ALT),
         action: Action::MoveRows { up },
     });
-    anywhere(common_presses().into_iter().chain(own))
+    anywhere(common_presses().into_iter().chain(own).chain(arrows))
         .chain(selecting)
         .chain(shared::piano(piano))
         .chain(shared::typed_characters())

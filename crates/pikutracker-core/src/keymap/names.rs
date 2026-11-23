@@ -62,6 +62,8 @@ pub fn named_actions() -> Vec<(String, Action)> {
         [
             (format!("Move{name}"), Action::Move(direction)),
             (format!("Jump{name}"), Action::Jump(direction)),
+            (format!("Select{name}"), Action::Select(direction)),
+            (format!("SelectJump{name}"), Action::SelectJump(direction)),
         ]
     });
     let tracks = (1..=TRACKS as u8).flat_map(|track_number| {

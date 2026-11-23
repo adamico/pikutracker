@@ -34,8 +34,6 @@ fn write(project: &mut Project, id: u8, steps: usize) -> PhraseId {
     id
 }
 
-/// Song row 0 plays a 2-Step Phrase, a 4-Step Phrase, a 2-Step Phrase
-/// with a Phrase loop over all of it, and a Chain whose first entry is empty. Song row 1 keeps going.
 fn song() -> Project {
     let mut project = Project::new();
     let short = write(&mut project, 1, 2);
@@ -71,8 +69,6 @@ fn play_on(app: &mut App, player: &mut Player, steps: usize) {
     app.show_playback(&player.report());
 }
 
-/// The bar over a Track's Chain number on a Song row: its colour and how
-/// many pixels of the two cells it fills, or None with no bar.
 fn bar(app: &App, song_row: usize, track: usize) -> Option<(Colour, usize)> {
     let grid = app.grid();
     let column = FIRST_TRACK_COLUMN + track * TRACK_WIDTH;

@@ -79,14 +79,16 @@ These are the keys of the default PcTracker preset. The M8-style column applies 
 | Enter a note (Phrase pane, note column) | Z–M lower octave, Q–U upper octave | Q–P |
 | Octave down / up | [ / ] | same |
 | Type a value | 0–9, A–F | same |
-| Change the value by 1 | Shift+Up / Shift+Down | Z+Right / Z+Left |
-| Change the value by a larger step (an octave for notes) | Ctrl+Up / Ctrl+Down | Z+Up / Z+Down |
+| Change the value by 1 | Ctrl+Up / Ctrl+Down | Z+Right / Z+Left |
+| Change the value by a larger step (an octave for notes) | Ctrl+Shift+Up / Ctrl+Shift+Down | Z+Up / Z+Down |
 | Clear | Delete | same |
 | Insert row | Insert | same |
 | Delete row | Ctrl+Delete | same |
 | Move the selected rows up / down | Alt+Up / Alt+Down (while selecting) | X+Up / X+Down (while selecting) |
 | Undo / redo | Ctrl+Z / Ctrl+Y | same |
-| Start a selection | Ctrl+B | X+Shift |
+| Select | Shift+Arrows | X+Shift, then Arrows |
+| Select by a jump | Shift+Alt+Arrows | X+Left / X+Right (while selecting) |
+| Drop the selection | Esc, or an arrow without Shift | Esc |
 | Copy | Ctrl+C | X (while selecting) |
 | Cut | Ctrl+X | Z+X |
 | Paste | Ctrl+V | Z+Shift |

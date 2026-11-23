@@ -27,8 +27,6 @@ pub struct Cell {
     pub bar: Option<ProgressBar>,
 }
 
-/// A background strip filling a cell's leftmost pixels, drawn under its
-/// character so the character stays readable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ProgressBar {
     pub colour: Colour,
@@ -79,8 +77,6 @@ impl Grid {
         }
     }
 
-    /// Lays a bar over `width` cells, filling `filled` out of `of` of their
-    /// pixels from the left, and leaves their characters and styles alone.
     pub fn put_bar(
         &mut self,
         column: usize,

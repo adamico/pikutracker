@@ -183,7 +183,6 @@ pub(super) fn loose_phrase(sfx: Sfx<'_>) -> Option<(Phrase, BTreeSet<u8>)> {
     (!entry.phrase.is_silent()).then_some((entry.phrase, entry.instruments))
 }
 
-/// The Phrase that plays a looping SFX from note `first` on, looping as the SFX does.
 fn loop_from(sfx: Sfx<'_>, first: usize, start: usize, end: usize) -> RebuiltEntry {
     if first == 0 {
         let mut entry = entry_of(sfx, &every_note());

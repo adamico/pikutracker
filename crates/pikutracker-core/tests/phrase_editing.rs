@@ -360,14 +360,14 @@ fn the_pc_tracker_brackets_change_the_octave_and_modified_arrows_nudge() {
         Some(Action::OctaveUp)
     );
     assert_eq!(
-        action(Key::Up, Modifiers::SHIFT),
+        action(Key::Up, Modifiers::CTRL),
         Some(Action::Nudge {
             up: true,
             coarse: false
         })
     );
     assert_eq!(
-        action(Key::Down, Modifiers::CTRL),
+        action(Key::Down, Modifiers::CTRL_SHIFT),
         Some(Action::Nudge {
             up: false,
             coarse: true

@@ -54,6 +54,11 @@ impl Modifiers {
         shift: true,
         alt: false,
     };
+    pub const ALT_SHIFT: Self = Self {
+        ctrl: false,
+        shift: true,
+        alt: true,
+    };
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

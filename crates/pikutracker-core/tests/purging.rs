@@ -115,8 +115,7 @@ fn esc_answers_the_question_even_with_a_selection_active() {
     apply(
         &mut app,
         &[
-            Action::StartSelection,
-            RIGHT,
+            Action::Select(Direction::Right),
             Action::PurgeUnused,
             Action::Cancel,
         ],

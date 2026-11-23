@@ -198,7 +198,6 @@ impl Phrase {
         &mut self.steps[index]
     }
 
-    /// The number of Steps that play, read from the loop pair as PICO-8 reads an SFX's.
     pub const fn length(&self) -> usize {
         let (start, end) = (self.loop_start as usize, self.loop_end as usize);
         if end == 0 && start > 0 {
@@ -210,7 +209,6 @@ impl Phrase {
         }
     }
 
-    /// The Steps of the Phrase loop, when the Phrase has one.
     pub const fn phrase_loop(&self) -> Option<Range<usize>> {
         let (start, end) = (self.loop_start as usize, self.loop_end as usize);
         if start < end { Some(start..end) } else { None }
@@ -241,7 +239,6 @@ impl Phrase {
         self.set_loop_end(end);
     }
 
-    /// Plays the first `length` Steps without a Phrase loop, as `LOOP 00 00` when all 32 play.
     pub fn set_length(&mut self, length: i32) {
         match length.clamp(1, MAX_STEPS as i32) {
             full if full == MAX_STEPS as i32 => self.set_loop(0, 0),

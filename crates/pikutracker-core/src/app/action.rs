@@ -21,6 +21,8 @@ impl Direction {
 pub enum Action {
     Move(Direction),
     Jump(Direction),
+    Select(Direction),
+    SelectJump(Direction),
     FocusNext,
     FocusPrevious,
     NewProject,

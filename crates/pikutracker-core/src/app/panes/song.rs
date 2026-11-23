@@ -241,9 +241,6 @@ impl SongPane {
     }
 }
 
-/// Lays a bar over each Track's Chain number showing how far it is through
-/// its Phrase: Steps played out of the Phrase's length, or full and dimmed
-/// once it has ended and waits for the Chain row to end.
 fn draw_progress_bars(
     grid: &mut Grid,
     area_column: usize,

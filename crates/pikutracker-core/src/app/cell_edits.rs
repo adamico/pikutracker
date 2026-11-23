@@ -73,6 +73,12 @@ impl App {
         }
     }
 
+    pub(super) fn start_selection_unless_started(&mut self) {
+        if self.selection_start.is_none() {
+            self.selection_start = self.cursor_cell();
+        }
+    }
+
     fn edit_selected_chain(&mut self, edit: impl FnOnce(&ChainPane, &mut Chain)) {
         match self.chain_under_cursor() {
             Some(id) => edit(&self.chain, self.project.chain_mut(id)),
