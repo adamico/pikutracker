@@ -1,4 +1,5 @@
 # Custom Instruments are unlimited in the Project and assigned to SFX 0–7 at Export
+_Partly superseded by [ADR 0025](0025-at-most-8-custom-instruments.md): a Project holds at most 8 Custom Instruments, numbered 8 to F with one digit, and Custom Instrument 8 + k always goes to SFX k instead of a slot chosen at Export._
 
 A Step's instrument is two hex digits: 00–07 are PICO-8's Built-in Instruments, and 08–FF are Custom Instruments (SFX Instruments or Waveform Instruments). A Custom Instrument has no fixed SFX number in the Project. Export gives each Custom Instrument used by the 4 Exported Tracks a free SFX in 0–7, within the Project's claimed SFX range, and rewrites the Steps' instrument digits to match. We chose this over mirroring PICO-8's 8 fixed slots because it follows ADR 0001: the Project holds more than a Cart can, just as 8 Tracks are Exported as 4 channels, and only what is Exported must fit.
 

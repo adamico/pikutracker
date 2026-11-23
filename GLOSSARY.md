@@ -18,12 +18,19 @@ _Avoid_: Arrangement, sequence
 One row of the Song: a Chain, or nothing, for each Track. Its Chains play together, one Chain row at a time.
 _Avoid_: Song position, Song line
 
-**Song loop row**:
-The Song row that playback jumps back to once the Song reaches its first empty row. A Song with no Song loop row stops there.
-_Avoid_: Loop start (that is PICO-8's flag), loop point
+**Loop start**:
+A mark on a Song row: the row that a later Loop back returns to. It becomes PICO-8's flag of the same name on the first Pattern of that row.
+_Avoid_: Song loop row, loop point
+
+**Loop back**:
+A mark on a Song row that makes playback return, after that row, to the nearest Loop start at or before it, or to Song row 00 if there is none. It becomes PICO-8's flag of the same name on the last Pattern of that row.
+_Avoid_: Loop end
+
+**Stop**:
+A mark on a Song row: playback stops after that row. It becomes PICO-8's flag of the same name on the last Pattern of that row.
 
 **Track**:
-One of the Song's 8 vertical lanes, played by one voice. Export picks 4 of them for PICO-8's channels.
+One of the Song's 4 vertical lanes, played by one voice. Track 1 plays on PICO-8's first channel, Track 2 on the second, and so on.
 _Avoid_: Channel (that is PICO-8's word)
 
 **Chain**:
@@ -40,7 +47,7 @@ _Avoid_: Pattern (that is PICO-8's word), SFX
 
 **Phrase loop**:
 The Steps from a chosen Step to the end of a Phrase's length, repeated until the Chain row ends. Steps before it play once as a lead-in.
-_Avoid_: Fill, loop start (that is PICO-8's flag), loop point
+_Avoid_: Fill, loop start (that marks a Song row), loop point
 
 **Loose Phrase**:
 A Phrase that holds something but that no Chain uses. Cart Import keeps a Cart's other SFX as loose Phrases, outside the Claim.
@@ -49,6 +56,10 @@ _Avoid_: Orphan Phrase
 **Step**:
 One row of a Phrase, equivalent to one PICO-8 note: a pitch with its instrument, volume and effect. A Step at volume 0 is silent and is shown as empty; a note is held by repeating it in the following Steps.
 _Avoid_: Row, note (when meaning the whole row)
+
+**Pen**:
+The octave, instrument, volume and effect that a newly entered note takes, overwriting all four values of its Step. Typing an instrument, volume or effect into a Step also sets the Pen. It belongs to the user's session, not to the Project.
+_Avoid_: Defaults, current instrument
 
 **Instrument**:
 What a Step plays: one of the 8 Built-in Instruments or one of the Project's Custom Instruments.
@@ -59,7 +70,7 @@ One of PICO-8's 8 fixed sounds (triangle, tilted saw, saw, square, pulse, organ,
 _Avoid_: Waveform
 
 **Custom Instrument**:
-An Instrument defined in the Project, either an SFX Instrument or a Waveform Instrument. A Project can hold many; at most 8 fit in a Cart.
+An Instrument defined in the Project, either an SFX Instrument or a Waveform Instrument. A Project holds at most 8, numbered 8 to F after the Built-in Instruments' 0 to 7, as a Cart does.
 _Avoid_: Sample
 
 **SFX Instrument**:
@@ -101,6 +112,10 @@ _Avoid_: Play cursor
 A rectangle of cells in the focused pane, from the cell where it was started to the cursor. Copy, Cut, nudges, moving rows, Clone and Change Speed act on it instead of the cell under the cursor. Changing pane clears it.
 _Avoid_: Block, mark
 
+**Multitrack**:
+The view of the Song as it plays: each Track's Steps in time order with their transposes applied, spaced by Ticks so that Steps side by side start together. The cursor moves only from Step to Step.
+_Avoid_: Pattern view
+
 **Follow**:
 A mode in which the panes track the Playhead. Moving the cursor by hand turns it off.
 _Avoid_: Auto-scroll
@@ -131,10 +146,6 @@ _Avoid_: Music (ambiguous), frame
 **Export**:
 Compiling a Project into a Cart's SFX and Patterns. May lose information the Cart cannot hold.
 _Avoid_: Save (saving writes the Project)
-
-**Export Track**:
-A Track assigned to one of PICO-8's 4 channels for Export. A Project has up to 4, and a Track can be on only one channel.
-_Avoid_: Output track, exported channel
 
 **Target Cart**:
 The one Cart a Project Exports into, if any. A Project can have no Target Cart, for example after a MIDI Import.

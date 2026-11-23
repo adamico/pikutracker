@@ -1,4 +1,5 @@
 # Cart Import finds songs by their flow flags
+_Partly superseded by [ADR 0023](0023-the-song-mirrors-the-carts-pattern-list.md): Cart Import no longer chooses a song. The flow flags become Song row marks, and Loop back follows the same rule._
 
 A Cart holds no list of songs, so Cart Import reads them from the Patterns' flow flags. A song starts at Pattern 0, or after a STOP, a LOOP BACK or an empty Pattern, and it runs until a STOP, a LOOP BACK or an empty Pattern. LOOP BACK jumps to the nearest LOOP START at or before it, or to Pattern 0; a jump outside the song means the song does not loop.
 
