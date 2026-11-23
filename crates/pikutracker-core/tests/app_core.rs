@@ -41,14 +41,20 @@ fn a_new_app_shows_the_empty_panes_in_the_agreed_column_budget() {
 }
 
 #[test]
-fn the_right_section_stays_empty_without_the_overview_scope_or_phrases_list() {
+fn the_right_section_shows_the_multitrack_without_the_overview_scope_or_phrases_list() {
     let app = App::new();
 
     let right_section: Vec<String> = (0..layout::RIGHT_SLOT.rows)
         .map(|line| right_slot_text(&app, line))
         .filter(|text| !text.is_empty())
         .collect();
-    assert_eq!(right_section, Vec::<String>::new());
+    assert_eq!(
+        right_section,
+        [
+            "MULTITRACK  ROW 00",
+            "    TRACK 1     TRACK 2     TRACK 3     TRACK 4"
+        ]
+    );
     let dump = app.grid().text_dump();
     for gone in ["OVERVIEW", "SCOPE", "EXPORT TRACKS", "PHRASES"] {
         assert!(!dump.contains(gone), "{gone}");
@@ -122,7 +128,7 @@ fn focus_previous_goes_back_from_the_song_pane_to_the_right_hand_view() {
     assert_eq!(song_text(&app, 2), "00  -- -- -- --");
     assert_eq!(chain_text(&app, 2), "00 --     ---");
     assert_eq!(phrase_text(&app, 7), "00 ...  .    .   .");
-    assert_eq!(right_slot_text(&app, 0), "");
+    assert_eq!(right_slot_text(&app, 0), "MULTITRACK  ROW 00");
 }
 
 #[test]

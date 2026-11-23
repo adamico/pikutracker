@@ -25,6 +25,7 @@ pub use messages::{LogItem, Report, Severity};
 use crate::export;
 use crate::keymap::{Key, KeyPress, Keyboard};
 use crate::midi_import::MidiTable;
+use crate::multitrack::Timeline;
 use crate::player::{AudioRequest, PlaybackReport, Playhead, TrackMix};
 use crate::project::{CHAIN_ENTRIES, FIRST_CUSTOM_INSTRUMENT, LAST_CUSTOM_INSTRUMENT, SONG_ROWS};
 use crate::project::{
@@ -44,6 +45,7 @@ use panes::file_list::{FileList, Purpose};
 use panes::instrument::InstrumentView;
 use panes::log::LogPane;
 use panes::midi_dialog::MidiDialog;
+use panes::multitrack::{MultitrackPane, MultitrackView};
 use panes::phrase::{PhrasePane, PhraseView};
 use panes::song::SongPane;
 use selection::CellPosition;
@@ -84,6 +86,7 @@ pub struct App {
     song: SongPane,
     chain: ChainPane,
     phrase: PhrasePane,
+    multitrack: MultitrackPane,
     played_pane: Focus,
     playing: bool,
     latest_play: u64,
@@ -144,6 +147,7 @@ impl App {
             song: SongPane::default(),
             chain: ChainPane::default(),
             phrase: PhrasePane::default(),
+            multitrack: MultitrackPane::default(),
             played_pane: Focus::default(),
             playing: false,
             latest_play: 0,
@@ -302,6 +306,10 @@ impl App {
             .and_then(|phrase| playhead.step_in(phrase, self.song.track()));
         if let Some(step) = step {
             self.phrase.follow(step);
+        }
+        let timeline = Timeline::of(&self.project);
+        if let Some(tick) = playhead_tick(&timeline, &playhead) {
+            self.multitrack.follow(tick, &timeline);
         }
     }
 
@@ -823,8 +831,17 @@ impl App {
             Focus::Phrase if self.selection_would_reach_phrase_header(direction) => {}
             Focus::Phrase => self.phrase.move_cursor(direction),
             Focus::RightSlot if self.log_open => self.log.move_cursor(direction),
+            Focus::RightSlot if self.shows_multitrack() => {
+                self.stop_following();
+                let (_, lines) = direction.column_and_row_delta();
+                self.multitrack.scroll(lines, &Timeline::of(&self.project));
+            }
             Focus::RightSlot => {}
         }
+    }
+
+    fn shows_multitrack(&self) -> bool {
+        self.file_list.is_none() && !self.log_open && self.cart_view.is_none()
     }
 
     fn selection_would_reach_phrase_header(&self, direction: Direction) -> bool {
@@ -907,6 +924,20 @@ impl App {
                 self.project.target_cart(),
                 &export::needs(&self.project),
             );
+        } else {
+            let timeline = Timeline::of(&self.project);
+            self.multitrack.draw(
+                &mut grid,
+                layout::RIGHT_SLOT,
+                right_slot_focused,
+                &MultitrackView {
+                    project: &self.project,
+                    timeline: &timeline,
+                    playhead_tick: self
+                        .playhead
+                        .and_then(|playhead| playhead_tick(&timeline, &playhead)),
+                },
+            );
         }
         layout::draw_separators(&mut grid);
         let project = self.project_name();
@@ -942,6 +973,11 @@ impl App {
             },
         }
     }
+}
+
+fn playhead_tick(timeline: &Timeline, playhead: &Playhead) -> Option<u32> {
+    let (song_row, chain_row) = playhead.chain_row?;
+    timeline.tick_of(song_row, chain_row, playhead.chain_row_tick)
 }
 
 fn next_held_index(

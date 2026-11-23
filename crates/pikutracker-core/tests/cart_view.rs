@@ -174,7 +174,7 @@ fn ctrl_t_again_closes_the_cart_view_and_returns_focus() {
     open_cart_view(&mut app, original);
     app.apply(Action::ToggleCart);
 
-    assert_eq!(right_slot(&app, 0), "");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
     app.apply(Action::HexDigit(1));
     assert_eq!(app.project().song_cell(0, 0).map(|id| id.number()), Some(1));
 }
@@ -343,7 +343,7 @@ fn enter_on_the_patterns_field_closes_the_view() {
     app.apply(DOWN);
     app.apply(Action::Confirm);
 
-    assert_eq!(right_slot(&app, 0), "");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
 }
 
 #[test]
@@ -358,7 +358,7 @@ fn esc_restores_the_claim_from_when_the_view_opened() {
     app.apply(Action::Cancel);
 
     assert_eq!(claim(&app), before);
-    assert_eq!(right_slot(&app, 0), "");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
 }
 
 #[test]

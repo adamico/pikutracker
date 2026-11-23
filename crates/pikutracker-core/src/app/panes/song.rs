@@ -1,12 +1,12 @@
 use super::{
     EMPTY, HEADING, LOOP_MARK, SELECTED, VALUE, draw_row_label, draw_styled_value, draw_title,
-    id_text, nudged_id, stepped, typed_value,
+    id_text, mark_text, nudged_id, stepped, typed_value,
 };
 use crate::app::Direction;
 use crate::app::layout::Area;
 use crate::app::selection::{CellPosition, CellRange};
 use crate::player::{Playhead, TrackMix};
-use crate::project::{ChainId, Project, SONG_ROWS, SongRowEnding, SongRowMarks, TRACKS};
+use crate::project::{ChainId, Project, SONG_ROWS, SongRowMarks, TRACKS};
 use crate::screen::grid::{Grid, Style};
 use crate::screen::palette::Colour;
 
@@ -18,17 +18,6 @@ const HEADER_ROWS: usize = 2;
 const MARK_COLUMN: usize = 2;
 const FIRST_TRACK_COLUMN: usize = 4;
 const TRACK_WIDTH: usize = 3;
-
-const fn mark_text(marks: SongRowMarks) -> &'static str {
-    match (marks.loop_start, marks.ending) {
-        (false, None) => "",
-        (true, None) => ">",
-        (false, Some(SongRowEnding::LoopBack)) => "<",
-        (false, Some(SongRowEnding::Stop)) => "|",
-        (true, Some(SongRowEnding::LoopBack)) => "=",
-        (true, Some(SongRowEnding::Stop)) => "/",
-    }
-}
 
 fn track_header(track_mix: &TrackMix, track: usize) -> (char, Style) {
     if track_mix.is_soloed(track) {

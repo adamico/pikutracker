@@ -115,7 +115,7 @@ fn a_result_without_items_leaves_the_right_hand_view_alone() {
     let mut app = App::new();
     app.report(Report::failure("CANNOT SAVE"));
 
-    assert_eq!(right_slot(&app, 0), "");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
 }
 
 #[test]
@@ -128,7 +128,7 @@ fn ctrl_l_opens_the_log_with_focus_and_closes_it_back_to_the_pane_you_came_from(
     assert_eq!(pane_text(&app, layout::CHAIN, 2), "00 --     ---");
 
     app.apply(Action::ToggleLog);
-    assert_eq!(right_slot(&app, 0), "");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
     assert_eq!(pane_text(&app, layout::CHAIN, 2), "00[--]    ---");
 }
 
@@ -139,7 +139,7 @@ fn esc_in_the_log_closes_it() {
 
     app.apply(Action::Cancel);
 
-    assert_eq!(right_slot(&app, 0), "");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
     assert_eq!(song_line(&app, 2), "00 [--]-- -- --");
 }
 
@@ -154,7 +154,7 @@ fn esc_clears_a_failure_before_it_closes_the_log() {
     assert!(!status_line(&app).contains("EXPORT FAILED"));
 
     app.apply(Action::Cancel);
-    assert_eq!(right_slot(&app, 0), "");
+    assert!(right_slot(&app, 0).starts_with("MULTITRACK"));
 }
 
 #[test]
