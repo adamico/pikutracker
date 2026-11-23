@@ -77,7 +77,7 @@ fn the_ticks_count_every_track_whichever_chain_is_on_show() {
     let short = phrase(&mut project, 5, 4, 8);
     let long = phrase(&mut project, 6, 8, 8);
     place(&mut project, 0, 0, 0, &[ChainEntry::new(short)]);
-    place(&mut project, 0, 7, 1, &[ChainEntry::new(long)]);
+    place(&mut project, 0, 3, 1, &[ChainEntry::new(long)]);
 
     let app = App::with_project(project);
 
@@ -180,7 +180,7 @@ fn transposed_app(semitones: i32, volume: i32) -> App {
 fn a_step_transposed_above_63_is_flagged_in_the_phrase_and_chain_panes() {
     let app = transposed_app(40, 5);
 
-    assert_eq!(step_text(&app, 0), "00 C-2 00 5 0 !");
+    assert_eq!(step_text(&app, 0), "00 C-2 0 5 0  !");
     assert_eq!(chain_text(&app, 0), "0 01 +28      !   32");
 }
 
@@ -188,14 +188,14 @@ fn a_step_transposed_above_63_is_flagged_in_the_phrase_and_chain_panes() {
 fn a_step_transposed_below_0_is_flagged() {
     let app = transposed_app(-25, 5);
 
-    assert_eq!(step_text(&app, 0), "00 C-2 00 5 0 !");
+    assert_eq!(step_text(&app, 0), "00 C-2 0 5 0  !");
     assert_eq!(chain_text(&app, 0), "0 01 -19      !   32");
 }
 
 #[test]
 fn the_edges_of_the_pitch_range_are_not_flagged() {
-    assert_eq!(step_text(&transposed_app(39, 5), 0), "00 C-2 00 5 0");
-    assert_eq!(step_text(&transposed_app(-24, 5), 0), "00 C-2 00 5 0");
+    assert_eq!(step_text(&transposed_app(39, 5), 0), "00 C-2 0 5 0");
+    assert_eq!(step_text(&transposed_app(-24, 5), 0), "00 C-2 0 5 0");
     assert_eq!(
         chain_text(&transposed_app(39, 5), 0),
         "0 01 +27          32"
@@ -206,7 +206,7 @@ fn the_edges_of_the_pitch_range_are_not_flagged() {
 fn a_silent_step_is_not_flagged() {
     let app = transposed_app(40, 0);
 
-    assert_eq!(step_text(&app, 0), "00 ... .. . .");
+    assert_eq!(step_text(&app, 0), "00 ... . . .");
     assert_eq!(chain_text(&app, 0), "0 01 +28          32");
 }
 
@@ -237,8 +237,8 @@ fn arpeggio_reading_a_silent_d_sharp_5(length: i32) -> App {
 fn a_silent_step_an_arpeggio_reads_is_flagged_like_export_rejects_it() {
     let app = arpeggio_reading_a_silent_d_sharp_5(4);
 
-    assert_eq!(step_text(&app, 0), "00 C-2 00 5 6");
-    assert_eq!(step_text(&app, 1), "01 ... .. . . !");
+    assert_eq!(step_text(&app, 0), "00 C-2 0 5 6");
+    assert_eq!(step_text(&app, 1), "01 ... . . .  !");
     assert_eq!(chain_text(&app, 0), "0 01 +01      !   32");
 }
 

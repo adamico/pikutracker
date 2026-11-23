@@ -216,12 +216,7 @@ impl InstrumentView {
         let field = self.field(&rows(&instrument.sound));
         let two_digits = matches!(
             field,
-            Field::Speed
-                | Field::Length
-                | Field::LoopStart
-                | Field::LoopEnd
-                | Field::Sample(_)
-                | Field::Step(_, StepCell::Instrument)
+            Field::Speed | Field::Length | Field::LoopStart | Field::LoopEnd | Field::Sample(_)
         );
         if two_digits {
             let value = typed_value(&mut self.first_digit, digit);
@@ -324,12 +319,12 @@ impl InstrumentView {
 
     pub fn draw(&self, grid: &mut Grid, project: &Project) {
         let instrument = self.shown(project);
-        draw_title(grid, 0, 0, &format!("INSTRUMENT {:02X}", self.id), true);
+        draw_title(grid, 0, 0, &format!("INSTRUMENT {:X}", self.id), true);
         let labels: Vec<(usize, &str)> = match &instrument.sound {
             InstrumentSound::Sfx(_) => vec![
                 (SETTINGS_ROW, "SPD     LEN     LOOP    TO"),
                 (FILTERS_ROW, "NZ    BZ    DT    RV    DP"),
-                (STEP_HEADING_ROW, "   NOT IN V F"),
+                (STEP_HEADING_ROW, "   NOT I V F"),
             ],
             InstrumentSound::Waveform(_) => {
                 vec![(SETTINGS_ROW, "BASS"), (FILTERS_ROW, "DT    RV    DP")]

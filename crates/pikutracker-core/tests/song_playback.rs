@@ -154,9 +154,9 @@ fn tracks_sound_together_as_a_plain_mix() {
     let mut only_low = both.clone();
     let mut only_high = both.clone();
     place(&mut both, 0, 0, 0, &[plain(low)]);
-    place(&mut both, 0, 7, 1, &[plain(high)]);
+    place(&mut both, 0, 3, 1, &[plain(high)]);
     place(&mut only_low, 0, 0, 0, &[plain(low)]);
-    place(&mut only_high, 0, 7, 1, &[plain(high)]);
+    place(&mut only_high, 0, 3, 1, &[plain(high)]);
 
     let mix = hear(both, &[SPACE], 2);
     let low = hear(only_low, &[SPACE], 2);

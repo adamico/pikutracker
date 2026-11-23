@@ -142,7 +142,7 @@ fn saving_a_new_project_asks_for_a_name_on_the_file_list() {
     });
     assert_eq!(status_line(&app), "SAVED DEMO.PTRK");
     assert!(!app.has_unsaved_changes());
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
+    assert_eq!(right_slot(&app, 0), "SCOPE");
 }
 
 #[test]
@@ -404,7 +404,7 @@ fn opening_a_file_replaces_the_project_and_says_so() {
     );
     assert_eq!(status_line(&app), "OPENED SONG.PTRK");
     assert!(!app.has_unsaved_changes());
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
+    assert_eq!(right_slot(&app, 0), "SCOPE");
 
     place_chain_01_on_the_first_song_row(&mut app);
     app.apply(Action::Save);
@@ -427,7 +427,7 @@ fn each_project_opens_at_the_top_of_the_song_with_the_song_pane_focused() {
     let dump = app.grid().text_dump();
     assert_eq!(
         dump.lines().nth(2).unwrap()[..28].trim_end(),
-        "00 [--]-- -- -- -- -- -- --"
+        "00 [--]-- -- --"
     );
     assert!(dump.lines().nth(2).unwrap().contains("0 -- ---  "));
 }

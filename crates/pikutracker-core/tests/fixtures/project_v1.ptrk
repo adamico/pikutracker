@@ -2,7 +2,6 @@
 (
     version: 1,
     default_speed: 12,
-    export_tracks: [Some(1), Some(3), None, Some(8)],
     target_cart: Some((
         path: "../carts/game.p8",
         claim: (
@@ -12,9 +11,9 @@
         claimed_bytes_hash: Some("5d41402abc4b2a76b9719d911017c592"),
     )),
     song: [
-        (row: 0, tracks: "00 -- -- 01 -- -- -- --", loop_start: true),
-        (row: 1, tracks: "-- -- -- -- -- -- -- --", ending: Some(LoopBack)),
-        (row: 2, tracks: "-- -- -- -- -- -- -- FF", loop_start: true, ending: Some(Stop)),
+        (row: 0, tracks: "00 -- -- 01", loop_start: true),
+        (row: 1, tracks: "-- -- -- --", ending: Some(LoopBack)),
+        (row: 2, tracks: "-- -- -- FF", loop_start: true, ending: Some(Stop)),
     ],
     chains: [
         (id: 0, entries: [
@@ -37,10 +36,10 @@
             reverb: 2,
             dampen: 0,
             steps: [
-                "C#2 08 5 3",
-                "C#2 08 0 3",
-                "--- -- - -",
-                "D#5 FF 7 7",
+                "C#2 8 5 3",
+                "C#2 8 0 3",
+                "--- - - -",
+                "D#5 F 7 7",
             ],
         ),
         (
@@ -53,7 +52,7 @@
             detune: 0,
             reverb: 0,
             dampen: 2,
-            steps: ["C-0 00 1 0"],
+            steps: ["C-0 0 1 0"],
         ),
         (
             id: 255,
@@ -81,11 +80,11 @@
                 dampen: 0,
                 loop_start: 1,
                 loop_end: 2,
-                steps: ["C-2 03 5 0", "G-2 03 4 1"],
+                steps: ["C-2 3 5 0", "G-2 3 4 1"],
             )),
         ),
         (
-            id: 255,
+            id: 15,
             name: None,
             sound: Waveform((
                 bass: true,

@@ -11,7 +11,6 @@ use crate::screen::grid::{Grid, Style};
 use crate::screen::palette::Colour;
 
 const SOLOED: Style = Style::fg(Colour::Yellow);
-const EXPORT_CHANNEL_NUMBER: Style = Style::fg(Colour::Green);
 const PLAYING_BAR: Colour = Colour::DarkGreen;
 const WAITING_BAR: Colour = Colour::DarkGrey;
 
@@ -209,18 +208,10 @@ impl SongPane {
             .and_then(|playhead| playhead.chain_row)
             .map(|(row, _)| row);
         draw_title(grid, area.column, 0, "SONG", focused);
-        let export_tracks = project.export_track_numbers();
         for track in 0..TRACKS {
             let column = area.column + FIRST_TRACK_COLUMN + track * TRACK_WIDTH;
             let (letter, style) = track_header(track_mix, track);
             grid.put(column, 1, &format!("{letter}{}", track + 1), style);
-            let number = track as u8 + 1;
-            let channel = export_tracks
-                .iter()
-                .position(|exported| *exported == Some(number));
-            if let Some(channel) = channel {
-                grid.put(column + 2, 1, &channel.to_string(), EXPORT_CHANNEL_NUMBER);
-            }
         }
 
         let visible = area.rows - HEADER_ROWS;

@@ -26,7 +26,7 @@ use crate::export;
 use crate::keymap::{Key, KeyPress, Keyboard};
 use crate::midi_import::MidiTable;
 use crate::player::{AudioRequest, PlaybackReport, Playhead, SCOPE_COLUMNS, TrackMix};
-use crate::project::{CHAIN_ENTRIES, FIRST_CUSTOM_INSTRUMENT, SONG_ROWS};
+use crate::project::{CHAIN_ENTRIES, FIRST_CUSTOM_INSTRUMENT, LAST_CUSTOM_INSTRUMENT, SONG_ROWS};
 use crate::project::{
     Chain, ChainEntry, ChainId, Phrase, PhraseId, Project, SongRowEnding, SongRowMarks, Step,
 };
@@ -45,8 +45,8 @@ use panes::file_list::{FileList, Purpose};
 use panes::instrument::InstrumentView;
 use panes::log::LogPane;
 use panes::midi_dialog::MidiDialog;
-use panes::overview::OverviewPane;
 use panes::phrase::{PhrasePane, PhraseView};
+use panes::scope;
 use panes::song::SongPane;
 use panes::song_picker::SONG_PICKER_KEYS;
 use selection::CellPosition;
@@ -64,6 +64,7 @@ const NOTHING_TO_REDO: &str = "NOTHING TO REDO";
 const FOLLOW_ON: &str = "FOLLOW ON";
 const FOLLOW_OFF: &str = "FOLLOW OFF";
 const BUILT_IN_INSTRUMENT: &str = "BUILT-IN INSTRUMENTS HAVE NO SETTINGS";
+const CUSTOM_INSTRUMENTS_END_AT_F: &str = "CUSTOM INSTRUMENTS END AT F";
 const OPEN_LIST_KEYS: &str = "UP/DOWN PICK  ENTER CHOOSE  ESC CANCEL";
 const SAVE_LIST_KEYS: &str = "TYPE A NAME  UP/DOWN PICK  ENTER CHOOSE  ESC CANCEL";
 
@@ -86,7 +87,6 @@ pub struct App {
     song: SongPane,
     chain: ChainPane,
     phrase: PhrasePane,
-    overview: OverviewPane,
     played_pane: Focus,
     playing: bool,
     latest_play: u64,
@@ -150,7 +150,6 @@ impl App {
             song: SongPane::default(),
             chain: ChainPane::default(),
             phrase: PhrasePane::default(),
-            overview: OverviewPane::default(),
             played_pane: Focus::default(),
             playing: false,
             latest_play: 0,
@@ -233,7 +232,6 @@ impl App {
             Focus::Song => KeyContext::ReferenceValue,
             Focus::Chain => KeyContext::ReferenceValue,
             Focus::Phrase => self.phrase.key_context(),
-            Focus::RightSlot if !self.log_open => KeyContext::ReferenceValue,
             _ => KeyContext::Navigation,
         }
     }
@@ -383,7 +381,6 @@ impl App {
             song: self.song.cursor_place(),
             chain: self.chain.cursor_place(),
             phrase: self.phrase.cursor_place(),
-            overview_channel: self.overview.channel(),
         }
     }
 
@@ -394,7 +391,6 @@ impl App {
         self.song.return_to(place.song);
         self.chain.return_to(place.chain);
         self.phrase.return_to(place.phrase);
-        self.overview.return_to(place.overview_channel);
     }
 
     fn undo(&mut self) {
@@ -652,6 +648,9 @@ impl App {
             Action::Save => self.save(),
             Action::OctaveUp => self.phrase.change_octave(1),
             Action::OctaveDown => self.phrase.change_octave(-1),
+            Action::Jump(Direction::Right) if view.id() == LAST_CUSTOM_INSTRUMENT => {
+                self.remark = Some(CUSTOM_INSTRUMENTS_END_AT_F);
+            }
             Action::Jump(direction) => {
                 let id = match direction {
                     Direction::Left => view.id().saturating_sub(1),
@@ -671,9 +670,6 @@ impl App {
             Focus::Song => self.song.type_digit(&mut self.project, digit),
             Focus::Chain => self.edit_chain(|pane, chain| pane.type_digit(chain, digit)),
             Focus::Phrase => self.edit_phrase(|pane, phrase| pane.type_digit(phrase, digit)),
-            Focus::RightSlot if !self.log_open => {
-                self.overview.type_digit(&mut self.project, digit);
-            }
             Focus::RightSlot => {}
         }
     }
@@ -686,9 +682,19 @@ impl App {
         match self.focus {
             Focus::Song => self.song.nudge(&mut self.project, up, coarse),
             Focus::Chain => self.edit_chain(|pane, chain| pane.nudge(chain, up, coarse)),
+            Focus::Phrase if up && self.goes_past_the_last_instrument() => {
+                self.remark = Some(CUSTOM_INSTRUMENTS_END_AT_F);
+            }
             Focus::Phrase => self.edit_phrase(|pane, phrase| pane.nudge(phrase, up, coarse)),
             Focus::RightSlot => {}
         }
+    }
+
+    fn goes_past_the_last_instrument(&self) -> bool {
+        self.phrase_under_cursor().is_some_and(|id| {
+            self.phrase
+                .is_on_the_last_instrument(self.project.phrase(id))
+        })
     }
 
     fn edit_chain(&mut self, edit: impl FnOnce(&mut ChainPane, &mut Chain)) {
@@ -838,7 +844,7 @@ impl App {
             Focus::Phrase if self.selection_would_reach_phrase_header(direction) => {}
             Focus::Phrase => self.phrase.move_cursor(direction),
             Focus::RightSlot if self.log_open => self.log.move_cursor(direction),
-            Focus::RightSlot => self.overview.move_cursor(direction),
+            Focus::RightSlot => {}
         }
     }
 
@@ -918,14 +924,13 @@ impl App {
                 layout::RIGHT_SLOT,
                 right_slot_focused,
                 self.project.target_cart(),
-                export::needs(&self.project),
+                &export::needs(&self.project),
             );
         } else {
-            self.overview.draw(
+            scope::draw(
                 &mut grid,
                 layout::RIGHT_SLOT,
                 right_slot_focused,
-                self.project.export_track_numbers(),
                 &self.scope,
             );
         }

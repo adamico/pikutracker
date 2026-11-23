@@ -2,7 +2,7 @@
 
 use pikutracker_core::app::{Action, App};
 use pikutracker_core::cart::Cart;
-use pikutracker_core::player::{AudioRequest, Player, TrackMix};
+use pikutracker_core::player::{AudioRequest, Player};
 use pikutracker_core::project::Project;
 use pikutracker_core::synth::{
     Instrument, Note, SAMPLES_PER_TICK, Sound, Voice, Waveform, packed_filters,
@@ -248,20 +248,6 @@ pub fn render_sounds(sounds: &[(Sound, &[usize])]) -> Vec<f32> {
 
 pub fn render_song(project: Project, samples: usize) -> Vec<f32> {
     let mut player = Player::new();
-    player.handle(AudioRequest::PlaySong {
-        project: Arc::new(project),
-        from_row: 0,
-    });
-    player.render(samples)
-}
-
-pub fn render_export_tracks(project: Project, samples: usize) -> Vec<f32> {
-    let mut mix = TrackMix::default();
-    for track in project.export_track_indices().into_iter().flatten() {
-        mix.toggle_solo(track);
-    }
-    let mut player = Player::new();
-    player.handle(AudioRequest::SetTrackMix(mix));
     player.handle(AudioRequest::PlaySong {
         project: Arc::new(project),
         from_row: 0,

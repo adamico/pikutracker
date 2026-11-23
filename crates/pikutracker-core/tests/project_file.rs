@@ -34,9 +34,6 @@ fn fixture_project() -> Project {
             ending: Some(SongRowEnding::Stop),
         },
     );
-    project.set_export_track(0, Some(1));
-    project.set_export_track(1, Some(3));
-    project.set_export_track(3, Some(8));
     project.set_target_cart(Some(TargetCart {
         path: "../carts/game.p8".to_owned(),
         claim: Claim {
@@ -48,7 +45,7 @@ fn fixture_project() -> Project {
 
     project.set_song_cell(0, 0, Some(ChainId::new(0)));
     project.set_song_cell(0, 3, Some(ChainId::new(1)));
-    project.set_song_cell(2, 7, Some(ChainId::new(0xFF)));
+    project.set_song_cell(2, 3, Some(ChainId::new(0xFF)));
 
     *project.chain_mut(ChainId::new(0)).entry_mut(0) = Some(ChainEntry::new(PhraseId::new(0)));
     let mut lowered = ChainEntry::new(PhraseId::new(1));
@@ -67,7 +64,7 @@ fn fixture_project() -> Project {
     *phrase.step_mut(0) = step(25, 8, 5, 3);
     *phrase.step_mut(1) = step(25, 8, 0, 3);
     *phrase.step_mut(2) = step(0, 0, 0, 0);
-    *phrase.step_mut(3) = step(63, 0xFF, 7, 7);
+    *phrase.step_mut(3) = step(63, 0xF, 7, 7);
 
     let phrase = project.phrase_mut(PhraseId::new(1));
     phrase.set_loop(4, 32);
@@ -109,7 +106,7 @@ fn fixture_project() -> Project {
         *sample = index as i8 - 2;
     }
     project.set_custom_instrument(
-        0xFF,
+        0xF,
         Some(CustomInstrument {
             name: None,
             sound: InstrumentSound::Waveform(WaveformInstrument {
@@ -149,7 +146,7 @@ fn steps_are_written_as_tracker_tokens() {
     let mut project = Project::new();
     *project.phrase_mut(PhraseId::new(0)).step_mut(0) = step(25, 8, 5, 3);
 
-    assert!(project_file::write(&project).contains("\"C#2 08 5 3\""));
+    assert!(project_file::write(&project).contains("\"C#2 8 5 3\""));
 }
 
 #[test]
@@ -159,7 +156,7 @@ fn a_silent_step_holding_data_is_written_in_full() {
 
     let text = project_file::write(&project);
 
-    assert!(text.contains("\"C#2 08 0 3\""));
+    assert!(text.contains("\"C#2 8 0 3\""));
     assert_eq!(
         project_file::parse(&text)
             .unwrap()
@@ -177,8 +174,8 @@ fn only_a_step_of_all_zeros_is_written_as_dashes() {
 
     let text = project_file::write(&project);
 
-    assert!(text.contains("\"--- -- - -\""));
-    assert!(text.contains("\"C-0 00 0 1\""));
+    assert!(text.contains("\"--- - - -\""));
+    assert!(text.contains("\"C-0 0 0 1\""));
 }
 
 #[test]
@@ -230,7 +227,7 @@ impl SeededRandom {
 fn random_step(random: &mut SeededRandom) -> Step {
     step(
         random.below(64),
-        random.below(256),
+        random.below(16),
         random.below(8),
         random.below(8),
     )
@@ -251,13 +248,9 @@ fn random_project(random: &mut SeededRandom) -> Project {
         };
         project.set_song_row_marks(usize::from(random.below(256)), marks);
     }
-    for channel in 0..4 {
-        let track = random.flip().then_some(channel as u8 + 1);
-        project.set_export_track(channel, track);
-    }
     for _ in 0..40 {
         let row = usize::from(random.below(256));
-        let track = usize::from(random.below(8));
+        let track = usize::from(random.below(4));
         let chain = ChainId::new(random.below(256));
         project.set_song_cell(row, track, Some(chain));
 
@@ -378,12 +371,13 @@ fn version_zero_is_refused() {
 #[test]
 fn values_outside_their_limits_are_refused() {
     let damaged = [
-        ("\"C#2 08 5 3\"", "\"E-5 08 5 3\""),
-        ("\"C#2 08 5 3\"", "\"C#2 08 8 3\""),
-        ("\"C#2 08 5 3\"", "\"C#2 08 5 8\""),
-        ("\"C#2 08 5 3\"", "\"H-2 08 5 3\""),
-        ("\"C#2 08 5 3\"", "\"C#2 8 5 3\""),
-        ("\"C#2 08 5 3\"", "\"C#2 08 5\""),
+        ("\"C#2 8 5 3\"", "\"E-5 8 5 3\""),
+        ("\"C#2 8 5 3\"", "\"C#2 8 8 3\""),
+        ("\"C#2 8 5 3\"", "\"C#2 8 5 8\""),
+        ("\"C#2 8 5 3\"", "\"H-2 8 5 3\""),
+        ("\"C#2 8 5 3\"", "\"C#2 08 5 3\""),
+        ("\"C#2 8 5 3\"", "\"C#2 G 5 3\""),
+        ("\"C#2 8 5 3\"", "\"C#2 8 5\""),
         ("loop_start: 3", "loop_start: 33"),
         ("loop_end: 0", "loop_end: 33"),
         ("speed: 8", "speed: 0"),
@@ -392,8 +386,6 @@ fn values_outside_their_limits_are_refused() {
             "detune: 3,\n            reverb: 2",
         ),
         ("default_speed: 12", "default_speed: 0"),
-        ("[Some(1), Some(3)", "[Some(9), Some(3)"),
-        ("[Some(1), Some(3)", "[Some(3), Some(3)"),
         ("[3, 4, 50]", "[3, 4, 64]"),
         ("(first: 24, last: 29)", "(first: 30, last: 29)"),
         ("(first: 24, last: 29)", "(first: 24, last: 64)"),
@@ -401,8 +393,9 @@ fn values_outside_their_limits_are_refused() {
         ("-- -- -- FF\"", "-- -- FF\""),
         ("(index: 15,", "(index: 16,"),
         ("id: 8,", "id: 7,"),
+        ("id: 15,\n            name", "id: 16,\n            name"),
         ("\"BASS\"", "\"THIRTEEN CHAR\""),
-        ("steps: [\"C-2 03 5 0\", \"G-2 03 4 1\"]", "steps: []"),
+        ("steps: [\"C-2 3 5 0\", \"G-2 3 4 1\"]", "steps: []"),
         ("loop_end: 2", "loop_end: 33"),
         ("-128, 127, 0,", "-128, 127,"),
     ];

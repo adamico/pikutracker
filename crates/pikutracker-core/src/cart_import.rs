@@ -3,14 +3,12 @@ mod rebuild;
 
 use crate::cart::{Cart, Pattern, SLOTS};
 use crate::project::{
-    Chain, ChainEntry, ChainId, Claim, EXPORT_CHANNELS, Phrase, PhraseId, Project, SongPlace,
-    SongRowEnding, SongRowMarks, TargetCart,
+    Chain, ChainEntry, ChainId, Claim, Phrase, PhraseId, Project, SongPlace, SongRowEnding,
+    SongRowMarks, TRACKS, TargetCart, custom_instrument_of_slot,
 };
 use crate::wording::counted;
 use instruments::imported_instrument;
-use rebuild::{
-    RebuiltChannel, RebuiltPattern, has_bit_7, instrument_of_slot, loose_phrase, rebuild_pattern,
-};
+use rebuild::{RebuiltChannel, RebuiltPattern, has_bit_7, loose_phrase, rebuild_pattern};
 use std::collections::BTreeSet;
 
 const LAST_SLOT: u8 = SLOTS as u8 - 1;
@@ -134,9 +132,6 @@ pub fn import(cart: &Cart, cart_path: &str) -> ImportedCart {
 
 pub fn import_song(cart: &Cart, cart_path: &str, song: Option<CartSong>) -> ImportedCart {
     let mut project = Project::new();
-    for channel in 0..EXPORT_CHANNELS {
-        project.set_export_track(channel, Some(channel as u8 + 1));
-    }
 
     let mut warnings = Vec::new();
     let mut claim = Claim::default();
@@ -155,7 +150,7 @@ pub fn import_song(cart: &Cart, cart_path: &str, song: Option<CartSong>) -> Impo
     let loose = LooseSfx::of(cart, &claim, &mut instruments);
     loose.keep(&mut project, &mut shared, &mut warnings);
     for slot in instruments {
-        let id = instrument_of_slot(slot);
+        let id = custom_instrument_of_slot(slot);
         project.set_custom_instrument(id, Some(imported_instrument(cart, slot)));
     }
 
@@ -327,7 +322,7 @@ impl<'a> SongBuilder<'a> {
         let rebuilt = rebuild_pattern(self.cart, pattern);
         self.chain_rows += rebuilt.chain_rows.len();
         if rebuilt.only_bit_7 {
-            let track = (0..EXPORT_CHANNELS).find(|&track| pattern.channel(track).is_some());
+            let track = (0..TRACKS).find(|&track| pattern.channel(track).is_some());
             self.warnings.push(ImportWarning {
                 text: format!(
                     "{} HOLDS ONLY BIT 7 SFX: THE CART STALLS HERE, THE EXPORTED SONG PLAYS \
@@ -342,7 +337,7 @@ impl<'a> SongBuilder<'a> {
                 }),
             });
         }
-        for track in 0..EXPORT_CHANNELS {
+        for track in 0..TRACKS {
             let mut chain = Chain::default();
             if let Some(played) = pattern.channel(track) {
                 self.played.insert(played);

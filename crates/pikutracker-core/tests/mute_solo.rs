@@ -237,12 +237,12 @@ fn the_phrase_pane_plays_a_muted_track_all_the_same() {
 #[test]
 fn track_headers_mark_muted_and_soloed_tracks() {
     let mut app = App::with_project(two_tracks());
-    assert_eq!(headers(&app), "T1 T2 T3 T4 T5 T6 T7 T8");
+    assert_eq!(headers(&app), "T1 T2 T3 T4");
 
     app.apply(Action::Mute { track_number: 2 });
     app.apply(Action::Solo { track_number: 3 });
 
-    assert_eq!(headers(&app), "T1 M2 S3 T4 T5 T6 T7 T8");
+    assert_eq!(headers(&app), "T1 M2 S3 T4");
 }
 
 #[test]
@@ -264,7 +264,7 @@ fn a_track_both_muted_and_soloed_shows_as_soloed() {
     app.apply(Action::Mute { track_number: 1 });
     app.apply(Action::Solo { track_number: 1 });
 
-    assert_eq!(headers(&app), "S1 T2 T3 T4 T5 T6 T7 T8");
+    assert_eq!(headers(&app), "S1 T2 T3 T4");
 }
 
 #[test]

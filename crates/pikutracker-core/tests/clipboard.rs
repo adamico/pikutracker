@@ -171,11 +171,11 @@ fn a_song_paste_past_the_last_row_reports_the_rows_lost() {
 fn a_song_paste_past_the_last_track_counts_every_clipped_row() {
     let mut app = App::with_project(song_block());
     apply(&mut app, &[SELECT_DOWN, SELECT_RIGHT, Action::Copy, UP]);
-    apply(&mut app, &moves(RIGHT, 6));
+    apply(&mut app, &moves(RIGHT, 2));
 
     app.apply(Action::Paste);
 
-    assert_eq!(song_cell(&app, 0, 7), Some(0x10));
+    assert_eq!(song_cell(&app, 0, 3), Some(0x10));
     assert_eq!(status_line(&app), "! PASTE LOST 2 ROWS");
 }
 

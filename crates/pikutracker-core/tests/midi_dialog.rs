@@ -161,8 +161,8 @@ fn s_ticks_a_whole_source() {
 }
 
 #[test]
-fn voices_past_eight_show_as_dropped_and_say_how_to_keep_them() {
-    let song = (0..9).fold(Song::new(), |song, voice| {
+fn more_than_four_ticked_voices_show_as_dropped_and_say_how_to_keep_them() {
+    let song = (0..5).fold(Song::new(), |song, voice| {
         song.note(0, TICKS_PER_STEP, 1, MIDDLE_C + voice, 127)
     });
 

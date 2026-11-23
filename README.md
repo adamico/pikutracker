@@ -4,7 +4,7 @@ A keyboard-driven desktop tracker for writing PICO-8 music. You compose in a Pro
 
 What pikutracker does:
 
-- Song, Chain and Phrase panes on one screen, with 8 Tracks to try parts in before you choose the 4 that go to PICO-8's channels.
+- Song, Chain and Phrase panes on one screen, with 4 Tracks, one per PICO-8 channel.
 - Export writes only the SFX and Patterns the Project claims, so the Cart's code, graphics, map and other sounds stay as they are.
 - Import the music of a `.p8` or `.p8.png` Cart, or a Standard MIDI File.
 - Playback emulates PICO-8's sound chip and is checked against recordings of real PICO-8.
@@ -28,7 +28,7 @@ The screen shows three panes side by side. From left to right:
 
 - **Song**: the whole piece, read from top to bottom. Each Song row names one Chain for each Track, or none. A Song has up to 256 rows.
   - **Loop start, Loop back and Stop**: marks on a Song row, shown beside its number, which become PICO-8's flags of the same name. After a Loop back row (`<`), playback returns to the nearest Loop start (`>`) at or before it, or to row 00 if there is none. Playback ends after a Stop row (`|`), at an empty row, or after the last row. A row with Loop start and Loop back shows `=`, and one with Loop start and Stop shows `/`.
-  - **Track**: one of the Song's 8 columns (T1 to T8), played by one voice. Export sends 4 of them to PICO-8's 4 channels, so you can try parts on the other Tracks before choosing.
+  - **Track**: one of the Song's 4 columns (T1 to T4), played by one voice. Track n Exports to PICO-8's channel n − 1.
 - **Chain**: a list of up to 16 Phrases, played in order. The same Phrase can appear more than once, and each entry can transpose it.
   - **Chain row**: entry K of every Track's Chain in the same Song row. They start together and become one PICO-8 Pattern. The TICK column of the Chain pane shows how long each lasts.
 - **Phrase**: 1 to 32 Steps (16 by default) with its own speed. This is where you write notes. A Phrase becomes roughly one PICO-8 SFX; when a Chain transposes it, the transposed copy is exported as its own SFX.
@@ -109,8 +109,8 @@ These are the keys of the default PcTracker preset. The M8-style column applies 
 | --- | --- | --- |
 | Play / stop the focused pane | Space | same |
 | Play the Song from the cursor | Shift+Space | same |
-| Mute Track 1–8 | F1–F8 | same |
-| Solo Track 1–8 | Shift+F1–F8 | same |
+| Mute Track 1–4 | F1–F4 | same |
+| Solo Track 1–4 | Shift+F1–F4 | same |
 | Clear mutes and solos | F9 | same |
 | Toggle Follow | F10 | same |
 
