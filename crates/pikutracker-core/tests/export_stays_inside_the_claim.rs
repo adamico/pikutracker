@@ -136,13 +136,10 @@ fn random_project(rng: &mut Rng) -> (Project, Needs) {
 }
 
 fn random_claim(rng: &mut Rng, needs: &Needs) -> Claim {
-    let low = rng.shuffled((0..8).collect());
-    let (instrument_slots, other_low) = low.split_at(needs.instruments);
-    let mut others = other_low.to_vec();
-    others.extend(8..64);
-    let others = rng.shuffled(others);
+    let instrument_slots: Vec<u8> = (0..needs.instruments as u8).collect();
+    let others = rng.shuffled((needs.instruments as u8..64).collect());
     let count = rng.between(needs.sfx, 64) - needs.instruments;
-    let mut sfx = instrument_slots.to_vec();
+    let mut sfx = instrument_slots;
     sfx.extend(&others[..count]);
     let sfx = rng.shuffled(sfx);
     let first = rng.between(0, 64 - needs.patterns);
@@ -434,9 +431,11 @@ fn a_p8_export_changes_no_byte_outside_the_claim() {
 fn break_export(rng: &mut Rng, project: &mut Project, claim: &mut Claim) -> &'static str {
     let needed = needs(project);
     match rng.below(6) {
-        5 if needed.instrument_sfx > 0 => {
-            claim.sfx.retain(|slot| *slot >= 8);
-            "no room in 00-07 for Custom Instruments"
+        5 if !needed.instrument_slots.is_empty() => {
+            claim
+                .sfx
+                .retain(|slot| !needed.instrument_slots.contains(slot));
+            "no SFX k for Custom Instrument 8 + k"
         }
         0 | 5 => {
             for channel in 0..4 {

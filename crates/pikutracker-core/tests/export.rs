@@ -597,14 +597,14 @@ fn sfx_instrument() -> InstrumentSound {
 }
 
 #[test]
-fn a_custom_instrument_takes_the_lowest_free_claimed_slot_in_0_to_7() {
+fn custom_instrument_8_plus_k_exports_to_sfx_k() {
     let project = custom_instrument_project(sfx_instrument());
 
-    let cart = exported_cart(&project, &claim(&[20, 5, 3, 8], (0, 0)));
+    let cart = exported_cart(&project, &claim(&[20, 5, 2, 8], (0, 0)));
 
     let first_note = 36u16 | 2 << 6 | 5 << 9;
     let second_note = 40u16 | 1 << 6 | 4 << 9 | 3 << 12;
-    let instrument = cart.sfx_bytes(3);
+    let instrument = cart.sfx_bytes(2);
     assert_eq!(instrument[..2], first_note.to_le_bytes());
     assert_eq!(instrument[2..4], second_note.to_le_bytes());
     assert_eq!(instrument[4..64], [0; 60]);
@@ -613,27 +613,28 @@ fn a_custom_instrument_takes_the_lowest_free_claimed_slot_in_0_to_7() {
 }
 
 #[test]
-fn steps_playing_a_custom_instrument_name_its_slot() {
+fn steps_playing_a_custom_instrument_keep_its_digit() {
     let project = custom_instrument_project(sfx_instrument());
 
-    let cart = exported_cart(&project, &claim(&[20, 5, 3, 8], (0, 0)));
+    let cart = exported_cart(&project, &claim(&[20, 5, 2, 8], (0, 0)));
 
     let note = cart.sfx(5).note(2);
-    assert_eq!((note.instrument, note.custom), (3, true));
+    assert_eq!((note.instrument, note.custom), (2, true));
     assert!(!cart.sfx(5).note(0).custom);
 }
 
 #[test]
-fn custom_instruments_take_slots_in_order_of_their_number() {
+fn each_custom_instrument_keeps_its_slot_whatever_else_is_claimed() {
     let mut project = custom_instrument_project(sfx_instrument());
-    *project.phrase_mut(PhraseId::new(0)).step_mut(3) = Step::new(12, 0x09, 5, 0).unwrap();
-    project.set_custom_instrument(0x09, Some(CustomInstrument::default()));
+    *project.phrase_mut(PhraseId::new(0)).step_mut(3) = Step::new(12, 0x0F, 5, 0).unwrap();
+    project.set_custom_instrument(0x0F, Some(CustomInstrument::default()));
 
-    let cart = exported_cart(&project, &claim(&[1, 6, 8], (0, 0)));
+    let cart = exported_cart(&project, &claim(&[0, 1, 2, 7, 8], (0, 0)));
 
-    assert_eq!(cart.sfx(8).note(3).instrument, 1);
-    assert_eq!(cart.sfx(8).note(2).instrument, 6);
-    assert_eq!(cart.sfx_bytes(6)[64..], [1 + 24, 4, 0, 2]);
+    assert_eq!(cart.sfx(0).note(3).instrument, 7);
+    assert_eq!(cart.sfx(0).note(2).instrument, 2);
+    assert_eq!(cart.sfx_bytes(2)[64..], [1 + 24, 4, 0, 2]);
+    assert_eq!(cart.pattern(0).channel(0), Some(0));
 }
 
 #[test]
@@ -649,9 +650,9 @@ fn a_waveform_instrument_writes_its_samples_and_the_fixed_header() {
         dampen: 1,
     }));
 
-    let cart = exported_cart(&project, &claim(&[0, 8], (0, 0)));
+    let cart = exported_cart(&project, &claim(&[2, 8], (0, 0)));
 
-    let instrument = cart.sfx_bytes(0);
+    let instrument = cart.sfx_bytes(2);
     assert_eq!(instrument[..3], [0xFF, 100, 0]);
     assert_eq!(instrument[64..], [1 + 16 + 72, 17, 0x80, 0]);
 }
@@ -686,25 +687,29 @@ fn under_reverb_a_silent_step_takes_a_slot_for_its_custom_instrument() {
     *phrase.step_mut(2) = Step::new(12, 0x0A, 0, 0).unwrap();
     phrase.filters_mut().set_reverb(1);
 
-    let exported = export(&project, &claim(&[3, 8], (0, 0)), &blank_cart()).unwrap();
+    let exported = export(&project, &claim(&[2, 8], (0, 0)), &blank_cart()).unwrap();
 
     assert_eq!(exported.sfx_count, 2);
     let note = Cart::read(&exported.cart_bytes).unwrap().sfx(8).note(2);
-    assert_eq!((note.instrument, note.custom, note.volume), (3, true, 0));
+    assert_eq!((note.instrument, note.custom, note.volume), (2, true, 0));
 }
 
 #[test]
-fn too_few_claimed_slots_in_0_to_7_fail_the_export() {
+fn a_claim_without_sfx_k_fails_an_export_that_plays_custom_instrument_8_plus_k() {
     let project = custom_instrument_project(sfx_instrument());
 
-    let failures = export(&project, &claim(&[8, 9], (0, 0)), &blank_cart()).unwrap_err();
+    let failures = export(&project, &claim(&[0, 1, 3, 8], (0, 0)), &blank_cart()).unwrap_err();
 
     assert_eq!(
         failures,
-        [ExportFailure::TooFewInstrumentSlots {
-            needed: 1,
-            claimed: 0
+        [ExportFailure::MissingInstrumentSlot {
+            instrument: 0x0A,
+            slot: 2
         }]
+    );
+    assert_eq!(
+        failures[0].to_string(),
+        "INSTRUMENT A NEEDS SFX 02, WHICH THE CLAIM LACKS"
     );
 }
 
@@ -712,7 +717,7 @@ fn too_few_claimed_slots_in_0_to_7_fail_the_export() {
 fn instruments_count_towards_the_sfx_a_claim_must_hold() {
     let project = custom_instrument_project(sfx_instrument());
 
-    let failures = export(&project, &claim(&[3], (0, 0)), &blank_cart()).unwrap_err();
+    let failures = export(&project, &claim(&[2], (0, 0)), &blank_cart()).unwrap_err();
 
     assert_eq!(
         failures,

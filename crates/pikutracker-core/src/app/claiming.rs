@@ -106,7 +106,7 @@ impl App {
         };
         let needs = export::needs(&self.project);
         let hash = target.claimed_bytes_hash.as_deref();
-        if let Some(claim) = view.suggested_claim(hash, needs) {
+        if let Some(claim) = view.suggested_claim(hash, &needs) {
             view.show_claim(&claim);
             target.claim = claim;
         }

@@ -37,10 +37,10 @@
             reverb: 2,
             dampen: 0,
             steps: [
-                "C#2 08 5 3",
-                "C#2 08 0 3",
-                "--- -- - -",
-                "D#5 FF 7 7",
+                "C#2 8 5 3",
+                "C#2 8 0 3",
+                "--- - - -",
+                "D#5 F 7 7",
             ],
         ),
         (
@@ -53,7 +53,7 @@
             detune: 0,
             reverb: 0,
             dampen: 2,
-            steps: ["C-0 00 1 0"],
+            steps: ["C-0 0 1 0"],
         ),
         (
             id: 255,
@@ -81,11 +81,11 @@
                 dampen: 0,
                 loop_start: 1,
                 loop_end: 2,
-                steps: ["C-2 03 5 0", "G-2 03 4 1"],
+                steps: ["C-2 3 5 0", "G-2 3 4 1"],
             )),
         ),
         (
-            id: 255,
+            id: 15,
             name: None,
             sound: Waveform((
                 bass: true,

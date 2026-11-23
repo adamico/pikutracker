@@ -57,9 +57,9 @@ fn step_line(app: &App, index: usize) -> String {
 fn a_new_phrase_shows_empty_steps() {
     let app = phrase_app(&[]);
 
-    assert_eq!(step_line(&app, 0), "00[...].. . .");
-    assert_eq!(step_line(&app, 15), "0F ... .. . .");
-    assert_eq!(step_line(&app, 31), "1F ... .. . .");
+    assert_eq!(step_line(&app, 0), "00[...]. . .");
+    assert_eq!(step_line(&app, 15), "0F ... . . .");
+    assert_eq!(step_line(&app, 31), "1F ... . . .");
 }
 
 #[test]
@@ -71,29 +71,29 @@ fn a_piano_key_enters_a_note_with_the_current_instrument_volume_and_octave() {
     assert_eq!(entered.instrument(), 2);
     assert_eq!(entered.volume(), 5);
     assert_eq!(entered.effect(), 0);
-    assert_eq!(step_line(&app, 0), "00 C-2 02 5 0");
+    assert_eq!(step_line(&app, 0), "00 C-2 2 5 0");
 }
 
 #[test]
 fn entering_a_note_moves_the_cursor_down_one_step() {
     let app = phrase_app(&[C]);
 
-    assert_eq!(step_line(&app, 1), "01[...].. . .");
+    assert_eq!(step_line(&app, 1), "01[...]. . .");
 }
 
 #[test]
 fn the_cursor_stays_on_step_31_after_entering_a_note_there() {
     let app = phrase_app(&[&[DOWN; 31][..], &[C]].concat());
 
-    assert_eq!(step_line(&app, 31), "1F[C-2]02 5 0");
+    assert_eq!(step_line(&app, 31), "1F[C-2]2 5 0");
 }
 
 #[test]
 fn piano_keys_cover_two_octaves_of_semitones() {
     let app = phrase_app(&[Action::PianoKey(1), Action::PianoKey(13)]);
 
-    assert_eq!(step_line(&app, 0), "00 C#2 02 5 0");
-    assert_eq!(step_line(&app, 1), "01 C#3 02 5 0");
+    assert_eq!(step_line(&app, 0), "00 C#2 2 5 0");
+    assert_eq!(step_line(&app, 1), "01 C#3 2 5 0");
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn pitch_33_is_named_a_2() {
     let app = phrase_app(&[Action::PianoKey(9)]);
 
     assert_eq!(step(&app, 0).pitch(), 33);
-    assert_eq!(step_line(&app, 0), "00 A-2 02 5 0");
+    assert_eq!(step_line(&app, 0), "00 A-2 2 5 0");
 }
 
 #[test]
@@ -139,7 +139,7 @@ fn a_note_above_the_pitch_range_stops_at_d_sharp_5() {
     let app = phrase_app(&[&[Action::OctaveUp; 4][..], &[Action::PianoKey(23)]].concat());
 
     assert_eq!(step(&app, 0).pitch(), 63);
-    assert_eq!(step_line(&app, 0), "00 D#5 02 5 0");
+    assert_eq!(step_line(&app, 0), "00 D#5 2 5 0");
 }
 
 #[test]
@@ -159,7 +159,7 @@ fn hex_digits_edit_the_instrument_volume_and_effect_of_a_step() {
     assert_eq!(edited.instrument(), 4);
     assert_eq!(edited.volume(), 3);
     assert_eq!(edited.effect(), 6);
-    assert_eq!(step_line(&app, 0), "00 C-2 04 3[6]");
+    assert_eq!(step_line(&app, 0), "00 C-2 4 3[6]");
 }
 
 #[test]
@@ -228,7 +228,7 @@ fn a_volume_0_step_shows_as_empty_and_keeps_its_pitch_and_instrument() {
         DOWN,
     ]);
 
-    assert_eq!(step_line(&app, 0), "00 ... .. . .");
+    assert_eq!(step_line(&app, 0), "00 ... . . .");
     let silent = step(&app, 0);
     assert_eq!(silent.volume(), 0);
     assert_eq!(silent.pitch(), 33);
@@ -251,7 +251,7 @@ fn volume_0_can_be_the_current_volume() {
 
     assert_eq!(step(&app, 1).pitch(), 24);
     assert_eq!(step(&app, 1).volume(), 0);
-    assert_eq!(step_line(&app, 1), "01 ... .. . .");
+    assert_eq!(step_line(&app, 1), "01 ... . . .");
 }
 
 #[test]
@@ -409,8 +409,8 @@ fn steps_past_len_are_shown_dimmed_with_their_notes() {
     let app = phrase_app(&[&[DOWN; 10][..], &[C], &[UP; 11], &LEN_8].concat());
 
     assert_eq!(phrase(&app).length(), 8);
-    assert_eq!(step_line(&app, 10), "0A C-2 02 5 0");
-    assert_eq!(step_line(&app, 31), "1F ... .. . .");
+    assert_eq!(step_line(&app, 10), "0A C-2 2 5 0");
+    assert_eq!(step_line(&app, 31), "1F ... . . .");
     assert_eq!(pitch_colour(&app, 10), Colour::DarkGrey);
     assert_eq!(label_colour(&app, 10), Colour::DarkGrey);
     assert_eq!(label_colour(&app, 7), Colour::Lavender);
@@ -432,7 +432,7 @@ fn lengthening_shows_the_steps_in_the_normal_style_with_no_data_change() {
 
     assert_eq!(phrase(&app).length(), 16);
     assert_eq!(phrase(&app).step(10), phrase(&shortened).step(10));
-    assert_eq!(step_line(&app, 10), "0A C-2 02 5 0");
+    assert_eq!(step_line(&app, 10), "0A C-2 2 5 0");
     assert_eq!(pitch_colour(&app, 10), Colour::White);
     assert_eq!(label_colour(&app, 10), Colour::Lavender);
 }
@@ -441,7 +441,7 @@ fn lengthening_shows_the_steps_in_the_normal_style_with_no_data_change() {
 fn the_cursor_moves_past_len_and_stops_at_step_31() {
     let app = phrase_app(&[&LEN_8[..], &[DOWN; 40]].concat());
 
-    assert_eq!(step_line(&app, 31), "1F[...].. . .");
+    assert_eq!(step_line(&app, 31), "1F[...]. . .");
 }
 
 #[test]
@@ -458,12 +458,12 @@ fn a_step_past_len_can_be_edited_and_still_does_not_play() {
     assert_eq!(phrase(&app).length(), 8);
     assert_eq!(step(&app, 20).pitch(), 24);
     assert_eq!(step(&app, 20).instrument(), 3);
-    assert_eq!(step_line(&app, 20), "14 C-2[03]5 0");
+    assert_eq!(step_line(&app, 20), "14 C-2[3]5 0");
 }
 
 #[test]
 fn entering_a_note_on_the_last_step_within_len_moves_into_the_dimmed_steps() {
     let app = phrase_app(&[&LEN_8[..], &[DOWN; 7], &[C]].concat());
 
-    assert_eq!(step_line(&app, 8), "08[...].. . .");
+    assert_eq!(step_line(&app, 8), "08[...]. . .");
 }

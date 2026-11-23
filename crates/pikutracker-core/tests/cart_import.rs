@@ -2,6 +2,7 @@ mod support;
 
 use pikutracker_core::cart::Cart;
 use pikutracker_core::cart_import::{import, import_song, songs};
+use pikutracker_core::export::export;
 use pikutracker_core::project::{
     ChainId, CustomInstrument, InstrumentSound, Phrase, PhraseId, Project, SfxInstrument, Step,
     TRACKS, WaveformInstrument,
@@ -537,6 +538,33 @@ fn an_sfx_used_as_an_instrument_becomes_an_sfx_instrument_numbered_8_above_its_s
     assert_eq!(imported, &expected);
     assert_eq!(project.custom_instruments().count(), 1);
     assert_eq!(project.target_cart().unwrap().claim.sfx, [0, 1]);
+}
+
+#[test]
+fn an_import_export_round_trip_keeps_every_instrument_in_its_slot() {
+    let mut melody = TestSfx::with_pitches(16, &[36, 40]);
+    melody.notes[0].custom = true;
+    melody.notes[0].instrument = 5;
+    melody.notes[1].instrument = 3;
+    let silent = TestSfx::with_pitches(8, &[]);
+    let instrument = TestSfx::with_pitches(4, &[24, 31, 28]);
+    let cart = TestCart {
+        sfx: vec![melody, silent, silent, silent, silent, instrument],
+        patterns: vec![pattern([Some(0), None, None, None])],
+    };
+    let original = cart.p8();
+    let (project, _) = imported(&cart);
+    let claim = project.target_cart().unwrap().claim.clone();
+
+    let exported = export(&project, &claim, &original).unwrap();
+
+    let (before, after) = (
+        Cart::read(&original).unwrap(),
+        Cart::read(&exported.cart_bytes).unwrap(),
+    );
+    assert!(project.custom_instrument(0x0D).is_some());
+    assert_eq!(after.sfx_bytes(5)[..64], before.sfx_bytes(5)[..64]);
+    assert_eq!(after.sfx_bytes(0)[..4], before.sfx_bytes(0)[..4]);
 }
 
 #[test]

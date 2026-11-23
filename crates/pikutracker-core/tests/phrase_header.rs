@@ -116,7 +116,7 @@ fn the_loop_pair_sits_beside_the_speed() {
 fn the_cursor_moves_back_down_from_the_header_to_the_first_step() {
     let app = phrase_app(&[UP, DOWN]);
 
-    assert_eq!(phrase_line(&app, FIRST_STEP_LINE), "00[...].. . .");
+    assert_eq!(phrase_line(&app, FIRST_STEP_LINE), "00[...]. . .");
 }
 
 #[test]
@@ -165,8 +165,8 @@ fn with_end_00_the_start_is_the_length_and_nothing_loops() {
     let app = with_loop(4, 0);
     assert_eq!(phrase(&app).length(), 4);
     assert_eq!(phrase(&app).phrase_loop(), None);
-    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 3), "03 ... .. . .");
-    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 4), "04 ... .. . .");
+    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 3), "03 ... . . .");
+    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 4), "04 ... . . .");
 
     let app = with_loop(1, 0);
     assert_eq!(phrase(&app).length(), 1);
@@ -195,7 +195,7 @@ fn any_other_pair_plays_all_32_steps_and_nothing_loops() {
             None,
             "LOOP {start:02X} {end:02X}"
         );
-        assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 31), "1F ... .. . .");
+        assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 31), "1F ... . . .");
     }
 }
 
@@ -212,12 +212,12 @@ fn the_loop_pair_runs_from_00_to_20() {
 fn the_phrase_loop_start_is_marked_beside_its_row_label() {
     let app = with_loop(4, 0x0C);
 
-    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 4), "04<... .. . .");
-    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 3), "03 ... .. . .");
-    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 5), "05 ... .. . .");
+    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 4), "04<... . . .");
+    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 3), "03 ... . . .");
+    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 5), "05 ... . . .");
 
     let app = with_loop(4, 0);
-    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 3), "03 ... .. . .");
+    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 3), "03 ... . . .");
 }
 
 #[test]
@@ -244,7 +244,7 @@ fn after_shortening_len_the_cursor_still_reaches_the_steps_past_it() {
         .concat(),
     );
 
-    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 7), "07[...].. . .");
+    assert_eq!(phrase_line(&app, FIRST_STEP_LINE + 7), "07[...]. . .");
 }
 
 #[test]

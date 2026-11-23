@@ -4,13 +4,11 @@ mod rebuild;
 use crate::cart::{Cart, SLOTS};
 use crate::project::{
     Chain, ChainEntry, ChainId, Claim, EXPORT_CHANNELS, Phrase, PhraseId, Project, SongPlace,
-    TargetCart,
+    TargetCart, custom_instrument_of_slot,
 };
 use crate::wording::counted;
 use instruments::imported_instrument;
-use rebuild::{
-    RebuiltChannel, RebuiltPattern, has_bit_7, instrument_of_slot, loose_phrase, rebuild_pattern,
-};
+use rebuild::{RebuiltChannel, RebuiltPattern, has_bit_7, loose_phrase, rebuild_pattern};
 use std::collections::BTreeSet;
 
 const LAST_SLOT: u8 = SLOTS as u8 - 1;
@@ -156,7 +154,7 @@ pub fn import_song(cart: &Cart, cart_path: &str, song: Option<CartSong>) -> Impo
     let loose = LooseSfx::of(cart, &claim, &mut instruments);
     loose.keep(&mut project, &mut shared, &mut warnings);
     for slot in instruments {
-        let id = instrument_of_slot(slot);
+        let id = custom_instrument_of_slot(slot);
         project.set_custom_instrument(id, Some(imported_instrument(cart, slot)));
     }
 
