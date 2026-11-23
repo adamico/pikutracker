@@ -44,7 +44,7 @@ impl App {
     fn cursor_cell(&self) -> Option<CellPosition> {
         match self.focus {
             Focus::Song => Some(self.song.cell()),
-            Focus::Chain => Some(self.chain.position()),
+            Focus::Chain => self.chain.position(),
             Focus::Phrase => self.phrase.cell(),
             Focus::RightSlot => None,
         }
@@ -80,7 +80,7 @@ impl App {
     }
 
     fn edit_selected_chain(&mut self, edit: impl FnOnce(&ChainPane, &mut Chain)) {
-        match self.chain_under_cursor() {
+        match self.shown_chain() {
             Some(id) => edit(&self.chain, self.project.chain_mut(id)),
             None => self.remark = Some(NO_CHAIN_HERE),
         }
@@ -111,10 +111,10 @@ impl App {
                 .project
                 .move_song_cells(cells.rows(), cells.columns(), up),
             Focus::Chain => self
-                .chain_under_cursor()
+                .shown_chain()
                 .is_some_and(|id| self.project.chain_mut(id).move_entries(cells.rows(), up)),
             Focus::Phrase => self
-                .phrase_under_cursor()
+                .shown_phrase()
                 .is_some_and(|id| self.project.phrase_mut(id).move_steps(cells.rows(), up)),
             Focus::RightSlot => false,
         };
@@ -158,7 +158,7 @@ impl App {
         match self.focus {
             Focus::Song => Some(Clipboard::Song(self.song.copy(&self.project, cells?))),
             Focus::Chain => {
-                let Some(id) = self.chain_under_cursor() else {
+                let Some(id) = self.shown_chain() else {
                     self.remark = Some(NO_CHAIN_HERE);
                     return None;
                 };
@@ -169,7 +169,7 @@ impl App {
                 })
             }
             Focus::Phrase => {
-                let Some(id) = self.phrase_under_cursor() else {
+                let Some(id) = self.shown_phrase() else {
                     self.remark = Some(NO_PHRASE_HERE);
                     return None;
                 };
@@ -241,7 +241,7 @@ impl App {
         columns: &RangeInclusive<usize>,
         rows: &[Option<ChainEntry>],
     ) -> Option<usize> {
-        let Some(id) = self.chain_under_cursor() else {
+        let Some(id) = self.shown_chain() else {
             self.remark = Some(NO_CHAIN_HERE);
             return None;
         };
@@ -253,7 +253,7 @@ impl App {
         columns: &RangeInclusive<usize>,
         rows: &[Step],
     ) -> Option<usize> {
-        let Some(id) = self.phrase_under_cursor() else {
+        let Some(id) = self.shown_phrase() else {
             self.remark = Some(NO_PHRASE_HERE);
             return None;
         };

@@ -1,6 +1,6 @@
 use super::{
-    EMPTY, HEADING, SELECTED, VALUE, draw_out_of_range_flag, draw_row_label, draw_styled_value,
-    draw_title, id_text, nudged_id, stepped, typed_value,
+    EMPTY, HEADING, SELECTED, VALUE, draw_numbered_title, draw_out_of_range_flag, draw_row_label,
+    draw_styled_value, nudged_id, stepped, typed_value,
 };
 use crate::app::Direction;
 use crate::app::layout::Area;
@@ -26,14 +26,14 @@ const ENTRY_CELLS: [(EntryCell, usize, &str); 2] = [
 
 #[derive(Clone, Copy, Debug)]
 pub struct ChainView {
-    pub song_row: usize,
-    pub track: usize,
+    pub id: Option<ChainId>,
     pub playing_entry: Option<usize>,
 }
 
 #[derive(Debug, Default)]
 pub struct ChainPane {
     entry: usize,
+    on_title: bool,
     column: usize,
     first_digit: Option<u8>,
     typing_negative: bool,
@@ -42,6 +42,7 @@ pub struct ChainPane {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ChainCursorPlace {
     entry: usize,
+    on_title: bool,
     column: usize,
 }
 
@@ -49,21 +50,36 @@ impl ChainPane {
     pub fn cursor_place(&self) -> ChainCursorPlace {
         ChainCursorPlace {
             entry: self.entry,
+            on_title: self.on_title,
             column: self.column,
         }
     }
 
     pub fn return_to(&mut self, place: ChainCursorPlace) {
         self.entry = place.entry;
+        self.on_title = place.on_title;
         self.column = place.column;
     }
 
     pub fn jump_to(&mut self, entry: usize) {
         self.entry = entry.min(CHAIN_ENTRIES - 1);
+        self.on_title = false;
+    }
+
+    pub fn on_title(&self) -> bool {
+        self.on_title
     }
 
     pub fn move_cursor(&mut self, direction: Direction) {
         let (columns, rows) = direction.column_and_row_delta();
+        if self.on_title {
+            self.on_title = rows <= 0;
+            return;
+        }
+        if rows < 0 && self.entry == 0 {
+            self.on_title = true;
+            return;
+        }
         self.column = stepped(self.column, columns, ENTRY_CELLS.len());
         self.entry = stepped(self.entry, rows, CHAIN_ENTRIES);
     }
@@ -82,6 +98,14 @@ impl ChainPane {
 
     pub fn finish_typing(&mut self) {
         self.first_digit = None;
+    }
+
+    pub fn type_title_digit(&mut self, digit: u8) -> ChainId {
+        ChainId::new(typed_value(&mut self.first_digit, digit))
+    }
+
+    pub fn nudged_title(&self, shown: Option<ChainId>, up: bool, coarse: bool) -> ChainId {
+        ChainId::new(nudged_id(shown.map(ChainId::number), up, coarse))
     }
 
     pub fn type_digit(&mut self, chain: &mut Chain, digit: u8) {
@@ -109,11 +133,11 @@ impl ChainPane {
         clear_cell(chain.entry_mut(self.entry), self.cell());
     }
 
-    pub fn position(&self) -> CellPosition {
-        CellPosition {
+    pub fn position(&self) -> Option<CellPosition> {
+        (!self.on_title).then_some(CellPosition {
             column: self.column,
             row: self.entry,
-        }
+        })
     }
 
     pub fn nudge_cells(&self, chain: &mut Chain, cells: CellRange, up: bool, coarse: bool) {
@@ -179,24 +203,20 @@ impl ChainPane {
         project: &Project,
         view: ChainView,
     ) {
-        let ChainView {
-            song_row,
-            track,
-            playing_entry,
-        } = view;
-        let id = project.song_cell(song_row, track);
-        let number = id_text(id.map(ChainId::number));
-        let title = format!("CHAIN {number}");
-        draw_title(grid, area.column, area.row, &title, focused);
+        let ChainView { id, playing_entry } = view;
+        let number = id.map(ChainId::number);
+        let on_number = focused && self.on_title;
+        draw_numbered_title(grid, area, "CHAIN", number, focused, on_number);
         grid.put(area.column, area.row + 1, "   PHRASE TRANSP", HEADING);
 
         for index in 0..CHAIN_ENTRIES {
             let row = area.row + HEADER_ROWS + index;
             let label = format!("{index:02X}");
             draw_row_label(grid, area.column, row, &label, playing_entry == Some(index));
-            let entry = project.chain_row_entry(song_row, track, index);
+            let entry = id.and_then(|id| project.chain(id).entry(index));
             for (column, (cell, offset, empty)) in ENTRY_CELLS.iter().enumerate() {
-                let is_cursor = focused && index == self.entry && column == self.column;
+                let is_cursor =
+                    focused && !self.on_title && index == self.entry && column == self.column;
                 let (text, style) = match entry {
                     Some(entry) => cell_text(*cell, entry),
                     None => ((*empty).to_owned(), EMPTY),

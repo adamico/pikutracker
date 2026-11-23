@@ -34,11 +34,11 @@ fn app(actions: &[Action]) -> App {
 }
 
 fn chain_number(app: &App) -> Option<u8> {
-    app.chain_under_cursor().map(|id| id.number())
+    app.shown_chain().map(|id| id.number())
 }
 
 fn phrase_number(app: &App) -> Option<u8> {
-    app.phrase_under_cursor().map(|id| id.number())
+    app.shown_phrase().map(|id| id.number())
 }
 
 #[test]

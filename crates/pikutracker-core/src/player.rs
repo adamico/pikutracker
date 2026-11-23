@@ -1,6 +1,6 @@
 use crate::project::{
-    ChainEntry, FIRST_CUSTOM_INSTRUMENT, Filters, InstrumentSound, MAX_STEPS, Phrase, PhraseId,
-    Project, SfxInstrument, Step, TRACKS, WaveformInstrument,
+    CHAIN_ENTRIES, ChainEntry, ChainId, FIRST_CUSTOM_INSTRUMENT, Filters, InstrumentSound,
+    MAX_STEPS, Phrase, PhraseId, Project, SfxInstrument, Step, TRACKS, WaveformInstrument,
 };
 use crate::synth::{
     Instrument, Instruments, Note, SAMPLE_RATE, SAMPLES_PER_TICK, Sound, Voice, Waveform,
@@ -20,6 +20,11 @@ pub enum AudioRequest {
         project: Arc<Project>,
         song_row: usize,
         track: usize,
+        from_entry: usize,
+    },
+    PlayChainAlone {
+        project: Arc<Project>,
+        chain: ChainId,
         from_entry: usize,
     },
     PlaySong {
@@ -99,6 +104,7 @@ impl TrackMix {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Playhead {
     pub chain_row: Option<(usize, usize)>,
+    pub chain_alone: Option<(ChainId, usize)>,
     pub tracks: [Option<(PhraseId, usize)>; TRACKS],
     pub waiting: [bool; TRACKS],
 }
@@ -122,6 +128,7 @@ pub struct PlaybackReport {
 enum Route {
     Song,
     Chain { track: usize },
+    ChainAlone { chain: ChainId },
     Phrase { phrase: PhraseId, transpose: i8 },
 }
 
@@ -204,6 +211,9 @@ impl Playback {
             Route::Chain { .. } => later_in_row
                 .or_else(|| first_chain_row(project, self.row, 0))
                 .map(|k| (self.row, k)),
+            Route::ChainAlone { chain } => first_entry(project, chain, self.k + 1)
+                .or_else(|| first_entry(project, chain, 0))
+                .map(|k| (self.row, k)),
             Route::Song => {
                 if let Some(k) = later_in_row {
                     return Some((self.row, k));
@@ -224,7 +234,12 @@ impl Playback {
                 entry.set_transpose(i32::from(transpose));
                 entry
             }),
-            _ => self.project.chain_row_entry(self.row, track, self.k),
+            Route::ChainAlone { chain } => (track == 0)
+                .then(|| self.project.chain(chain).entry(self.k))
+                .flatten(),
+            Route::Song | Route::Chain { .. } => {
+                self.project.chain_row_entry(self.row, track, self.k)
+            }
         }
     }
 
@@ -232,7 +247,7 @@ impl Playback {
         match self.route {
             Route::Song => true,
             Route::Chain { track: alone } => track == alone,
-            Route::Phrase { .. } => track == 0,
+            Route::Phrase { .. } | Route::ChainAlone { .. } => track == 0,
         }
     }
 
@@ -255,11 +270,16 @@ impl Playback {
             }
         }
         let chain_row = match self.route {
-            Route::Phrase { .. } => None,
-            _ => Some((self.row, self.k)),
+            Route::Song | Route::Chain { .. } => Some((self.row, self.k)),
+            Route::Phrase { .. } | Route::ChainAlone { .. } => None,
+        };
+        let chain_alone = match self.route {
+            Route::ChainAlone { chain } => Some((chain, self.k)),
+            _ => None,
         };
         Playhead {
             chain_row,
+            chain_alone,
             tracks,
             waiting,
         }
@@ -286,6 +306,10 @@ impl Playback {
 
 fn first_chain_row(project: &Project, row: usize, from: usize) -> Option<usize> {
     project.played_chain_rows(row).find(|&k| k >= from)
+}
+
+fn first_entry(project: &Project, chain: ChainId, from: usize) -> Option<usize> {
+    (from..CHAIN_ENTRIES).find(|&k| project.chain(chain).entry(k).is_some())
 }
 
 #[derive(Clone, Debug)]
@@ -336,6 +360,15 @@ impl Player {
                 let k = first_chain_row(&project, song_row, from_entry)
                     .or_else(|| first_chain_row(&project, song_row, 0));
                 self.start(project, Route::Chain { track }, song_row, k, 0);
+            }
+            AudioRequest::PlayChainAlone {
+                project,
+                chain,
+                from_entry,
+            } => {
+                let k = first_entry(&project, chain, from_entry)
+                    .or_else(|| first_entry(&project, chain, 0));
+                self.start(project, Route::ChainAlone { chain }, 0, k, 0);
             }
             AudioRequest::PlaySong { project, from_row } => {
                 let k = first_chain_row(&project, from_row, 0);
@@ -495,7 +528,10 @@ impl Player {
         for voice in &mut self.voices {
             voice.play(Sound::default(), 0);
         }
-        if matches!(playback.route, Route::Chain { .. }) {
+        if matches!(
+            playback.route,
+            Route::Chain { .. } | Route::ChainAlone { .. }
+        ) {
             playback.lanes = [Lane::default(); TRACKS];
             playback.waiting_for_edit = true;
             self.playback = Some(playback);

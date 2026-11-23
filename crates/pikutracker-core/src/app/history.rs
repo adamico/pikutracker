@@ -2,6 +2,7 @@ use super::focus::Focus;
 use super::panes::chain::ChainCursorPlace;
 use super::panes::phrase::PhraseCursorPlace;
 use super::panes::song::SongCursorPlace;
+use super::shown::Shown;
 use crate::project::{Project, ProjectChange};
 use std::collections::VecDeque;
 
@@ -13,6 +14,7 @@ pub(super) struct CursorPlace {
     pub(super) song: SongCursorPlace,
     pub(super) chain: ChainCursorPlace,
     pub(super) phrase: PhraseCursorPlace,
+    pub(super) shown: Shown,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
