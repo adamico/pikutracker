@@ -1,5 +1,6 @@
-use super::files::{Waiting, cannot_use};
+use super::files::{Waiting, cannot_use, shown_name};
 use super::focus::Focus;
+use super::importing::TEXT_CART_EXTENSION;
 use super::messages::Report;
 use super::panes::cart_view::{CartField, CartView};
 use super::panes::file_list::Purpose;
@@ -8,7 +9,7 @@ use super::{Action, App, Direction};
 use crate::cart::Cart;
 use crate::export;
 use crate::project::{Claim, TargetCart};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const PICK_A_CART_FIRST: &str = "PICK A TARGET CART FIRST";
 
@@ -144,29 +145,62 @@ impl App {
     }
 
     pub(super) fn finish_picking_cart(&mut self, path: &Path, contents: &[u8]) {
-        self.file_list = None;
         let cart = match Cart::read(contents) {
             Ok(cart) => cart,
             Err(error) => {
+                self.file_list = None;
                 self.report(Report::failure(cannot_use(path, &error.to_string())));
                 return;
             }
         };
-        let path = self.path_from_project(path);
         let claimed_bytes_hash_of_same_cart = self
             .project
             .target_cart()
-            .filter(|target| target.path == path)
+            .filter(|target| target.path == self.path_from_project(path))
             .and_then(|target| target.claimed_bytes_hash.clone());
+        self.adopt_target_cart(path, cart, claimed_bytes_hash_of_same_cart);
+    }
+
+    fn adopt_target_cart(&mut self, path: &Path, cart: Cart, claimed_bytes_hash: Option<String>) {
+        self.file_list = None;
         let target = TargetCart {
-            path,
+            path: self.path_from_project(path),
             claim: Claim::default(),
-            claimed_bytes_hash: claimed_bytes_hash_of_same_cart,
+            claimed_bytes_hash,
         };
         if let Some(view) = self.cart_view.as_mut() {
             view.show_contents(Ok(cart));
             view.move_cursor(Direction::Down);
         }
         self.apply_suggestion(target);
+    }
+
+    pub(super) fn new_cart_name(&self) -> String {
+        self.project_path
+            .as_deref()
+            .and_then(Path::file_stem)
+            .map_or_else(String::new, |stem| {
+                format!("{}{TEXT_CART_EXTENSION}", stem.to_string_lossy())
+            })
+    }
+
+    pub(super) fn make_new_cart(&mut self, path: PathBuf) {
+        self.request_write_bytes(path.clone(), Cart::new_cart_bytes());
+        self.waiting = Some(Waiting::MakingCart(path));
+    }
+
+    pub(super) fn finish_making_cart(&mut self, path: &Path) {
+        let Ok(cart) = Cart::read(&Cart::new_cart_bytes()) else {
+            return;
+        };
+        self.adopt_target_cart(path, cart.clone(), None);
+        if let Some(target) = self.project.target_cart() {
+            let hash = cart.claimed_bytes_hash(&target.claim);
+            self.record_claimed_bytes_hash(hash);
+        }
+        self.report(Report::info(format!(
+            "CREATED NEW CART {}",
+            shown_name(path)
+        )));
     }
 }

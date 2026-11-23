@@ -180,11 +180,15 @@ impl App {
     }
 
     pub(super) fn finish_writing_target(&mut self, finished: FinishedExport) {
+        self.record_claimed_bytes_hash(finished.claimed_bytes_hash);
+        self.report(finished.report);
+    }
+
+    pub(super) fn record_claimed_bytes_hash(&mut self, hash: String) {
         if let Some(target) = self.project.target_cart() {
             let mut target = target.clone();
-            target.claimed_bytes_hash = Some(finished.claimed_bytes_hash);
+            target.claimed_bytes_hash = Some(hash);
             self.project.set_target_cart(Some(target));
         }
-        self.report(finished.report);
     }
 }

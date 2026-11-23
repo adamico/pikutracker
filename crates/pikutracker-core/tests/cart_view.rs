@@ -404,6 +404,7 @@ fn pick_cart(app: &mut App, contents: Vec<u8>) {
     answer_listing(app, &[CART_NAME, "song.mid", "other.ptrk"]);
     assert_eq!(right_slot(app, 0), "TARGET CART");
     app.apply(DOWN);
+    app.apply(DOWN);
     app.apply(Action::Confirm);
     assert_eq!(
         app.take_file_requests(),
@@ -422,8 +423,8 @@ fn the_cart_file_list_shows_only_carts() {
     app.apply(Action::Confirm);
     answer_listing(&mut app, &[CART_NAME, "song.mid", "other.ptrk"]);
 
-    assert_eq!(right_slot(&app, 3), " game.p8");
-    assert_eq!(right_slot(&app, 4), "");
+    assert_eq!(right_slot(&app, 4), " game.p8");
+    assert_eq!(right_slot(&app, 5), "");
 }
 
 #[test]
@@ -562,8 +563,12 @@ fn picking_the_target_cart_again_keeps_its_claimed_bytes_hash() {
     app.apply(Action::Confirm);
     answer_listing(&mut app, &[CART_NAME]);
     app.apply(DOWN);
+    app.apply(DOWN);
     app.apply(Action::Confirm);
-    app.take_file_requests();
+    assert_eq!(
+        app.take_file_requests(),
+        [FileRequest::ReadBytes { path: cart_path() }]
+    );
     app.receive_file(FileResponse::BytesRead {
         path: cart_path(),
         contents: original,

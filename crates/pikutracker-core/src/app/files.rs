@@ -10,6 +10,7 @@ use crate::project_file;
 use std::path::{Path, PathBuf};
 
 const UNTITLED: &str = "Untitled";
+const ONLY_P8_NEW_CARTS: &str = "A NEW CART MUST BE A .P8 FILE, NOT .P8.PNG";
 const NOT_FOUND: &str = "not found";
 pub(super) const OVERWRITE_ANSWERS: &str = "ENTER OVERWRITE  ESC CANCEL";
 const UNSAVED_QUESTION: &str = "UNSAVED CHANGES WILL BE LOST  ENTER DISCARD  ESC CANCEL";
@@ -96,6 +97,7 @@ pub(super) enum Waiting {
     ExportWriting(PathBuf, FinishedExport),
     CartViewReading(PathBuf),
     PickingCart(PathBuf),
+    MakingCart(PathBuf),
     SettingAside {
         state_file: PathBuf,
         bad_file: PathBuf,
@@ -209,6 +211,9 @@ impl App {
             Some(Waiting::ExportWriting(written, finished)) if written == path => {
                 self.finish_writing_target(finished);
             }
+            Some(Waiting::MakingCart(written)) if written == path => {
+                self.finish_making_cart(&written);
+            }
             other => self.waiting = other,
         }
     }
@@ -244,6 +249,9 @@ impl App {
                 return;
             }
             Some(Waiting::PickingCart(picked)) if picked == path => cannot_use(path, &reason),
+            Some(Waiting::MakingCart(made)) if made == path => {
+                format!("CANNOT CREATE {name}: {reason}")
+            }
             Some(Waiting::SettingAside { state_file, .. }) if state_file == path => format!(
                 "CANNOT RENAME {name} TO {name}.BAD: {reason}. RECENT PROJECTS ARE NOT SAVED THIS SESSION"
             ),
@@ -359,11 +367,14 @@ impl App {
     }
 
     pub(super) fn browse(&mut self, purpose: Purpose) {
-        let name = self
-            .project_path
-            .as_deref()
-            .and_then(Path::file_name)
-            .map_or_else(String::new, |name| name.to_string_lossy().into_owned());
+        let name = match purpose {
+            Purpose::TargetCart => self.new_cart_name(),
+            _ => self
+                .project_path
+                .as_deref()
+                .and_then(Path::file_name)
+                .map_or_else(String::new, |name| name.to_string_lossy().into_owned()),
+        };
         let directory = match purpose {
             Purpose::TargetCart | Purpose::LocateCart => self.target_cart_folder().to_path_buf(),
             Purpose::Open | Purpose::SaveAs | Purpose::Import => self.directory.clone(),
@@ -482,6 +493,8 @@ impl App {
                 self.waiting = Some(Waiting::PickingCart(path));
             }
             Choice::LocatedCart(path) => self.locate_target_cart(&path),
+            Choice::NewCart(path) => self.make_new_cart(path),
+            Choice::RefusedPngNewCart => self.remark = Some(ONLY_P8_NEW_CARTS.into()),
             Choice::Save { path, exists: true } => {
                 self.question = Some(Question {
                     text: format!("{} EXISTS  {OVERWRITE_ANSWERS}", shown_name(&path)),

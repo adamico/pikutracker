@@ -36,6 +36,8 @@ const PIXEL_DATA_BITS: u8 = 0b11;
 
 const BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 const TEXT_HEADER: &[u8] = b"pico-8 cartridge";
+const NEW_CART_HEADER_TAIL: &[u8] = b" // http://www.pico-8.com";
+const NEW_CART_LINES: [&[u8]; 2] = [b"version 43", b"__lua__"];
 const SFX_SECTION: &[u8] = b"__sfx__";
 const MUSIC_SECTION: &[u8] = b"__music__";
 const SECTION_MARK: &[u8] = b"__";
@@ -184,6 +186,16 @@ impl Cart {
         } else {
             read_text(bytes)
         }
+    }
+
+    pub fn new_cart_bytes() -> Vec<u8> {
+        let header: &[u8] = &[TEXT_HEADER, NEW_CART_HEADER_TAIL].concat();
+        std::iter::once(header)
+            .chain(NEW_CART_LINES)
+            .flat_map(|line| [line, b"\n"])
+            .flatten()
+            .copied()
+            .collect()
     }
 
     pub fn sfx_bytes(&self, slot: u8) -> &[u8; 68] {

@@ -15,9 +15,12 @@ pub(super) enum ImportKind {
     Midi,
 }
 
+pub(super) const TEXT_CART_EXTENSION: &str = ".p8";
+pub(super) const PNG_CART_EXTENSION: &str = ".p8.png";
+
 pub(super) fn import_kind(file_name: &str) -> Option<ImportKind> {
     let name = file_name.to_lowercase();
-    if name.ends_with(".p8") || name.ends_with(".p8.png") {
+    if name.ends_with(TEXT_CART_EXTENSION) || name.ends_with(PNG_CART_EXTENSION) {
         Some(ImportKind::Cart)
     } else if name.ends_with(".mid") || name.ends_with(".midi") {
         Some(ImportKind::Midi)

@@ -48,7 +48,7 @@ The workflow and the optional M8-style keys come from the Dirtywave M8; its [ope
 
 ## Getting started
 
-When nothing else is shown, the status line at the bottom lists the main keys: Ctrl+N new, Ctrl+O open, Ctrl+S save, Ctrl+I import, Ctrl+E export, Space play. Ctrl+S saves the Project as one `.ptrk` file. Ctrl+E Exports it into a Cart.
+When nothing else is shown, the status line at the bottom lists the main keys: Ctrl+N new, Ctrl+O open, Ctrl+S save, Ctrl+I import, Ctrl+E export, Space play. Ctrl+S saves the Project as one `.ptrk` file. Ctrl+E Exports it into a Cart. The first Export opens the Cart view: press Enter on its Cart field, then pick a Cart or type a name to create a New Cart, an empty `.p8` file next to the Project.
 
 ## Default shortcuts
 
