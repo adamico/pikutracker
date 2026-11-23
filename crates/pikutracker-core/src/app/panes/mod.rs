@@ -7,7 +7,7 @@ pub mod midi_dialog;
 pub mod multitrack;
 pub mod phrase;
 pub mod song;
-mod title_number;
+pub mod title_number;
 
 use crate::project::{Project, SongRowEnding, SongRowMarks};
 use crate::screen::grid::{Grid, Style};

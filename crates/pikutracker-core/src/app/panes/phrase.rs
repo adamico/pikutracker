@@ -170,7 +170,8 @@ impl PhrasePane {
 
     pub fn move_cursor(&mut self, direction: Direction) {
         let (columns, rows) = direction.column_and_row_delta();
-        if self.title.takes_move(rows) {
+        if self.title.has_cursor() {
+            self.title.set_cursor(rows <= 0);
             return;
         }
         match self.header_row {
@@ -282,12 +283,8 @@ impl PhrasePane {
         self.title.finish_typing();
     }
 
-    pub fn type_title_digit(&mut self, digit: u8) -> PhraseId {
-        PhraseId::new(self.title.type_digit(digit))
-    }
-
-    pub fn nudged_title(shown: Option<PhraseId>, up: bool, coarse: bool) -> PhraseId {
-        PhraseId::new(TitleNumber::nudged(shown.map(PhraseId::number), up, coarse))
+    pub fn title_mut(&mut self) -> &mut TitleNumber {
+        &mut self.title
     }
 
     pub fn type_digit(&mut self, phrase: &mut Phrase, digit: u8) {

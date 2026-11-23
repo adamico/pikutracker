@@ -479,7 +479,7 @@ impl App {
             self.settle_after_edit();
             return;
         }
-        if self.title_has_cursor() && self.use_title(action) {
+        if self.use_title(action) {
             return;
         }
         let before_edit = self.step_before_edit(action);
@@ -688,33 +688,29 @@ impl App {
         }
     }
 
-    fn title_has_cursor(&self) -> bool {
-        match self.focus {
-            Focus::Chain => self.chain.on_title(),
-            Focus::Phrase => self.phrase.on_title(),
-            Focus::Song | Focus::RightSlot => false,
-        }
-    }
-
     fn use_title(&mut self, action: Action) -> bool {
-        match (self.focus, action) {
-            (Focus::Chain, Action::HexDigit(digit)) => {
-                self.shown.open_chain(self.chain.type_title_digit(digit));
-            }
-            (Focus::Chain, Action::Nudge { up, coarse }) => {
-                let chain = ChainPane::nudged_title(self.shown_chain_id(), up, coarse);
-                self.shown.open_chain(chain);
-            }
-            (Focus::Phrase, Action::HexDigit(digit)) => {
-                self.shown.open_phrase(self.phrase.type_title_digit(digit));
-            }
-            (Focus::Phrase, Action::Nudge { up, coarse }) => {
-                let phrase = PhrasePane::nudged_title(self.shown_phrase_id(), up, coarse);
-                self.shown.open_phrase(phrase);
-            }
-            (_, action) if action.acts_on_cells() => {}
-            _ => return false,
+        let (title, shown, open): (_, _, fn(&mut Shown, u8)) = match self.focus {
+            Focus::Chain => (
+                self.chain.title_mut(),
+                self.shown.chain().map(ChainId::number),
+                |shown, number| shown.open_chain(ChainId::new(number)),
+            ),
+            Focus::Phrase => (
+                self.phrase.title_mut(),
+                self.shown.phrase().map(PhraseId::number),
+                |shown, number| shown.open_phrase(PhraseId::new(number)),
+            ),
+            Focus::Song | Focus::RightSlot => return false,
+        };
+        if !title.has_cursor() {
+            return false;
         }
+        let number = match action {
+            Action::HexDigit(digit) => title.type_digit(digit),
+            Action::Nudge { up, coarse } => title.nudged(shown, up, coarse),
+            _ => return action.acts_on_cells(),
+        };
+        open(&mut self.shown, number);
         true
     }
 
