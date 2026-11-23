@@ -6,5 +6,6 @@ A Project is saved as one standalone `.ptrk` file. It holds at most one link to 
 
 - The file is RON text with an integer format version. Older versions are migrated forward, and newer versions are refused.
 - Moving the Cart breaks the link. Export then asks the user to locate the Cart, and keeps the Claim.
-- The Project stores a hash of its claimed bytes, taken at Cart Import and after each Export. If the Cart's claimed bytes no longer match, because they were edited in PICO-8, Export warns before overwriting them.
+- A New Cart is written to disk as soon as its name is confirmed, and becomes the Target Cart only once that write succeeds. So a missing Target Cart still means only that it moved.
+- The Project stores a hash of its claimed bytes, taken at Cart Import, when a New Cart is made, and after each Export. If the Cart's claimed bytes no longer match, because they were edited in PICO-8, Export warns before overwriting them.
 - Embedding the Project in the Cart is out of scope for the MVP.

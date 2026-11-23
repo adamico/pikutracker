@@ -141,7 +141,7 @@ The one Cart a Project Exports into, if any. A Project can have no Target Cart, 
 _Avoid_: Linked cart, output cart
 
 **New Cart**:
-Making a `.p8` Cart from inside the tracker to become the Project's Target Cart. It starts with no code, graphics or sound, and from then on is an ordinary Target Cart.
+A `.p8` Cart the tracker made itself to be a Project's Target Cart, rather than one the user picked. Once made, it is an ordinary Target Cart.
 _Avoid_: Blank cart, empty cart
 
 **Claim**:
@@ -149,7 +149,7 @@ The SFX slots and the range of Patterns in the Project's Target Cart that the Pr
 _Avoid_: Reservation, allocation
 
 **Claimed-bytes hash**:
-A fingerprint of the Target Cart's bytes inside the Claim, taken at Cart Import and after each Export. When the Cart no longer matches it, those bytes were changed outside the tracker.
+A fingerprint of the Target Cart's bytes inside the Claim, taken at Cart Import, when a New Cart is made, and after each Export. When the Cart no longer matches it, those bytes were changed outside the tracker.
 _Avoid_: Checksum
 
 **Import**:
