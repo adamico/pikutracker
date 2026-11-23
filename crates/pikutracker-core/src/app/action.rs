@@ -87,7 +87,6 @@ pub enum KeyContext {
     FileName,
     InstrumentName,
     MidiImport,
-    SongPicker,
     SpeedEntry,
     ClaimText,
 }

@@ -37,7 +37,6 @@ use change_speed::{SpeedChange, SpeedEntry};
 use files::{Question, Waiting};
 use focus::Focus;
 use history::{CursorPlace, History, Merge};
-use importing::PickingSong;
 use messages::Notice;
 use panes::cart_view::CartView;
 use panes::chain::{ChainPane, ChainView};
@@ -47,7 +46,6 @@ use panes::log::LogPane;
 use panes::midi_dialog::MidiDialog;
 use panes::phrase::{PhrasePane, PhraseView};
 use panes::song::SongPane;
-use panes::song_picker::SONG_PICKER_KEYS;
 use selection::CellPosition;
 use status_line::StatusLine;
 use std::path::PathBuf;
@@ -103,7 +101,6 @@ pub struct App {
     focus_before_log: Focus,
     file_list: Option<FileList>,
     midi_dialog: Option<Box<MidiDialog>>,
-    picking_song: Option<Box<PickingSong>>,
     instrument_view: Option<InstrumentView>,
     cart_view: Option<CartView>,
     cart_visits: u32,
@@ -159,7 +156,6 @@ impl App {
             focus_before_log: Focus::default(),
             file_list: None,
             midi_dialog: None,
-            picking_song: None,
             instrument_view: None,
             cart_view: None,
             cart_visits: 0,
@@ -173,15 +169,8 @@ impl App {
         &self.project
     }
 
-    fn shown_project(&self) -> &Project {
-        self.picking_song
-            .as_ref()
-            .map_or(&self.project, |picking| picking.picker.project())
-    }
-
     pub fn chain_under_cursor(&self) -> Option<ChainId> {
-        self.shown_project()
-            .song_cell(self.song.row(), self.song.track())
+        self.project.song_cell(self.song.row(), self.song.track())
     }
 
     pub fn phrase_under_cursor(&self) -> Option<PhraseId> {
@@ -190,12 +179,12 @@ impl App {
 
     fn entry_under_cursor(&self) -> Option<ChainEntry> {
         let chain = self.chain_under_cursor()?;
-        self.shown_project().chain(chain).entry(self.chain.entry())
+        self.project.chain(chain).entry(self.chain.entry())
     }
 
     fn shown_phrase(&self) -> Phrase {
         self.phrase_under_cursor()
-            .map_or_else(Phrase::default, |id| *self.shown_project().phrase(id))
+            .map_or_else(Phrase::default, |id| *self.project.phrase(id))
     }
 
     pub fn key_context(&self) -> KeyContext {
@@ -207,9 +196,6 @@ impl App {
         }
         if self.midi_dialog.is_some() {
             return KeyContext::MidiImport;
-        }
-        if self.picking_song.is_some() {
-            return KeyContext::SongPicker;
         }
         if let Some(list) = &self.file_list {
             return match list.purpose() {
@@ -420,10 +406,6 @@ impl App {
         }
         if self.midi_dialog.is_some() {
             self.use_midi_dialog(action);
-            return;
-        }
-        if self.picking_song.is_some() {
-            self.use_song_picker(action);
             return;
         }
         if self.speed_entry.is_some() {
@@ -865,9 +847,9 @@ impl App {
             return grid;
         }
         let chain_row = self.playhead.and_then(|playhead| playhead.chain_row);
-        let takes_keys = self.file_list.is_some() || self.picking_song.is_some();
+        let takes_keys = self.file_list.is_some();
         let focus = (!takes_keys).then_some(self.focus);
-        let project = self.shown_project();
+        let project = &self.project;
         self.song.draw(
             &mut grid,
             layout::SONG,
@@ -906,9 +888,7 @@ impl App {
         );
         self.draw_selection(&mut grid);
         let right_slot_focused = focus == Some(Focus::RightSlot);
-        if let Some(picking) = &self.picking_song {
-            picking.picker.draw(&mut grid, layout::RIGHT_SLOT);
-        } else if let Some(list) = &self.file_list {
+        if let Some(list) = &self.file_list {
             list.draw(&mut grid, layout::RIGHT_SLOT);
         } else if self.log_open {
             self.log
@@ -944,9 +924,6 @@ impl App {
         }
         if let Some(notice) = notice {
             return StatusLine::Notice(notice);
-        }
-        if self.picking_song.is_some() {
-            return StatusLine::Hints(SONG_PICKER_KEYS);
         }
         match self.file_list.as_ref().map(FileList::purpose) {
             Some(Purpose::SaveAs) => StatusLine::Hints(SAVE_LIST_KEYS),
