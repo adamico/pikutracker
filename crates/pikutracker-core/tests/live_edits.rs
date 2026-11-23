@@ -201,7 +201,7 @@ fn a_speed_change_applies_from_the_next_step() {
 
     apply(
         &mut app,
-        &[UP, UP, UP, Action::HexDigit(1), Action::HexDigit(0)],
+        &[UP, UP, UP, UP, UP, Action::HexDigit(1), Action::HexDigit(0)],
     );
     samples.extend(render(&mut app, &mut player, 5));
 
@@ -217,7 +217,16 @@ fn a_phrase_shortened_past_the_playhead_ends_its_entry() {
 
     apply(
         &mut app,
-        &[UP, UP, UP, RIGHT, Action::HexDigit(0), Action::HexDigit(1)],
+        &[
+            UP,
+            UP,
+            UP,
+            UP,
+            UP,
+            RIGHT,
+            Action::HexDigit(0),
+            Action::HexDigit(1),
+        ],
     );
     let rest = render(&mut app, &mut player, 2);
     samples.extend(rest);
@@ -307,6 +316,8 @@ fn a_looping_phrase_shortened_past_the_playhead_starts_its_loop_again() {
     apply(
         &mut app,
         &[
+            UP,
+            UP,
             UP,
             UP,
             UP,

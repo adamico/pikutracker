@@ -128,7 +128,7 @@ These are the keys of the default PcTracker preset. The M8-style column applies 
 
 No settings file is needed. To use the M8-style key preset or rebind keys, copy `config.example.ron` to `~/.config/pikutracker/config.ron` (or `$XDG_CONFIG_HOME`) and edit the copy. The file explains each option.
 
-pikutracker keeps Follow, the keyboard octave, MIDI table edits and your recent Projects in `~/.local/state/pikutracker/state.ron` (or `$XDG_STATE_HOME`).
+pikutracker keeps Follow, the Pen (octave, instrument, volume and effect for new notes), MIDI table edits and your recent Projects in `~/.local/state/pikutracker/state.ron` (or `$XDG_STATE_HOME`).
 
 ## Licence
 

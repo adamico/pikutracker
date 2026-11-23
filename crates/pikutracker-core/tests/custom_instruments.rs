@@ -169,7 +169,7 @@ fn a_step_instrument_is_one_hex_digit() {
 
     assert_eq!(first_step(&app).instrument(), 0x0A);
     assert_eq!(
-        support::pane_text(&app, layout::PHRASE, 5),
+        support::pane_text(&app, layout::PHRASE, 7),
         "00 C-2 [A]   5   0"
     );
 }

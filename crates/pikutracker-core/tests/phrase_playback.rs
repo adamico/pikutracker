@@ -31,12 +31,16 @@ fn phrase_app() -> App {
             UP,
             UP,
             UP,
+            UP,
+            UP,
             Action::HexDigit(0),
             Action::HexDigit(8),
             RIGHT,
             Action::HexDigit(0),
             Action::HexDigit(4),
             LEFT,
+            DOWN,
+            DOWN,
             DOWN,
             DOWN,
             DOWN,
@@ -212,10 +216,14 @@ fn a_phrase_silent_inside_len_counts_as_empty() {
             UP,
             UP,
             UP,
+            UP,
+            UP,
             RIGHT,
             Action::HexDigit(1),
             Action::HexDigit(0),
             LEFT,
+            DOWN,
+            DOWN,
             DOWN,
             DOWN,
             DOWN,
@@ -225,9 +233,9 @@ fn a_phrase_silent_inside_len_counts_as_empty() {
     apply(
         &mut app,
         &[
-            &[UP; 12][..],
+            &[UP; 14][..],
             &[RIGHT, Action::HexDigit(0), Action::HexDigit(4), LEFT],
-            &[DOWN, DOWN, DOWN],
+            &[DOWN; 5],
         ]
         .concat(),
     );
@@ -247,7 +255,17 @@ fn the_message_clears_on_the_next_action() {
 
 #[test]
 fn the_phrase_filters_reach_the_sound() {
-    let reverb = [UP, RIGHT, Action::HexDigit(2), LEFT, DOWN];
+    let reverb = [
+        UP,
+        UP,
+        UP,
+        RIGHT,
+        Action::HexDigit(2),
+        LEFT,
+        DOWN,
+        DOWN,
+        DOWN,
+    ];
     let mut dry_app = two_note_app();
     let mut wet_app = two_note_app();
     apply(&mut wet_app, &[UP, UP]);

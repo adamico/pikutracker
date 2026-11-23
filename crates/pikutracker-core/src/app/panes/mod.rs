@@ -9,7 +9,7 @@ pub mod phrase;
 pub mod song;
 
 use crate::app::layout::Area;
-use crate::project::{SongRowEnding, SongRowMarks};
+use crate::project::{Project, SongRowEnding, SongRowMarks};
 use crate::screen::grid::{Grid, Style};
 use crate::screen::palette::Colour;
 
@@ -31,8 +31,21 @@ const SELECTED: Style = Style {
 const LOOP_MARK: Style = Style::fg(Colour::Pink);
 const OUT_OF_RANGE: Style = Style::fg(Colour::Red);
 const PLAYHEAD: Style = Style::fg(Colour::Green);
+const PEN_LABEL: Style = Style::fg(Colour::LightPeach);
+const INSTRUMENT_NAMES: [&str; 8] = [
+    "TRIANGLE",
+    "TILTED SAW",
+    "SAW",
+    "SQUARE",
+    "PULSE",
+    "ORGAN",
+    "NOISE",
+    "PHASER",
+];
+const EFFECT_NAMES: [&str; 8] = [
+    "NONE", "SLIDE", "VIBRATO", "DROP", "FADE IN", "FADE OUT", "ARP FAST", "ARP SLOW",
+];
 const COARSE_ID: i32 = 16;
-const TITLE_NUMBER_WIDTH: usize = 2;
 const MAX_ID: i32 = 255;
 
 fn typed_value(first_digit: &mut Option<u8>, digit: u8) -> u8 {
@@ -107,6 +120,15 @@ fn draw_styled_value(
         grid.put(column + text.chars().count(), row, "]", CURSOR_BRACKET);
     } else {
         grid.put(column, row, text, style);
+    }
+}
+
+pub(super) fn instrument_name(project: &Project, instrument: u8) -> Option<&str> {
+    match INSTRUMENT_NAMES.get(usize::from(instrument)) {
+        Some(name) => Some(name),
+        None => project
+            .custom_instrument(instrument)
+            .and_then(|custom| custom.name.as_deref()),
     }
 }
 
