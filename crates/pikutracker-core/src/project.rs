@@ -1,7 +1,9 @@
 mod change;
+mod song_order;
 mod usage;
 
 pub(crate) use change::ProjectChange;
+pub use song_order::{SongRowEnding, SongRowMarks};
 pub use usage::UnusedItems;
 
 use std::collections::BTreeMap;
@@ -463,7 +465,7 @@ pub struct Project {
     phrases: Vec<Phrase>,
     chains: Vec<Chain>,
     song: Vec<[Option<ChainId>; TRACKS]>,
-    song_loop_row: Option<usize>,
+    song_marks: Vec<SongRowMarks>,
     default_speed: u8,
     export_tracks: [Option<u8>; EXPORT_CHANNELS],
     target_cart: Option<TargetCart>,
@@ -476,7 +478,7 @@ impl Default for Project {
             phrases: vec![Phrase::default(); ID_COUNT],
             chains: vec![Chain::default(); ID_COUNT],
             song: vec![[None; TRACKS]; SONG_ROWS],
-            song_loop_row: Some(0),
+            song_marks: vec![SongRowMarks::default(); SONG_ROWS],
             default_speed: DEFAULT_SPEED,
             export_tracks: [None; EXPORT_CHANNELS],
             target_cart: None,
@@ -545,15 +547,7 @@ impl Project {
     }
 
     pub fn song_row_is_empty(&self, row: usize) -> bool {
-        (0..CHAIN_ENTRIES).all(|chain_row| self.chain_row_ticks(row, chain_row) == 0)
-    }
-
-    pub const fn song_loop_row(&self) -> Option<usize> {
-        self.song_loop_row
-    }
-
-    pub fn set_song_loop_row(&mut self, row: Option<usize>) {
-        self.song_loop_row = row;
+        self.played_chain_rows(row).next().is_none()
     }
 
     pub const fn default_speed(&self) -> u8 {

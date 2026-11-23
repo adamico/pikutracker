@@ -2,7 +2,6 @@
 (
     version: 1,
     default_speed: 12,
-    song_loop_row: Some(1),
     export_tracks: [Some(1), Some(3), None, Some(8)],
     target_cart: Some((
         path: "../carts/game.p8",
@@ -13,8 +12,9 @@
         claimed_bytes_hash: Some("5d41402abc4b2a76b9719d911017c592"),
     )),
     song: [
-        (row: 0, tracks: "00 -- -- 01 -- -- -- --"),
-        (row: 2, tracks: "-- -- -- -- -- -- -- FF"),
+        (row: 0, tracks: "00 -- -- 01 -- -- -- --", loop_start: true),
+        (row: 1, tracks: "-- -- -- -- -- -- -- --", ending: Some(LoopBack)),
+        (row: 2, tracks: "-- -- -- -- -- -- -- FF", loop_start: true, ending: Some(Stop)),
     ],
     chains: [
         (id: 0, entries: [

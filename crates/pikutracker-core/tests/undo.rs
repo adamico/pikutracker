@@ -152,7 +152,7 @@ fn edits_in_every_pane_are_undone_in_order() {
     apply(
         &mut app,
         &[
-            Action::ToggleSongLoopRow,
+            Action::ToggleLoopStart,
             Action::FocusNext,
             NUDGE_UP,
             Action::FocusNext,
@@ -326,15 +326,15 @@ fn undo_turns_follow_off_because_it_moves_the_cursor() {
 #[test]
 fn the_history_keeps_the_last_thousand_steps() {
     let mut app = App::new();
-    apply(&mut app, &[Action::ToggleSongLoopRow; 1001]);
-    assert_eq!(app.project().song_loop_row(), None);
+    apply(&mut app, &[Action::ToggleLoopStart; 1001]);
+    assert!(app.project().song_row_marks(0).loop_start);
 
     apply(&mut app, &[Action::Undo; 1000]);
-    assert_eq!(app.project().song_loop_row(), None);
+    assert!(app.project().song_row_marks(0).loop_start);
 
     app.apply(Action::Undo);
     assert_eq!(status_line(&app), NOTHING_TO_UNDO);
-    assert_eq!(app.project().song_loop_row(), None);
+    assert!(app.project().song_row_marks(0).loop_start);
 }
 
 #[test]

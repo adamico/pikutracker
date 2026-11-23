@@ -1,6 +1,6 @@
 use pikutracker_core::project::{
     ChainEntry, ChainId, Claim, CustomInstrument, Filters, InstrumentSound, PhraseId, Project,
-    SfxInstrument, Step, TargetCart, WaveformInstrument,
+    SfxInstrument, SongRowEnding, SongRowMarks, Step, TargetCart, WaveformInstrument,
 };
 use pikutracker_core::project_file::{self, FORMAT_VERSION, Migration, ProjectFileError};
 
@@ -13,7 +13,27 @@ fn step(pitch: u8, instrument: u8, volume: u8, effect: u8) -> Step {
 fn fixture_project() -> Project {
     let mut project = Project::new();
     project.set_default_speed(12);
-    project.set_song_loop_row(Some(1));
+    project.set_song_row_marks(
+        0,
+        SongRowMarks {
+            loop_start: true,
+            ending: None,
+        },
+    );
+    project.set_song_row_marks(
+        1,
+        SongRowMarks {
+            loop_start: false,
+            ending: Some(SongRowEnding::LoopBack),
+        },
+    );
+    project.set_song_row_marks(
+        2,
+        SongRowMarks {
+            loop_start: true,
+            ending: Some(SongRowEnding::Stop),
+        },
+    );
     project.set_export_track(0, Some(1));
     project.set_export_track(1, Some(3));
     project.set_export_track(3, Some(8));
@@ -219,8 +239,18 @@ fn random_step(random: &mut SeededRandom) -> Step {
 fn random_project(random: &mut SeededRandom) -> Project {
     let mut project = Project::new();
     project.set_default_speed(i32::from(random.below(255)) + 1);
-    let loop_row = random.flip().then(|| usize::from(random.below(256)));
-    project.set_song_loop_row(loop_row);
+    for _ in 0..4 {
+        let ending = [
+            None,
+            Some(SongRowEnding::LoopBack),
+            Some(SongRowEnding::Stop),
+        ];
+        let marks = SongRowMarks {
+            loop_start: random.flip(),
+            ending: ending[usize::from(random.below(3))],
+        };
+        project.set_song_row_marks(usize::from(random.below(256)), marks);
+    }
     for channel in 0..4 {
         let track = random.flip().then_some(channel as u8 + 1);
         project.set_export_track(channel, track);
@@ -362,7 +392,6 @@ fn values_outside_their_limits_are_refused() {
             "detune: 3,\n            reverb: 2",
         ),
         ("default_speed: 12", "default_speed: 0"),
-        ("Some(1),\n    export", "Some(256),\n    export"),
         ("[Some(1), Some(3)", "[Some(9), Some(3)"),
         ("[Some(1), Some(3)", "[Some(3), Some(3)"),
         ("[3, 4, 50]", "[3, 4, 64]"),

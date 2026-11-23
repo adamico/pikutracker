@@ -2,7 +2,9 @@ mod support;
 
 use pikutracker_core::app::{Action, App, Direction};
 use pikutracker_core::player::Player;
-use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
+use pikutracker_core::project::{
+    ChainEntry, ChainId, PhraseId, Project, SongRowEnding, SongRowMarks,
+};
 use pikutracker_core::synth::{SAMPLE_RATE, SAMPLES_PER_TICK};
 use support::apply;
 
@@ -145,6 +147,13 @@ fn an_edit_to_a_step_already_passed_waits_for_the_next_time_round() {
     let mut project = Project::new();
     let tone = write(&mut project, 1, &[A2, A2]);
     place(&mut project, 0, 0, 0, tone);
+    project.set_song_row_marks(
+        0,
+        SongRowMarks {
+            loop_start: false,
+            ending: Some(SongRowEnding::LoopBack),
+        },
+    );
     let mut app = playing_in_phrase_pane(project);
     let mut player = Player::new();
     let mut samples = render(&mut app, &mut player, 1);
@@ -259,7 +268,7 @@ fn an_emptied_song_row_acts_like_reaching_an_empty_row() {
     apply(&mut app, &[DOWN, Action::Clear]);
     samples.extend(render(&mut app, &mut player, 2));
 
-    assert_steps(&samples, &[220.0, 440.0, 220.0]);
+    assert_steps(&samples, &[220.0, 440.0, 0.0]);
 }
 
 #[test]

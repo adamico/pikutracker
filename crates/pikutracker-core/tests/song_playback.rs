@@ -2,7 +2,9 @@ mod support;
 
 use pikutracker_core::app::{Action, App, Direction};
 use pikutracker_core::player::{AudioRequest, Player};
-use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
+use pikutracker_core::project::{
+    ChainEntry, ChainId, PhraseId, Project, SongRowEnding, SongRowMarks,
+};
 use pikutracker_core::synth::{SAMPLE_RATE, SAMPLES_PER_TICK};
 use support::status_line;
 
@@ -133,7 +135,6 @@ fn a_chain_row_lasts_exactly_its_ticks_at_183_samples_each() {
     let mut project = Project::new();
     let tone = write(&mut project, 1, &[A2, A2]);
     place(&mut project, 0, 0, 0, &[plain(tone)]);
-    project.set_song_loop_row(None);
     let mut app = App::with_project(project);
     let mut player = Player::new();
     app.apply(SPACE);
@@ -274,10 +275,20 @@ fn three_row_song() -> Project {
     project
 }
 
+fn marked(
+    mut project: Project,
+    row: usize,
+    loop_start: bool,
+    ending: Option<SongRowEnding>,
+) -> Project {
+    project.set_song_row_marks(row, SongRowMarks { loop_start, ending });
+    project
+}
+
 #[test]
-fn the_song_jumps_to_the_loop_row_at_its_first_empty_row() {
-    let mut project = three_row_song();
-    project.set_song_loop_row(Some(1));
+fn after_a_loop_back_row_the_song_returns_to_the_loop_start() {
+    let project = marked(three_row_song(), 1, true, None);
+    let project = marked(project, 2, false, Some(SongRowEnding::LoopBack));
 
     let samples = hear(project, &[SPACE], 6);
 
@@ -285,47 +296,73 @@ fn the_song_jumps_to_the_loop_row_at_its_first_empty_row() {
 }
 
 #[test]
-fn a_new_song_loops_to_its_first_row() {
-    let samples = hear(three_row_song(), &[SPACE], 4);
+fn loop_back_returns_to_the_nearest_loop_start_at_or_before_it() {
+    let project = marked(three_row_song(), 0, true, None);
+    let project = marked(project, 1, true, Some(SongRowEnding::LoopBack));
 
-    assert_steps(&samples, &[220.0, 440.0, 880.0, 220.0]);
+    let samples = hear(project, &[SPACE], 4);
+
+    assert_steps(&samples, &[220.0, 440.0, 440.0, 440.0]);
 }
 
 #[test]
-fn rows_after_the_first_empty_row_do_not_play() {
+fn loop_back_without_a_loop_start_returns_to_song_row_00() {
+    let project = marked(three_row_song(), 2, false, Some(SongRowEnding::LoopBack));
+
+    let samples = hear(project, &[DOWN, SPACE], 4);
+
+    assert_steps(&samples, &[440.0, 880.0, 220.0, 440.0]);
+}
+
+#[test]
+fn playing_from_below_a_loop_start_still_loops_back_to_it() {
+    let project = marked(three_row_song(), 1, true, None);
+    let project = marked(project, 2, false, Some(SongRowEnding::LoopBack));
+
+    let samples = hear(project, &[DOWN, DOWN, SPACE], 3);
+
+    assert_steps(&samples, &[880.0, 440.0, 880.0]);
+}
+
+#[test]
+fn playback_ends_after_a_stop_row() {
+    let project = marked(three_row_song(), 1, false, Some(SongRowEnding::Stop));
+
+    let samples = hear(project, &[SPACE], 4);
+
+    assert_steps(&samples, &[220.0, 440.0, 0.0, 0.0]);
+}
+
+#[test]
+fn playback_ends_at_an_empty_song_row() {
     let mut project = three_row_song();
     project.set_song_cell(1, 0, None);
 
     let samples = hear(project, &[SPACE], 3);
 
-    assert_steps(&samples, &[220.0, 220.0, 220.0]);
+    assert_steps(&samples, &[220.0, 0.0, 0.0]);
 }
 
 #[test]
-fn the_song_stops_at_its_end_when_it_has_no_loop_row() {
-    let mut project = three_row_song();
-    project.set_song_loop_row(None);
-
-    let samples = hear(project, &[SPACE], 5);
+fn playback_ends_after_the_last_row() {
+    let samples = hear(three_row_song(), &[SPACE], 5);
 
     assert_steps(&samples, &[220.0, 440.0, 880.0, 0.0, 0.0]);
 }
 
 #[test]
-fn the_song_stops_when_its_loop_row_is_empty() {
-    let mut project = three_row_song();
-    project.set_song_loop_row(Some(9));
+fn a_loop_back_to_an_empty_row_ends_playback() {
+    let mut project = marked(three_row_song(), 2, false, Some(SongRowEnding::LoopBack));
+    project.set_song_cell(0, 0, None);
 
-    let samples = hear(project, &[SPACE], 5);
+    let samples = hear(project, &[DOWN, SPACE], 4);
 
-    assert_steps(&samples, &[220.0, 440.0, 880.0, 0.0, 0.0]);
+    assert_steps(&samples, &[440.0, 880.0, 0.0, 0.0]);
 }
 
 #[test]
 fn space_plays_again_after_the_song_has_stopped_by_itself() {
-    let mut project = three_row_song();
-    project.set_song_loop_row(None);
-    let mut app = App::with_project(project);
+    let mut app = App::with_project(three_row_song());
     let mut player = Player::new();
     app.apply(SPACE);
     render(&mut app, &mut player, 5);
@@ -341,9 +378,7 @@ fn space_plays_again_after_the_song_has_stopped_by_itself() {
 
 #[test]
 fn a_report_about_an_earlier_play_does_not_stop_the_current_one() {
-    let mut project = three_row_song();
-    project.set_song_loop_row(None);
-    let mut app = App::with_project(project);
+    let mut app = App::with_project(three_row_song());
     let mut player = Player::new();
     app.apply(SPACE);
     render(&mut app, &mut player, 5);
@@ -364,7 +399,7 @@ fn a_report_about_an_earlier_play_does_not_stop_the_current_one() {
 fn space_in_the_song_pane_plays_from_the_cursors_row() {
     let samples = hear(three_row_song(), &[DOWN, SPACE], 3);
 
-    assert_steps(&samples, &[440.0, 880.0, 220.0]);
+    assert_steps(&samples, &[440.0, 880.0, 0.0]);
 }
 
 #[test]

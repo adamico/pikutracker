@@ -27,6 +27,7 @@ To build from source, run `cargo run --release -p pikutracker`.
 The screen shows three panes side by side. From left to right:
 
 - **Song**: the whole piece, read from top to bottom. Each Song row names one Chain for each Track, or none. A Song has up to 256 rows.
+  - **Loop start, Loop back and Stop**: marks on a Song row, shown beside its number, which become PICO-8's flags of the same name. After a Loop back row (`<`), playback returns to the nearest Loop start (`>`) at or before it, or to row 00 if there is none. Playback ends after a Stop row (`|`), at an empty row, or after the last row. A row with Loop start and Loop back shows `=`, and one with Loop start and Stop shows `/`.
   - **Track**: one of the Song's 8 columns (T1 to T8), played by one voice. Export sends 4 of them to PICO-8's 4 channels, so you can try parts on the other Tracks before choosing.
 - **Chain**: a list of up to 16 Phrases, played in order. The same Phrase can appear more than once, and each entry can transpose it.
   - **Chain row**: entry K of every Track's Chain in the same Song row. They start together and become one PICO-8 Pattern. The TICK column of the Chain pane shows how long each lasts.
@@ -95,7 +96,9 @@ These are the keys of the default PcTracker preset. The M8-style column applies 
 | New unused Chain or Phrase under the cursor | Ctrl+Shift+N | Double-tap Z |
 | Clone the Chain or Phrase under the cursor | Ctrl+D | Z (while selecting) |
 | Clone Chains together with their Phrases | Ctrl+Shift+D | same |
-| Set or clear the Song loop row | Ctrl+R | X+R |
+| Set or clear Loop start on the Song row | Ctrl+R | X+R |
+| Set or clear Loop back on the Song row | Ctrl+Shift+R | X+B |
+| Set or clear Stop on the Song row | Ctrl+P | X+P |
 | Set one Speed on every Phrase in the selection, or else the Song | Ctrl+Shift+T | same |
 | Scale Speeds by a ratio, keeping Phrases in time | Alt+T | Z+T |
 | Purge unused Chains and Phrases | Ctrl+Shift+P | same |

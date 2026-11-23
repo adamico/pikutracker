@@ -29,7 +29,7 @@
     // Insert, Delete and F1 to F12. Further actions include MoveUp, FocusNext, Confirm,
     // Cancel, Clear, JumpUp (Alt+Up), SelectUp (Shift+Up), SelectJumpUp (Shift+Alt+Up),
     // StartSelection (no PcTracker key), Mute1 to Mute8, Solo1 to Solo8, NudgeUp (Ctrl+Up),
-    // NudgeDownCoarse (Ctrl+Shift+Down), OctaveUp and ToggleSongLoopRow.
+    // NudgeDownCoarse (Ctrl+Shift+Down) and OctaveUp.
     //
     // Remove the // in front of a line to use it, then change the key. The keys shown
     // are the PcTracker preset's.
@@ -59,6 +59,9 @@
         // "ChangeSpeed": "Ctrl+Shift+T",
         // "ScaleSpeed": "Alt+T",
         // "PurgeUnused": "Ctrl+Shift+P",
+        // "ToggleLoopStart": "Ctrl+R",
+        // "ToggleLoopBack": "Ctrl+Shift+R",
+        // "ToggleStop": "Ctrl+P",
 
         // Views
         // "ToggleCart": "Ctrl+T",

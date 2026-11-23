@@ -99,52 +99,6 @@ fn the_last_song_row_falls_off_on_insert_and_comes_back_empty_on_delete() {
 }
 
 #[test]
-fn the_song_loop_row_stays_on_the_music_it_marked() {
-    let mut project = song_rows();
-    project.set_song_loop_row(Some(2));
-    let mut app = App::with_project(project);
-
-    apply(&mut app, &[DOWN, Action::InsertRow]);
-    assert_eq!(app.project().song_loop_row(), Some(3));
-
-    app.apply(Action::DeleteRow);
-    assert_eq!(app.project().song_loop_row(), Some(2));
-}
-
-#[test]
-fn the_song_loop_row_does_not_move_for_a_row_below_it() {
-    let mut project = song_rows();
-    project.set_song_loop_row(Some(0));
-    let mut app = App::with_project(project);
-
-    apply(&mut app, &[DOWN, Action::InsertRow, Action::DeleteRow]);
-
-    assert_eq!(app.project().song_loop_row(), Some(0));
-}
-
-#[test]
-fn deleting_the_song_loop_row_leaves_the_loop_on_the_row_that_takes_its_place() {
-    let mut project = song_rows();
-    project.set_song_loop_row(Some(1));
-    let mut app = App::with_project(project);
-
-    apply(&mut app, &[DOWN, Action::DeleteRow]);
-
-    assert_eq!(app.project().song_loop_row(), Some(1));
-}
-
-#[test]
-fn a_song_without_a_loop_stays_without_one() {
-    let mut project = song_rows();
-    project.set_song_loop_row(None);
-    let mut app = App::with_project(project);
-
-    apply(&mut app, &[Action::InsertRow, Action::DeleteRow]);
-
-    assert_eq!(app.project().song_loop_row(), None);
-}
-
-#[test]
 fn insert_opens_an_empty_chain_entry_and_the_last_entry_falls_off() {
     let mut app = App::with_project(full_chain());
 
@@ -248,17 +202,6 @@ fn each_insert_or_delete_is_one_undo_step_in_every_pane() {
             assert!(app.project() == &after);
         }
     }
-}
-
-#[test]
-fn undoing_a_shift_puts_back_the_song_loop_row_too() {
-    let mut project = song_rows();
-    project.set_song_loop_row(Some(2));
-    let mut app = App::with_project(project);
-
-    apply(&mut app, &[Action::InsertRow, Action::Undo]);
-
-    assert_eq!(app.project().song_loop_row(), Some(2));
 }
 
 #[test]

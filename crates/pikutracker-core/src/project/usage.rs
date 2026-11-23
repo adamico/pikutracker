@@ -1,5 +1,6 @@
 use super::{
-    CHAIN_ENTRIES, Chain, ChainId, ID_COUNT, Phrase, PhraseId, Project, SONG_ROWS, Step, TRACKS,
+    CHAIN_ENTRIES, Chain, ChainId, ID_COUNT, Phrase, PhraseId, Project, SONG_ROWS, SongRowMarks,
+    Step, TRACKS,
 };
 use std::ops::RangeInclusive;
 
@@ -114,13 +115,8 @@ impl Project {
     pub fn insert_song_row(&mut self, row: usize) {
         self.song[row..].rotate_right(1);
         self.song[row] = [None; TRACKS];
-        self.song_loop_row = self.song_loop_row.map(|loop_row| {
-            if loop_row >= row {
-                (loop_row + 1).min(SONG_ROWS - 1)
-            } else {
-                loop_row
-            }
-        });
+        self.song_marks[row..].rotate_right(1);
+        self.song_marks[row] = SongRowMarks::default();
     }
 
     pub fn move_song_cells(
@@ -144,9 +140,8 @@ impl Project {
     pub fn delete_song_row(&mut self, row: usize) {
         self.song[row..].rotate_left(1);
         self.song[SONG_ROWS - 1] = [None; TRACKS];
-        self.song_loop_row = self
-            .song_loop_row
-            .map(|loop_row| loop_row - usize::from(loop_row > row));
+        self.song_marks[row..].rotate_left(1);
+        self.song_marks[SONG_ROWS - 1] = SongRowMarks::default();
     }
 
     pub fn unused_items(&self) -> UnusedItems {

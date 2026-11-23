@@ -5,7 +5,7 @@ use pikutracker_core::app::{
 };
 use pikutracker_core::keymap::{Key, KeyPress, Keymap, Modifiers};
 use pikutracker_core::player::AudioRequest;
-use pikutracker_core::project::Project;
+use pikutracker_core::project::{Project, SongRowEnding, SongRowMarks};
 use std::path::{Path, PathBuf};
 use support::status_line;
 use support::{TestCart, TestPattern, TestSfx};
@@ -329,20 +329,17 @@ fn is_song_2(project: &Project) -> bool {
         .map(|entry| project.phrase(entry.phrase()));
     first.is_some_and(|phrase| phrase.step(0).pitch() == 30)
         && project.song_row_is_empty(1)
-        && project.song_loop_row() == Some(0)
+        && project.song_row_marks(0)
+            == SongRowMarks {
+                loop_start: true,
+                ending: Some(SongRowEnding::LoopBack),
+            }
         && project.target_cart().unwrap().claim.first_and_last_pattern == Some((2, 2))
 }
 
-fn song_title(app: &App) -> String {
+fn first_song_row_label(app: &App) -> String {
     let dump = app.grid().text_dump();
-    dump.lines()
-        .next()
-        .unwrap()
-        .chars()
-        .take(28)
-        .collect::<String>()
-        .trim_end()
-        .to_owned()
+    dump.lines().nth(2).unwrap().chars().take(3).collect()
 }
 
 #[test]
@@ -376,12 +373,12 @@ fn a_cart_with_several_songs_opens_the_song_picker() {
 fn the_song_pane_previews_the_highlighted_song() {
     let mut app = App::new();
     import_file(&mut app, "demo.p8", two_song_cart().p8());
-    assert_eq!(song_title(&app), "SONG  LOOP --");
+    assert_eq!(first_song_row_label(&app), "00 ");
 
     app.apply(DOWN);
 
     assert_eq!(right_slot(&app, 6), ">SONG 2 PATTERN 02");
-    assert_eq!(song_title(&app), "SONG  LOOP 00");
+    assert_eq!(first_song_row_label(&app), "00=");
     let dump = app.grid().text_dump();
     assert!(dump.contains("F#2"), "{dump}");
 }

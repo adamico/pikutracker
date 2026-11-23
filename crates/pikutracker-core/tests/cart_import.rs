@@ -3,8 +3,8 @@ mod support;
 use pikutracker_core::cart::Cart;
 use pikutracker_core::cart_import::{import, import_song, songs};
 use pikutracker_core::project::{
-    ChainId, CustomInstrument, InstrumentSound, Phrase, PhraseId, Project, SfxInstrument, Step,
-    TRACKS, WaveformInstrument,
+    ChainId, CustomInstrument, InstrumentSound, Phrase, PhraseId, Project, SfxInstrument,
+    SongRowEnding, SongRowMarks, Step, TRACKS, WaveformInstrument,
 };
 use pikutracker_core::project_file;
 use support::{TestCart, TestPattern, TestSfx, music_samples, render_music, render_song};
@@ -245,7 +245,7 @@ fn a_song_ending_in_stop_does_not_loop_and_stops_the_claim() {
 
     let (project, warnings) = imported(&cart);
 
-    assert_eq!(project.song_loop_row(), None);
+    assert_eq!(project.song_row_marks(1).ending, Some(SongRowEnding::Stop));
     assert_eq!(
         project.target_cart().unwrap().claim.first_and_last_pattern,
         Some((0, 1))
@@ -267,7 +267,11 @@ fn loop_back_jumps_to_the_nearest_loop_start_before_it() {
 
     let (project, _) = imported(&cart);
 
-    assert_eq!(project.song_loop_row(), Some(1));
+    assert!(project.song_row_marks(1).loop_start);
+    assert_eq!(
+        project.song_row_marks(2).ending,
+        Some(SongRowEnding::LoopBack)
+    );
 }
 
 #[test]
@@ -279,7 +283,7 @@ fn a_song_that_runs_into_an_empty_pattern_ends_there_without_a_loop() {
 
     let (project, _) = imported(&cart);
 
-    assert_eq!(project.song_loop_row(), None);
+    assert_eq!(project.song_row_marks(0), SongRowMarks::default());
     assert_eq!(
         project.target_cart().unwrap().claim.first_and_last_pattern,
         Some((0, 0))
@@ -296,7 +300,7 @@ fn a_cart_with_no_music_gives_an_empty_song_and_an_empty_claim() {
     let (project, _) = imported(&cart);
 
     assert!(project.song_row_is_empty(0));
-    assert_eq!(project.song_loop_row(), None);
+    assert_eq!(project.song_row_marks(0), SongRowMarks::default());
     let claim = &project.target_cart().unwrap().claim;
     assert!(claim.sfx.is_empty());
     assert_eq!(claim.first_and_last_pattern, None);
@@ -453,7 +457,7 @@ fn a_later_song_starts_on_song_row_0_and_claims_only_its_own_patterns() {
 }
 
 #[test]
-fn the_song_loop_row_is_where_loop_back_jumps_inside_the_song() {
+fn loop_start_and_loop_back_inside_the_song_become_marks() {
     let mut stop = pattern([Some(0), None, None, None]);
     stop.stop = true;
     let mut start = pattern([Some(1), None, None, None]);
@@ -467,7 +471,11 @@ fn the_song_loop_row_is_where_loop_back_jumps_inside_the_song() {
 
     let (project, _) = imported_song(&cart, 1);
 
-    assert_eq!(project.song_loop_row(), Some(1));
+    assert!(project.song_row_marks(1).loop_start);
+    assert_eq!(
+        project.song_row_marks(2).ending,
+        Some(SongRowEnding::LoopBack)
+    );
 }
 
 #[test]
@@ -484,7 +492,7 @@ fn a_loop_back_that_jumps_outside_the_song_means_no_loop() {
 
     let (project, _) = imported_song(&cart, 1);
 
-    assert_eq!(project.song_loop_row(), None);
+    assert_eq!(project.song_row_marks(0).ending, None);
 }
 
 fn melody_on_sfx_1() -> TestSfx {

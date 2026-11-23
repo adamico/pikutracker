@@ -1,10 +1,10 @@
 mod instruments;
 mod rebuild;
 
-use crate::cart::{Cart, SLOTS};
+use crate::cart::{Cart, Pattern, SLOTS};
 use crate::project::{
     Chain, ChainEntry, ChainId, Claim, EXPORT_CHANNELS, Phrase, PhraseId, Project, SongPlace,
-    TargetCart,
+    SongRowEnding, SongRowMarks, TargetCart,
 };
 use crate::wording::counted;
 use instruments::imported_instrument;
@@ -137,7 +137,6 @@ pub fn import_song(cart: &Cart, cart_path: &str, song: Option<CartSong>) -> Impo
     for channel in 0..EXPORT_CHANNELS {
         project.set_export_track(channel, Some(channel as u8 + 1));
     }
-    project.set_song_loop_row(None);
 
     let mut warnings = Vec::new();
     let mut claim = Claim::default();
@@ -254,6 +253,20 @@ fn pattern_name(slot: u8) -> String {
     format!("PATTERN {slot:02X}")
 }
 
+fn marks_of(pattern: Pattern, song_loops: bool) -> SongRowMarks {
+    let ending = if pattern.stop() {
+        Some(SongRowEnding::Stop)
+    } else if pattern.loop_back() && song_loops {
+        Some(SongRowEnding::LoopBack)
+    } else {
+        None
+    };
+    SongRowMarks {
+        loop_start: pattern.loop_start(),
+        ending,
+    }
+}
+
 fn track_name(track: usize) -> String {
     format!("T{}", track + 1)
 }
@@ -297,8 +310,9 @@ impl<'a> SongBuilder<'a> {
         let (first, last) = song.patterns;
         for (row, slot) in (first..=last).enumerate() {
             self.add_pattern(row, slot);
+            let marks = marks_of(self.cart.pattern(slot), song.loop_back_row.is_some());
+            self.project.set_song_row_marks(row, marks);
         }
-        self.project.set_song_loop_row(song.loop_back_row);
         self.warn_about_the_whole_song(song);
         let mut claimed = self.played;
         claimed.extend(self.instruments.iter());

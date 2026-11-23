@@ -1,7 +1,6 @@
 (
     version: 1,
     default_speed: 16,
-    song_loop_row: Some(1),
     export_tracks: [
         Some(1),
         Some(2),
@@ -39,6 +38,7 @@
         (
             row: 1,
             tracks: "03 04 02 02 -- -- -- --",
+            loop_start: true,
         ),
         (
             row: 2,
@@ -59,6 +59,7 @@
         (
             row: 6,
             tracks: "0A 0B 02 02 -- -- -- --",
+            ending: Some(LoopBack),
         ),
     ],
     chains: [
