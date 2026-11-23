@@ -31,7 +31,7 @@ use crate::player::{AudioRequest, PlaybackReport, Playhead, TrackMix};
 use crate::project::{CHAIN_ENTRIES, FIRST_CUSTOM_INSTRUMENT, LAST_CUSTOM_INSTRUMENT, SONG_ROWS};
 use crate::project::{
     Chain, ChainEntry, ChainId, Phrase, PhraseId, Project, SongPlace, SongRowEnding, SongRowMarks,
-    Step,
+    Step, Track,
 };
 use crate::screen::grid::Grid;
 use crate::settings::AppState;
@@ -214,7 +214,7 @@ impl App {
     fn show_what_the_cursors_point_at(&mut self) {
         let cursors = CursorPlaces {
             song_row: self.song.row(),
-            track: self.song.track(),
+            track: Track::from_index(self.song.track()),
             chain_entry: self.chain.entry(),
         };
         self.shown.follow_cursors(&self.project, cursors);

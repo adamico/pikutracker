@@ -6,7 +6,7 @@ use super::{
 use crate::app::Direction;
 use crate::app::layout::Area;
 use crate::multitrack::{MultitrackLine, TimedStep, Timeline};
-use crate::project::{Project, Step, TRACKS};
+use crate::project::{Project, Step, Track};
 use crate::screen::grid::{Grid, Style};
 
 const HEADER_ROWS: usize = 2;
@@ -19,7 +19,7 @@ const SILENCE: &str = "   ";
 
 #[derive(Debug, Default)]
 pub struct MultitrackPane {
-    track: usize,
+    track: Track,
     tick: u32,
 }
 
@@ -48,16 +48,16 @@ impl MultitrackPane {
                     self.tick = step.start;
                 }
             }
-            Direction::Left => self.go_to_the_first_step_sounding((0..self.track).rev(), timeline),
-            Direction::Right => {
-                self.go_to_the_first_step_sounding(self.track + 1..TRACKS, timeline);
+            Direction::Left => {
+                self.go_to_the_first_step_sounding(self.track.before().rev(), timeline)
             }
+            Direction::Right => self.go_to_the_first_step_sounding(self.track.after(), timeline),
         }
     }
 
     fn go_to_the_first_step_sounding(
         &mut self,
-        mut tracks: impl Iterator<Item = usize>,
+        mut tracks: impl Iterator<Item = Track>,
         timeline: &Timeline,
     ) {
         let tick = self.tick;
@@ -94,12 +94,12 @@ impl MultitrackPane {
             .map_or(0, |span| span.place.song_row);
         let title = format!("MULTITRACK  ROW {song_row:02X}");
         draw_title(grid, area.column, area.row, &title, focused);
-        for track in 0..TRACKS {
-            let column = area.column + FIRST_TRACK_COLUMN + track * TRACK_WIDTH;
+        for track in Track::all() {
+            let column = track_column(area, track);
             grid.put(
                 column,
                 area.row + 1,
-                &format!("TRACK {}", track + 1),
+                &format!("TRACK {}", track.number()),
                 HEADING,
             );
         }
@@ -121,8 +121,8 @@ impl MultitrackPane {
             if !line.holds_steps {
                 continue;
             }
-            for track in 0..TRACKS {
-                let column = area.column + FIRST_TRACK_COLUMN + track * TRACK_WIDTH;
+            for track in Track::all() {
+                let column = track_column(area, track);
                 let is_cursor = focused && track == self.track && tick == self.tick;
                 match view.timeline.step_sounding_at(track, tick) {
                     Some(step) if step.start == tick => {
@@ -135,6 +135,10 @@ impl MultitrackPane {
             }
         }
     }
+}
+
+fn track_column(area: Area, track: Track) -> usize {
+    area.column + FIRST_TRACK_COLUMN + track.index() * TRACK_WIDTH
 }
 
 fn draw_step(grid: &mut Grid, column: usize, row: usize, step: &TimedStep, is_cursor: bool) {

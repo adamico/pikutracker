@@ -1,4 +1,4 @@
-use crate::project::{ChainEntry, ChainId, PhraseId, Project};
+use crate::project::{ChainEntry, ChainId, PhraseId, Project, Track};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) struct Shown {
@@ -11,14 +11,14 @@ pub(super) struct Shown {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct CursorPlaces {
     pub(super) song_row: usize,
-    pub(super) track: usize,
+    pub(super) track: Track,
     pub(super) chain_entry: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct SongCursorPlaceSeen {
     row: usize,
-    track: usize,
+    track: Track,
     chain: Option<ChainId>,
 }
 
@@ -55,7 +55,7 @@ impl Shown {
         let song_cursor = SongCursorPlaceSeen {
             row: song_row,
             track,
-            chain: project.song_cell(song_row, track),
+            chain: project.song_cell(song_row, track.index()),
         };
         if self.song_cursor_last_seen != Some(song_cursor) {
             self.song_cursor_last_seen = Some(song_cursor);

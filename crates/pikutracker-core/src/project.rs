@@ -481,6 +481,36 @@ pub struct TargetCart {
     pub claimed_bytes_hash: Option<String>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Track(usize);
+
+impl Track {
+    pub const fn from_index(index: usize) -> Self {
+        assert!(index < TRACKS);
+        Self(index)
+    }
+
+    pub fn all() -> impl DoubleEndedIterator<Item = Self> {
+        (0..TRACKS).map(Self)
+    }
+
+    pub const fn index(self) -> usize {
+        self.0
+    }
+
+    pub const fn number(self) -> usize {
+        self.0 + 1
+    }
+
+    pub fn before(self) -> impl DoubleEndedIterator<Item = Self> {
+        (0..self.0).map(Self)
+    }
+
+    pub fn after(self) -> impl DoubleEndedIterator<Item = Self> {
+        (self.0 + 1..TRACKS).map(Self)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ChainRowPlace {
     pub song_row: usize,

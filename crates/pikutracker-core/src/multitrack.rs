@@ -1,4 +1,6 @@
-use crate::project::{ChainEntry, ChainRowPlace, PhraseId, Project, SongPlace, Step, TRACKS};
+use crate::project::{
+    ChainEntry, ChainRowPlace, PhraseId, Project, SongPlace, Step, TRACKS, Track,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TimedStep {
@@ -74,8 +76,9 @@ impl Timeline {
                     start,
                     ticks: project.chain_row_ticks(song_row, chain_row),
                 };
-                for (track, steps) in timeline.tracks.iter_mut().enumerate() {
-                    if let Some(entry) = project.chain_row_entry(song_row, track, chain_row) {
+                for (track, steps) in Track::all().zip(timeline.tracks.iter_mut()) {
+                    if let Some(entry) = project.chain_row_entry(song_row, track.index(), chain_row)
+                    {
                         steps.extend(steps_of_entry(project, span, track, entry));
                     }
                 }
@@ -86,11 +89,11 @@ impl Timeline {
         timeline
     }
 
-    pub fn steps(&self, track: usize) -> &[TimedStep] {
-        &self.tracks[track]
+    pub fn steps(&self, track: Track) -> &[TimedStep] {
+        &self.tracks[track.index()]
     }
 
-    pub fn step_sounding_at(&self, track: usize, tick: u32) -> Option<&TimedStep> {
+    pub fn step_sounding_at(&self, track: Track, tick: u32) -> Option<&TimedStep> {
         let steps = self.steps(track);
         let after = steps.partition_point(|step| step.start <= tick);
         steps[..after].last().filter(|step| step.sounds_at(tick))
@@ -158,7 +161,7 @@ impl Timeline {
 fn steps_of_entry(
     project: &Project,
     span: ChainRowSpan,
-    track: usize,
+    track: Track,
     entry: ChainEntry,
 ) -> impl Iterator<Item = TimedStep> + '_ {
     let phrase = project.phrase(entry.phrase());
@@ -172,7 +175,7 @@ fn steps_of_entry(
             ticks: speed.min(span.ticks - at),
             place: SongPlace {
                 chain_row: span.place,
-                track,
+                track: track.index(),
                 step_index,
             },
             phrase: entry.phrase(),
