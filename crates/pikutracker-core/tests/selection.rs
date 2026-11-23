@@ -1,6 +1,6 @@
 mod support;
 
-use pikutracker_core::app::{Action, App, Direction};
+use pikutracker_core::app::{Action, App, Direction, layout};
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project, Step};
 use pikutracker_core::screen::palette::Colour;
 use support::apply;
@@ -28,8 +28,8 @@ const OCTAVE_UP: Action = Action::Nudge {
 };
 
 const SELECTED: Colour = Colour::Lavender;
-const SONG_FIRST_LINE: usize = 2;
-const SONG_FIRST_COLUMN: usize = 4;
+const SONG_FIRST_LINE: usize = layout::SONG.row + 2;
+const SONG_FIRST_COLUMN: usize = layout::SONG.column + 4;
 const SONG_TRACK_WIDTH: usize = 3;
 
 fn song_cell(app: &App, row: usize, track: usize) -> Option<u8> {

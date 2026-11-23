@@ -5,7 +5,6 @@ pub mod instrument;
 pub mod log;
 pub mod midi_dialog;
 pub mod phrase;
-pub mod scope;
 pub mod song;
 pub mod song_picker;
 
@@ -30,7 +29,6 @@ const SELECTED: Style = Style {
 const LOOP_MARK: Style = Style::fg(Colour::Pink);
 const OUT_OF_RANGE: Style = Style::fg(Colour::Red);
 const PLAYHEAD: Style = Style::fg(Colour::Green);
-const OUT_OF_RANGE_COLUMN: usize = 14;
 const COARSE_ID: i32 = 16;
 const MAX_ID: i32 = 255;
 
@@ -59,7 +57,7 @@ fn stepped(position: usize, delta: isize, positions: usize) -> usize {
 }
 
 fn draw_out_of_range_flag(grid: &mut Grid, column: usize, row: usize) {
-    grid.put(column + OUT_OF_RANGE_COLUMN, row, "!", OUT_OF_RANGE);
+    grid.put(column, row, "!", OUT_OF_RANGE);
 }
 
 fn draw_row_label(grid: &mut Grid, column: usize, row: usize, label: &str, playing: bool) {

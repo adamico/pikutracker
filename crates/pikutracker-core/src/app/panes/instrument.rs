@@ -1,4 +1,4 @@
-use super::phrase::{STEP_CELLS, StepCell, step_texts};
+use super::phrase::{STEP_CELLS, STEP_HEADING, StepCell, step_texts};
 use super::{HEADING, VALUE, draw_row_label, draw_styled_value, draw_title, stepped, typed_value};
 use crate::app::{Action, Direction, KeyContext};
 use crate::project::{
@@ -324,7 +324,7 @@ impl InstrumentView {
             InstrumentSound::Sfx(_) => vec![
                 (SETTINGS_ROW, "SPD     LEN     LOOP    TO"),
                 (FILTERS_ROW, "NZ    BZ    DT    RV    DP"),
-                (STEP_HEADING_ROW, "   NOT I V F"),
+                (STEP_HEADING_ROW, STEP_HEADING),
             ],
             InstrumentSound::Waveform(_) => {
                 vec![(SETTINGS_ROW, "BASS"), (FILTERS_ROW, "DT    RV    DP")]

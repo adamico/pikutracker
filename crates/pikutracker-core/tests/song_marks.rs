@@ -1,6 +1,6 @@
 mod support;
 
-use pikutracker_core::app::{Action, App, Direction};
+use pikutracker_core::app::{Action, App, Direction, layout};
 use pikutracker_core::keymap::{Key, KeyPress, Keymap, Modifiers, named_actions};
 use pikutracker_core::project::{ChainId, Project, SongRowEnding, SongRowMarks};
 use support::apply;
@@ -105,8 +105,10 @@ fn each_toggle_is_one_undoable_edit() {
 }
 
 fn song_line(app: &App, line: usize) -> String {
-    let dump = app.grid().text_dump();
-    let text: String = dump.lines().nth(line).unwrap().chars().take(7).collect();
+    let text: String = support::pane_text(app, layout::SONG, line)
+        .chars()
+        .take(7)
+        .collect();
     text.trim_end().to_owned()
 }
 

@@ -1,5 +1,8 @@
-use pikutracker_core::app::{Action, App, Direction};
+mod support;
+
+use pikutracker_core::app::{Action, App, Direction, layout};
 use pikutracker_core::keymap::{Key, KeyPress, Keymap, Modifiers};
+use support::pane_text;
 
 const NONE: Modifiers = Modifiers::NONE;
 const CTRL: Modifiers = Modifiers::CTRL;
@@ -117,16 +120,7 @@ fn key_presses_drive_the_headless_app_through_the_preset() {
         app.apply(action);
     }
 
-    let dump = app.grid().text_dump();
-    let chain_entry_one: String = dump
-        .lines()
-        .nth(3)
-        .unwrap()
-        .chars()
-        .skip(29)
-        .take(13)
-        .collect();
-    assert_eq!(chain_entry_one, "1[--]---     ");
+    assert_eq!(pane_text(&app, layout::CHAIN, 3), "01[--]    ---");
 }
 
 #[test]

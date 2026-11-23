@@ -1,5 +1,8 @@
-use pikutracker_core::app::{Action, App};
+mod support;
+
+use pikutracker_core::app::{App, layout};
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project, Step};
+use support::pane_text;
 
 const FIRST_ENTRY_LINE: usize = 2;
 const FIRST_STEP_LINE: usize = 5;
@@ -34,67 +37,26 @@ fn transposed(phrase: PhraseId, semitones: i32) -> ChainEntry {
     entry
 }
 
-fn pane_text(app: &App, line: usize, columns: std::ops::Range<usize>) -> String {
-    let text: String = app
-        .grid()
-        .text_dump()
-        .lines()
-        .nth(line)
-        .unwrap()
-        .chars()
-        .chain(std::iter::repeat(' '))
-        .skip(columns.start)
-        .take(columns.len())
-        .collect();
-    text.trim_end().to_owned()
-}
-
 fn chain_text(app: &App, entry: usize) -> String {
-    pane_text(app, FIRST_ENTRY_LINE + entry, 29..62)
+    pane_text(app, layout::CHAIN, FIRST_ENTRY_LINE + entry)
 }
 
 fn step_text(app: &App, step: usize) -> String {
-    pane_text(app, FIRST_STEP_LINE + step, 63..82)
+    pane_text(app, layout::PHRASE, FIRST_STEP_LINE + step)
 }
 
 #[test]
-fn each_k_line_shows_the_ticks_of_its_chain_row() {
-    let mut project = Project::new();
-    let short = phrase(&mut project, 5, 4, 8);
-    let long = phrase(&mut project, 6, 8, 8);
-    place(&mut project, 0, 0, 0, &[ChainEntry::new(short)]);
-    place(&mut project, 0, 1, 1, &[ChainEntry::new(long)]);
-
-    let app = App::with_project(project);
-
-    assert_eq!(chain_text(&app, 0), "0 05 +00          64");
-    assert_eq!(chain_text(&app, 1), "1 -- ---           -");
-}
-
-#[test]
-fn the_ticks_count_every_track_whichever_chain_is_on_show() {
-    let mut project = Project::new();
-    let short = phrase(&mut project, 5, 4, 8);
-    let long = phrase(&mut project, 6, 8, 8);
-    place(&mut project, 0, 0, 0, &[ChainEntry::new(short)]);
-    place(&mut project, 0, 3, 1, &[ChainEntry::new(long)]);
-
-    let app = App::with_project(project);
-
-    assert_eq!(chain_text(&app, 0), "0 05 +00          64");
-}
-
-#[test]
-fn the_ticks_follow_the_song_row_under_the_cursor() {
+fn the_chain_pane_reads_phrase_and_transp_with_no_tick_column() {
     let mut project = Project::new();
     let id = phrase(&mut project, 5, 4, 8);
-    place(&mut project, 1, 1, 0, &[ChainEntry::new(id)]);
+    place(&mut project, 0, 0, 0, &[ChainEntry::new(id)]);
 
-    let mut app = App::with_project(project);
-    assert_eq!(chain_text(&app, 0), "0 -- ---           -");
+    let app = App::with_project(project);
 
-    app.apply(Action::Move(pikutracker_core::app::Direction::Down));
-    assert_eq!(chain_text(&app, 0), "0 -- ---          32");
+    assert_eq!(pane_text(&app, layout::CHAIN, 1), "   PHRASE TRANSP");
+    assert_eq!(chain_text(&app, 0), "00 05     +00");
+    assert_eq!(chain_text(&app, 15), "0F --     ---");
+    assert!(!app.grid().text_dump().contains("TICK"));
 }
 
 #[test]
@@ -180,34 +142,31 @@ fn transposed_app(semitones: i32, volume: i32) -> App {
 fn a_step_transposed_above_63_is_flagged_in_the_phrase_and_chain_panes() {
     let app = transposed_app(40, 5);
 
-    assert_eq!(step_text(&app, 0), "00 C-2 0 5 0  !");
-    assert_eq!(chain_text(&app, 0), "0 01 +28      !   32");
+    assert_eq!(step_text(&app, 0), "00 C-2  0    5   0  !");
+    assert_eq!(chain_text(&app, 0), "00 01     +28 !");
 }
 
 #[test]
 fn a_step_transposed_below_0_is_flagged() {
     let app = transposed_app(-25, 5);
 
-    assert_eq!(step_text(&app, 0), "00 C-2 0 5 0  !");
-    assert_eq!(chain_text(&app, 0), "0 01 -19      !   32");
+    assert_eq!(step_text(&app, 0), "00 C-2  0    5   0  !");
+    assert_eq!(chain_text(&app, 0), "00 01     -19 !");
 }
 
 #[test]
 fn the_edges_of_the_pitch_range_are_not_flagged() {
-    assert_eq!(step_text(&transposed_app(39, 5), 0), "00 C-2 0 5 0");
-    assert_eq!(step_text(&transposed_app(-24, 5), 0), "00 C-2 0 5 0");
-    assert_eq!(
-        chain_text(&transposed_app(39, 5), 0),
-        "0 01 +27          32"
-    );
+    assert_eq!(step_text(&transposed_app(39, 5), 0), "00 C-2  0    5   0");
+    assert_eq!(step_text(&transposed_app(-24, 5), 0), "00 C-2  0    5   0");
+    assert_eq!(chain_text(&transposed_app(39, 5), 0), "00 01     +27");
 }
 
 #[test]
 fn a_silent_step_is_not_flagged() {
     let app = transposed_app(40, 0);
 
-    assert_eq!(step_text(&app, 0), "00 ... . . .");
-    assert_eq!(chain_text(&app, 0), "0 01 +28          32");
+    assert_eq!(step_text(&app, 0), "00 ...  .    .   .");
+    assert_eq!(chain_text(&app, 0), "00 01     +28");
 }
 
 #[test]
@@ -221,7 +180,7 @@ fn a_step_past_len_is_not_flagged() {
 
     let app = App::with_project(project);
 
-    assert_eq!(chain_text(&app, 0), "0 01 +0C          32");
+    assert_eq!(chain_text(&app, 0), "00 01     +0C");
 }
 
 fn arpeggio_reading_a_silent_d_sharp_5(length: i32) -> App {
@@ -237,14 +196,14 @@ fn arpeggio_reading_a_silent_d_sharp_5(length: i32) -> App {
 fn a_silent_step_an_arpeggio_reads_is_flagged_like_export_rejects_it() {
     let app = arpeggio_reading_a_silent_d_sharp_5(4);
 
-    assert_eq!(step_text(&app, 0), "00 C-2 0 5 6");
-    assert_eq!(step_text(&app, 1), "01 ... . . .  !");
-    assert_eq!(chain_text(&app, 0), "0 01 +01      !   32");
+    assert_eq!(step_text(&app, 0), "00 C-2  0    5   6");
+    assert_eq!(step_text(&app, 1), "01 ...  .    .   .  !");
+    assert_eq!(chain_text(&app, 0), "00 01     +01 !");
 }
 
 #[test]
 fn a_step_past_len_an_arpeggio_reads_flags_the_chain_entry() {
     let app = arpeggio_reading_a_silent_d_sharp_5(1);
 
-    assert_eq!(chain_text(&app, 0), "0 01 +01      !    8");
+    assert_eq!(chain_text(&app, 0), "00 01     +01 !");
 }

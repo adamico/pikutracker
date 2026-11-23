@@ -1,6 +1,6 @@
 mod support;
 
-use pikutracker_core::app::{Action, App, Direction, KeyContext};
+use pikutracker_core::app::{Action, App, Direction, KeyContext, layout};
 use pikutracker_core::keymap::{Key, KeyPress, Keymap, Modifiers};
 use pikutracker_core::player::{AudioRequest, Player};
 use pikutracker_core::project::{
@@ -168,10 +168,9 @@ fn a_step_instrument_is_one_hex_digit() {
     app.apply(Action::HexDigit(0x0A));
 
     assert_eq!(first_step(&app).instrument(), 0x0A);
-    assert!(
-        lines(&app)[5].contains("│00 C-2[A]5 0 "),
-        "{}",
-        lines(&app)[5]
+    assert_eq!(
+        support::pane_text(&app, layout::PHRASE, 5),
+        "00 C-2 [A]   5   0"
     );
 }
 
@@ -263,9 +262,9 @@ fn enter_on_a_step_instrument_column_opens_the_instrument_full_screen() {
     assert_eq!(lines[3], "KIND SFX");
     assert_eq!(lines[4], "SPD 10  LEN 10  LOOP 00 TO 00");
     assert_eq!(lines[5], "NZ 0  BZ 0  DT 0  RV 0  DP 0");
-    assert_eq!(lines[7], "   NOT I V F");
-    assert_eq!(lines[8], "00 ... . . .");
-    assert_eq!(lines[23], "0F ... . . .");
+    assert_eq!(lines[7], "   NOTE INST VOL FX");
+    assert_eq!(lines[8], "00 ...  .    .   .");
+    assert_eq!(lines[23], "0F ...  .    .   .");
     assert_eq!(lines[24], "");
 }
 
@@ -274,7 +273,7 @@ fn a_built_in_instrument_has_no_view() {
     let mut app = on_instrument(0x03);
     app.apply(ENTER);
 
-    assert!(lines(&app)[0].starts_with("SONG"));
+    assert!(lines(&app)[0].starts_with("PHRASE"));
     assert_eq!(
         support::status_line(&app),
         "BUILT-IN INSTRUMENTS HAVE NO SETTINGS"
@@ -286,7 +285,7 @@ fn escape_closes_the_instrument_view() {
     let mut app = instrument_view(0x08);
     app.apply(ESC);
 
-    assert!(lines(&app)[0].starts_with("SONG"));
+    assert!(lines(&app)[0].starts_with("PHRASE"));
     assert_eq!(first_step(&app).instrument(), 0x08);
 }
 
@@ -303,7 +302,7 @@ fn an_sfx_instrument_edits_its_steps() {
     apply(&mut app, &[DOWN, DOWN, DOWN, DOWN, C_KEY]);
 
     assert_eq!(sfx(&app, 0x08).steps[0], step(C2, 2, 5));
-    assert_eq!(lines(&app)[8], "00 C-2 2 5 0");
+    assert_eq!(lines(&app)[8], "00 C-2  2    5   0");
 }
 
 #[test]

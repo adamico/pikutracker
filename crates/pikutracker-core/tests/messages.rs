@@ -1,11 +1,12 @@
 mod support;
 
+use pikutracker_core::app::layout;
 use pikutracker_core::app::{Action, App, Direction, LogItem, Report, Severity};
 use pikutracker_core::project::SongPlace;
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
 use pikutracker_core::screen::palette::Colour;
 use std::time::Duration;
-use support::status_line;
+use support::{pane_text, status_line};
 
 const STATUS_ROW: usize = 44;
 const DOWN: Action = Action::Move(Direction::Down);
@@ -15,16 +16,7 @@ fn status_background(app: &App) -> Colour {
 }
 
 fn right_slot(app: &App, line: usize) -> String {
-    let text: String = app
-        .grid()
-        .text_dump()
-        .lines()
-        .nth(line)
-        .unwrap()
-        .chars()
-        .skip(83)
-        .collect();
-    text.trim_end().to_owned()
+    pane_text(app, layout::RIGHT_SLOT, line)
 }
 
 fn right_slot_lines(app: &App) -> Vec<String> {
@@ -32,9 +24,7 @@ fn right_slot_lines(app: &App) -> Vec<String> {
 }
 
 fn song_line(app: &App, line: usize) -> String {
-    app.grid().text_dump().lines().nth(line).unwrap()[..28]
-        .trim_end()
-        .to_owned()
+    pane_text(app, layout::SONG, line)
 }
 
 fn item(text: &str) -> LogItem {
@@ -125,7 +115,7 @@ fn a_result_without_items_leaves_the_right_hand_view_alone() {
     let mut app = App::new();
     app.report(Report::failure("CANNOT SAVE"));
 
-    assert_eq!(right_slot(&app, 0), "SCOPE");
+    assert_eq!(right_slot(&app, 0), "");
 }
 
 #[test]
@@ -135,11 +125,11 @@ fn ctrl_l_opens_the_log_with_focus_and_closes_it_back_to_the_pane_you_came_from(
 
     app.apply(Action::ToggleLog);
     assert_eq!(right_slot(&app, 0), "LOG");
-    assert!(!app.grid().text_dump().contains("0[--]---"));
+    assert_eq!(pane_text(&app, layout::CHAIN, 2), "00 --     ---");
 
     app.apply(Action::ToggleLog);
-    assert_eq!(right_slot(&app, 0), "SCOPE");
-    assert!(app.grid().text_dump().contains("0[--]---"));
+    assert_eq!(right_slot(&app, 0), "");
+    assert_eq!(pane_text(&app, layout::CHAIN, 2), "00[--]    ---");
 }
 
 #[test]
@@ -149,7 +139,7 @@ fn esc_in_the_log_closes_it() {
 
     app.apply(Action::Cancel);
 
-    assert_eq!(right_slot(&app, 0), "SCOPE");
+    assert_eq!(right_slot(&app, 0), "");
     assert_eq!(song_line(&app, 2), "00 [--]-- -- --");
 }
 
@@ -164,7 +154,7 @@ fn esc_clears_a_failure_before_it_closes_the_log() {
     assert!(!status_line(&app).contains("EXPORT FAILED"));
 
     app.apply(Action::Cancel);
-    assert_eq!(right_slot(&app, 0), "SCOPE");
+    assert_eq!(right_slot(&app, 0), "");
 }
 
 #[test]

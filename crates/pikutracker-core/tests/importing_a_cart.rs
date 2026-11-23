@@ -1,5 +1,6 @@
 mod support;
 
+use pikutracker_core::app::layout;
 use pikutracker_core::app::{
     Action, App, Direction, DirectoryEntry, FileRequest, FileResponse, KeyContext,
 };
@@ -7,24 +8,15 @@ use pikutracker_core::keymap::{Key, KeyPress, Keymap, Modifiers};
 use pikutracker_core::player::AudioRequest;
 use pikutracker_core::project::{Project, SongRowEnding, SongRowMarks};
 use std::path::{Path, PathBuf};
-use support::status_line;
 use support::{TestCart, TestPattern, TestSfx};
+use support::{pane_text, status_line};
 
 const DOWN: Action = Action::Move(Direction::Down);
 const PICKER_KEYS: &str = "UP/DOWN PICK  P LISTEN  ENTER IMPORT  ESC BACK";
 const UNSAVED_QUESTION: &str = "UNSAVED CHANGES WILL BE LOST  ENTER DISCARD  ESC CANCEL";
 
 fn right_slot(app: &App, line: usize) -> String {
-    let text: String = app
-        .grid()
-        .text_dump()
-        .lines()
-        .nth(line)
-        .unwrap()
-        .chars()
-        .skip(83)
-        .collect();
-    text.trim_end().to_owned()
+    pane_text(app, layout::RIGHT_SLOT, line)
 }
 
 fn file(name: &str) -> DirectoryEntry {
@@ -119,7 +111,7 @@ fn selecting_a_p8_cart_opens_it_as_a_new_project() {
     assert!(project.chain_row_entry(1, 1, 0).is_some());
     assert_eq!(project.target_cart().unwrap().path, "demo.p8");
     assert_eq!(status_line(&app), "IMPORTED SONG 1 OF DEMO.P8");
-    assert_eq!(right_slot(&app, 0), "SCOPE");
+    assert_eq!(right_slot(&app, 0), "");
 }
 
 #[test]
@@ -193,7 +185,7 @@ fn leaving_the_file_list_changes_nothing() {
     answer_listing(&mut app, vec![file("demo.p8")]);
     app.apply(Action::Cancel);
 
-    assert_eq!(right_slot(&app, 0), "SCOPE");
+    assert_eq!(right_slot(&app, 0), "");
     assert_eq!(app.project(), &edited);
 }
 
@@ -276,7 +268,7 @@ fn a_damaged_cart_is_refused_and_the_project_stays() {
         "! CANNOT IMPORT DEMO.P8: NOT A PICO-8 CART"
     );
     assert_eq!(app.project(), &edited);
-    assert_eq!(right_slot(&app, 0), "SCOPE");
+    assert_eq!(right_slot(&app, 0), "");
 }
 
 #[test]
@@ -338,8 +330,7 @@ fn is_song_2(project: &Project) -> bool {
 }
 
 fn first_song_row_label(app: &App) -> String {
-    let dump = app.grid().text_dump();
-    dump.lines().nth(2).unwrap().chars().take(3).collect()
+    pane_text(app, layout::SONG, 2).chars().take(3).collect()
 }
 
 #[test]
@@ -445,7 +436,7 @@ fn esc_leaves_the_song_picker_and_keeps_the_project() {
     app.apply(Action::Cancel);
 
     assert_eq!(app.project(), &edited);
-    assert_eq!(right_slot(&app, 0), "SCOPE");
+    assert_eq!(right_slot(&app, 0), "");
     assert_eq!(app.take_audio_requests(), [AudioRequest::Stop]);
     assert_eq!(app.chain_under_cursor(), edited.song_cell(0, 0));
 }

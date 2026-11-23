@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use pikutracker_core::app::layout::Area;
 use pikutracker_core::app::{Action, App};
 use pikutracker_core::cart::Cart;
 use pikutracker_core::player::{AudioRequest, Player};
@@ -22,6 +23,21 @@ pub fn apply(app: &mut App, actions: &[Action]) {
     for action in actions {
         app.apply(*action);
     }
+}
+
+pub fn pane_text(app: &App, area: Area, line: usize) -> String {
+    let text: String = app
+        .grid()
+        .text_dump()
+        .lines()
+        .nth(area.row + line)
+        .unwrap_or_default()
+        .chars()
+        .chain(std::iter::repeat(' '))
+        .skip(area.column)
+        .take(area.width)
+        .collect();
+    text.trim_end().to_owned()
 }
 
 pub fn status_line(app: &App) -> String {

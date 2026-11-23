@@ -1,29 +1,20 @@
 mod support;
 
+use pikutracker_core::app::layout;
 use pikutracker_core::app::{Action, App, Direction, DirectoryEntry, FileRequest, FileResponse};
 use pikutracker_core::cart::Cart;
 use pikutracker_core::player::AudioRequest;
 use pikutracker_core::project::{Claim, PhraseId, Project, TargetCart};
 use pikutracker_core::project_file;
 use std::path::{Path, PathBuf};
-use support::status_line;
 use support::{HEADER, TestCart, TestPattern, TestSfx};
+use support::{pane_text, status_line};
 
 const DOWN: Action = Action::Move(Direction::Down);
 const CART_NAME: &str = "game.p8";
 
-fn line(app: &App, index: usize) -> String {
-    app.grid()
-        .text_dump()
-        .lines()
-        .nth(index)
-        .unwrap()
-        .to_owned()
-}
-
 fn right_slot(app: &App, index: usize) -> String {
-    let text: String = line(app, index).chars().skip(83).collect();
-    text.trim_end().to_owned()
+    pane_text(app, layout::RIGHT_SLOT, index)
 }
 
 fn cart_path() -> PathBuf {
@@ -105,14 +96,6 @@ fn with_more_song_rows_than_the_claim_holds(app: &App) -> App {
 }
 
 #[test]
-fn the_right_slot_keeps_only_the_scope() {
-    let app = App::new();
-
-    assert_eq!(right_slot(&app, 0), "SCOPE");
-    assert!(!app.grid().text_dump().contains("EXPORT TRACKS"));
-}
-
-#[test]
 fn escape_in_the_right_slot_moves_focus_to_the_phrase_pane() {
     let mut app = App::new();
     focus_right_slot(&mut app);
@@ -129,7 +112,7 @@ fn escape_in_the_right_slot_moves_focus_to_the_phrase_pane() {
 fn the_song_pane_shows_tracks_1_to_4_only() {
     let app = App::new();
 
-    assert_eq!(line(&app, 1)[..28].trim_end(), "    T1 T2 T3 T4");
+    assert_eq!(pane_text(&app, layout::SONG, 1), "    T1 T2 T3 T4");
 }
 
 #[test]

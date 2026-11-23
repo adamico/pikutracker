@@ -11,7 +11,7 @@ use std::ops::RangeInclusive;
 
 const COARSE_TRANSPOSE: i32 = 12;
 const HEADER_ROWS: usize = 2;
-const TICKS_COLUMN: usize = 16;
+const OUT_OF_RANGE_COLUMN: usize = 14;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum EntryCell {
@@ -20,8 +20,8 @@ enum EntryCell {
 }
 
 const ENTRY_CELLS: [(EntryCell, usize, &str); 2] = [
-    (EntryCell::Phrase, 2, "--"),
-    (EntryCell::Transpose, 5, "---"),
+    (EntryCell::Phrase, 3, "--"),
+    (EntryCell::Transpose, 10, "---"),
 ];
 
 #[derive(Clone, Copy, Debug)]
@@ -157,7 +157,7 @@ impl ChainPane {
             for column in cells.columns() {
                 if (entry, column) != (self.entry, self.column) {
                     let (_, offset, empty) = ENTRY_CELLS[column];
-                    let row = HEADER_ROWS + entry;
+                    let row = area.row + HEADER_ROWS + entry;
                     grid.restyle(area.column + offset, row, empty.len(), SELECTED);
                 }
             }
@@ -186,14 +186,13 @@ impl ChainPane {
         } = view;
         let id = project.song_cell(song_row, track);
         let number = id_text(id.map(ChainId::number));
-        let title = format!("CHAIN {number}  T{} ROW {song_row:02X}", track + 1);
-        draw_title(grid, area.column, 0, &title, focused);
-        grid.put(area.column, 1, "K PH TSP", HEADING);
-        grid.put(area.column + TICKS_COLUMN, 1, "TICK", HEADING);
+        let title = format!("CHAIN {number}");
+        draw_title(grid, area.column, area.row, &title, focused);
+        grid.put(area.column, area.row + 1, "   PHRASE TRANSP", HEADING);
 
         for index in 0..CHAIN_ENTRIES {
-            let row = HEADER_ROWS + index;
-            let label = format!("{index:X}");
+            let row = area.row + HEADER_ROWS + index;
+            let label = format!("{index:02X}");
             draw_row_label(grid, area.column, row, &label, playing_entry == Some(index));
             let entry = project.chain_row_entry(song_row, track, index);
             for (column, (cell, offset, empty)) in ENTRY_CELLS.iter().enumerate() {
@@ -210,16 +209,8 @@ impl ChainPane {
                     .is_out_of_range(entry.transpose())
             });
             if out_of_range {
-                draw_out_of_range_flag(grid, area.column, row);
+                draw_out_of_range_flag(grid, area.column + OUT_OF_RANGE_COLUMN, row);
             }
-            draw_ticks(
-                grid,
-                area.column + TICKS_COLUMN,
-                row,
-                project,
-                song_row,
-                index,
-            );
         }
     }
 }
@@ -288,21 +279,4 @@ fn cell_text(cell: EntryCell, entry: ChainEntry) -> (String, Style) {
             (format!("{sign}{:02X}", transpose.abs()), VALUE)
         }
     }
-}
-
-fn draw_ticks(
-    grid: &mut Grid,
-    column: usize,
-    row: usize,
-    project: &Project,
-    song_row: usize,
-    chain_row: usize,
-) {
-    let ticks = project.chain_row_ticks(song_row, chain_row);
-    let (text, style) = if ticks > 0 {
-        (format!("{ticks:>4}"), VALUE)
-    } else {
-        ("   -".to_owned(), EMPTY)
-    };
-    grid.put(column, row, &text, style);
 }

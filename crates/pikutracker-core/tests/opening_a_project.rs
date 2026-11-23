@@ -1,9 +1,14 @@
-use pikutracker_core::app::{Action, App, Direction, DirectoryEntry, FileRequest, FileResponse};
+mod support;
+
+use pikutracker_core::app::{
+    Action, App, Direction, DirectoryEntry, FileRequest, FileResponse, layout,
+};
 use pikutracker_core::player::{AudioRequest, Player, TrackMix};
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
 use pikutracker_core::project_file;
 use pikutracker_core::synth::SAMPLES_PER_TICK;
 use std::path::PathBuf;
+use support::pane_text;
 
 const STEP_SAMPLES: usize = 16 * SAMPLES_PER_TICK as usize;
 const TRACK_HEADER_ROW: usize = 1;
@@ -56,12 +61,8 @@ fn open(app: &mut App, project: &Project) {
 }
 
 fn headers(app: &App) -> String {
-    app.grid()
-        .text_dump()
-        .lines()
-        .nth(TRACK_HEADER_ROW)
-        .unwrap()[4..27]
-        .trim_end()
+    pane_text(app, layout::SONG, TRACK_HEADER_ROW)
+        .trim_start()
         .to_owned()
 }
 

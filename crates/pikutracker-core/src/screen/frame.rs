@@ -7,8 +7,27 @@ pub const LOGICAL_HEIGHT: u32 = 360;
 
 const WIDTH: usize = LOGICAL_WIDTH as usize;
 const HEIGHT: usize = LOGICAL_HEIGHT as usize;
-const SEPARATOR: char = '│';
 const SEPARATOR_COLUMN: usize = 2;
+const SEPARATOR_ROW: usize = 3;
+
+struct SeparatorLines {
+    vertical: bool,
+    horizontal: std::ops::Range<usize>,
+}
+
+fn separator_lines(ch: char) -> Option<SeparatorLines> {
+    let (vertical, horizontal) = match ch {
+        '│' => (true, 0..0),
+        '─' => (false, 0..CELL_WIDTH),
+        '├' => (true, SEPARATOR_COLUMN..CELL_WIDTH),
+        '┤' => (true, 0..SEPARATOR_COLUMN + 1),
+        _ => return None,
+    };
+    Some(SeparatorLines {
+        vertical,
+        horizontal,
+    })
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Frame {
@@ -50,9 +69,14 @@ impl Frame {
             }
         }
 
-        if cell.ch == SEPARATOR {
-            for y in 0..CELL_HEIGHT {
-                self.set_pixel(left + SEPARATOR_COLUMN, top + y, cell.style.fg);
+        if let Some(lines) = separator_lines(cell.ch) {
+            if lines.vertical {
+                for y in 0..CELL_HEIGHT {
+                    self.set_pixel(left + SEPARATOR_COLUMN, top + y, cell.style.fg);
+                }
+            }
+            for x in lines.horizontal {
+                self.set_pixel(left + x, top + SEPARATOR_ROW, cell.style.fg);
             }
             return;
         }
