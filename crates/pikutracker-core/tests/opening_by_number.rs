@@ -160,7 +160,7 @@ fn a_note_goes_into_the_phrase_opened_by_number_and_undo_returns_to_it() {
         project.chain(ChainId::new(0))
     );
 
-    apply(&mut app, &[TAB, TAB, TAB, DOWN]);
+    apply(&mut app, &[Action::FocusPrevious, DOWN]);
     assert_eq!(app.shown_phrase(), None);
 
     app.apply(Action::Undo);
