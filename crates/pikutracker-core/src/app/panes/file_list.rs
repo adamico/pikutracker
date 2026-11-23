@@ -1,7 +1,7 @@
 use super::{HEADING, VALUE, draw_title, stepped};
 use crate::app::Direction;
 use crate::app::files::DirectoryEntry;
-use crate::app::importing::{ImportKind, import_kind};
+use crate::app::importing::{ImportKind, PNG_CART_EXTENSION, TEXT_CART_EXTENSION, import_kind};
 use crate::app::layout::Area;
 use crate::screen::grid::{Grid, Style};
 use crate::screen::palette::Colour;
@@ -27,6 +27,10 @@ pub enum Purpose {
 }
 
 impl Purpose {
+    pub fn takes_a_name(self) -> bool {
+        matches!(self, Self::SaveAs | Self::TargetCart)
+    }
+
     fn lists(self, name: &str) -> bool {
         match self {
             Self::Open | Self::SaveAs => is_project_file(name),
@@ -44,6 +48,8 @@ pub enum Choice {
     Import(PathBuf),
     TargetCart(PathBuf),
     LocatedCart(PathBuf),
+    NewCart(PathBuf),
+    RefusedPngNewCart,
     Save { path: PathBuf, exists: bool },
 }
 
@@ -110,7 +116,7 @@ impl FileList {
     }
 
     fn name_rows(&self) -> usize {
-        usize::from(self.purpose == Purpose::SaveAs)
+        usize::from(self.purpose.takes_a_name())
     }
 
     fn top_rows(&self) -> usize {
@@ -124,7 +130,7 @@ impl FileList {
 
     pub fn type_char(&mut self, ch: char) {
         let allowed = ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.');
-        if self.purpose == Purpose::SaveAs && allowed && self.name.len() < MAX_NAME {
+        if self.purpose.takes_a_name() && allowed && self.name.len() < MAX_NAME {
             self.name.push(ch);
             self.picked = 0;
         }
@@ -137,7 +143,10 @@ impl FileList {
 
     pub fn choose(&mut self) -> Choice {
         let Some(index) = self.picked.checked_sub(self.name_rows()) else {
-            return self.save_choice();
+            return match self.purpose {
+                Purpose::TargetCart => self.new_cart_choice(),
+                _ => self.save_choice(),
+            };
         };
         if let Some(recent) = self.recent_projects.get(index) {
             return Choice::Open(recent.clone());
@@ -178,6 +187,29 @@ impl FileList {
         }
     }
 
+    fn new_cart_choice(&self) -> Choice {
+        if self.name.is_empty() || !self.listed {
+            return Choice::Stay;
+        }
+        let lower = self.name.to_lowercase();
+        if lower.ends_with(PNG_CART_EXTENSION) {
+            return Choice::RefusedPngNewCart;
+        }
+        let file_name = if lower.ends_with(TEXT_CART_EXTENSION) {
+            self.name.clone()
+        } else {
+            format!("{}{TEXT_CART_EXTENSION}", self.name)
+        };
+        let existing = self
+            .rows
+            .iter()
+            .find(|row| !row.is_directory && row.name.eq_ignore_ascii_case(&file_name));
+        match existing {
+            Some(row) => Choice::TargetCart(self.directory.join(&row.name)),
+            None => Choice::NewCart(self.directory.join(file_name)),
+        }
+    }
+
     pub fn draw(&self, grid: &mut Grid, area: Area) {
         let title = match self.purpose {
             Purpose::Open => "OPEN PROJECT",
@@ -202,7 +234,7 @@ impl FileList {
         grid.put(area.column, row, tail(&directory, SLOT_WIDTH + 1), HEADING);
         row += 1;
 
-        if self.purpose == Purpose::SaveAs {
+        if self.purpose.takes_a_name() {
             self.draw_pointer(grid, area, row, 0);
             let name = format!("{NAME_LABEL}{}_", self.name);
             grid.put(area.column + 1, row, tail(&name, SLOT_WIDTH), VALUE);

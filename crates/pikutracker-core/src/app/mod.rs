@@ -42,7 +42,7 @@ use history::{CursorPlace, History, Merge};
 use messages::Notice;
 use panes::cart_view::CartView;
 use panes::chain::{ChainPane, ChainView};
-use panes::file_list::{FileList, Purpose};
+use panes::file_list::FileList;
 use panes::instrument::InstrumentView;
 use panes::log::LogPane;
 use panes::midi_dialog::MidiDialog;
@@ -235,11 +235,10 @@ impl App {
             return KeyContext::MidiImport;
         }
         if let Some(list) = &self.file_list {
-            return match list.purpose() {
-                Purpose::SaveAs => KeyContext::FileName,
-                Purpose::Open | Purpose::Import | Purpose::TargetCart | Purpose::LocateCart => {
-                    KeyContext::Navigation
-                }
+            return if list.purpose().takes_a_name() {
+                KeyContext::FileName
+            } else {
+                KeyContext::Navigation
             };
         }
         if let Some(view) = &self.instrument_view {
@@ -1112,10 +1111,8 @@ impl App {
             return StatusLine::Notice(notice);
         }
         match self.file_list.as_ref().map(FileList::purpose) {
-            Some(Purpose::SaveAs) => StatusLine::Hints(SAVE_LIST_KEYS),
-            Some(Purpose::Open | Purpose::Import | Purpose::TargetCart | Purpose::LocateCart) => {
-                StatusLine::Hints(OPEN_LIST_KEYS)
-            }
+            Some(purpose) if purpose.takes_a_name() => StatusLine::Hints(SAVE_LIST_KEYS),
+            Some(_) => StatusLine::Hints(OPEN_LIST_KEYS),
             None => StatusLine::Idle {
                 project,
                 unsaved: self.has_unsaved_changes(),
