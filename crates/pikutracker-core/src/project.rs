@@ -8,10 +8,9 @@ use std::collections::BTreeMap;
 use std::ops::Range;
 
 pub const MAX_STEPS: usize = 32;
-pub const TRACKS: usize = 8;
+pub const TRACKS: usize = 4;
 pub const CHAIN_ENTRIES: usize = 16;
 pub const SONG_ROWS: usize = 256;
-pub const EXPORT_CHANNELS: usize = 4;
 pub const WAVEFORM_SAMPLES: usize = 64;
 pub const FIRST_CUSTOM_INSTRUMENT: u8 = 8;
 pub const LAST_CUSTOM_INSTRUMENT: u8 = 0xF;
@@ -482,7 +481,6 @@ pub struct Project {
     song: Vec<[Option<ChainId>; TRACKS]>,
     song_loop_row: Option<usize>,
     default_speed: u8,
-    export_tracks: [Option<u8>; EXPORT_CHANNELS],
     target_cart: Option<TargetCart>,
     custom_instruments: BTreeMap<u8, CustomInstrument>,
 }
@@ -495,7 +493,6 @@ impl Default for Project {
             song: vec![[None; TRACKS]; SONG_ROWS],
             song_loop_row: Some(0),
             default_speed: DEFAULT_SPEED,
-            export_tracks: [None; EXPORT_CHANNELS],
             target_cart: None,
             custom_instruments: BTreeMap::new(),
         }
@@ -579,19 +576,6 @@ impl Project {
 
     pub fn set_default_speed(&mut self, speed: i32) {
         self.default_speed = speed.clamp(MIN_SPEED, MAX_SPEED) as u8;
-    }
-
-    pub const fn export_track_numbers(&self) -> [Option<u8>; EXPORT_CHANNELS] {
-        self.export_tracks
-    }
-
-    pub fn export_track_indices(&self) -> [Option<usize>; EXPORT_CHANNELS] {
-        self.export_tracks
-            .map(|track| track.map(|track| usize::from(track) - 1))
-    }
-
-    pub fn set_export_track(&mut self, channel: usize, track_number: Option<u8>) {
-        self.export_tracks[channel] = track_number;
     }
 
     pub const fn target_cart(&self) -> Option<&TargetCart> {

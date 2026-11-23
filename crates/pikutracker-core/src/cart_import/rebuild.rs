@@ -1,6 +1,6 @@
 use crate::cart::{Cart, CartNote, Pattern, SFX_NOTES, Sfx, WAVEFORM_INSTRUMENT_BIT};
 use crate::project::{
-    ARPEGGIO_GROUP, EXPORT_CHANNELS, Filters, MAX_STEPS, Phrase, Step, arpeggio_group_start,
+    ARPEGGIO_GROUP, Filters, MAX_STEPS, Phrase, Step, TRACKS, arpeggio_group_start,
     custom_instrument_of_slot,
 };
 use std::collections::BTreeSet;
@@ -25,7 +25,7 @@ pub(super) struct RebuiltChannel {
 }
 
 pub(super) struct RebuiltPattern {
-    pub(super) chain_rows: Vec<[Option<RebuiltChannel>; EXPORT_CHANNELS]>,
+    pub(super) chain_rows: Vec<[Option<RebuiltChannel>; TRACKS]>,
     pub(super) only_bit_7: bool,
 }
 
@@ -233,8 +233,8 @@ fn rebuild_channel(sfx: Sfx<'_>, from: u32, to: u32, sets_length: bool) -> Rebui
     }
 }
 
-fn timing_of(sfx: &[Option<Sfx<'_>>; EXPORT_CHANNELS]) -> Option<(usize, u32)> {
-    let playing = || (0..EXPORT_CHANNELS).filter_map(|c| sfx[c].map(|sfx| (c, sfx)));
+fn timing_of(sfx: &[Option<Sfx<'_>>; TRACKS]) -> Option<(usize, u32)> {
+    let playing = || (0..TRACKS).filter_map(|c| sfx[c].map(|sfx| (c, sfx)));
     if let Some((channel, sfx)) = playing().find(|(_, sfx)| Playback::of(*sfx) == Playback::Once) {
         return Some((channel, notes_when_setting_length(sfx) * speed_of(sfx)));
     }

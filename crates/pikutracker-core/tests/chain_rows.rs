@@ -77,7 +77,7 @@ fn the_ticks_count_every_track_whichever_chain_is_on_show() {
     let short = phrase(&mut project, 5, 4, 8);
     let long = phrase(&mut project, 6, 8, 8);
     place(&mut project, 0, 0, 0, &[ChainEntry::new(short)]);
-    place(&mut project, 0, 7, 1, &[ChainEntry::new(long)]);
+    place(&mut project, 0, 3, 1, &[ChainEntry::new(long)]);
 
     let app = App::with_project(project);
 

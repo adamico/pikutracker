@@ -61,6 +61,7 @@ fn headers(app: &App) -> String {
         .lines()
         .nth(TRACK_HEADER_ROW)
         .unwrap()[4..27]
+        .trim_end()
         .to_owned()
 }
 
@@ -122,7 +123,7 @@ fn opening_a_project_resets_mute_and_solo() {
 
     open(&mut app, &song());
 
-    assert_eq!(headers(&app), "T1 T2 T3 T4 T5 T6 T7 T8");
+    assert_eq!(headers(&app), "T1 T2 T3 T4");
     assert!(
         app.take_audio_requests()
             .contains(&AudioRequest::SetTrackMix(TrackMix::default())),
@@ -137,7 +138,7 @@ fn a_new_project_resets_mute_and_solo_too() {
 
     app.apply(Action::NewProject);
 
-    assert_eq!(headers(&app), "T1 T2 T3 T4 T5 T6 T7 T8");
+    assert_eq!(headers(&app), "T1 T2 T3 T4");
 }
 
 #[test]
@@ -150,5 +151,5 @@ fn a_failed_open_leaves_mute_and_solo_alone() {
         contents: "not a project".to_owned(),
     });
 
-    assert_eq!(headers(&app), "M1 T2 T3 T4 T5 T6 T7 T8");
+    assert_eq!(headers(&app), "M1 T2 T3 T4");
 }

@@ -291,7 +291,6 @@ impl App {
         self.song = Default::default();
         self.chain = Default::default();
         self.phrase.return_to_top();
-        self.overview = Default::default();
         self.cart_view = None;
         self.focus = Focus::Song;
         self.played_pane = Focus::Song;

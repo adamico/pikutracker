@@ -14,9 +14,6 @@ fn fixture_project() -> Project {
     let mut project = Project::new();
     project.set_default_speed(12);
     project.set_song_loop_row(Some(1));
-    project.set_export_track(0, Some(1));
-    project.set_export_track(1, Some(3));
-    project.set_export_track(3, Some(8));
     project.set_target_cart(Some(TargetCart {
         path: "../carts/game.p8".to_owned(),
         claim: Claim {
@@ -28,7 +25,7 @@ fn fixture_project() -> Project {
 
     project.set_song_cell(0, 0, Some(ChainId::new(0)));
     project.set_song_cell(0, 3, Some(ChainId::new(1)));
-    project.set_song_cell(2, 7, Some(ChainId::new(0xFF)));
+    project.set_song_cell(2, 3, Some(ChainId::new(0xFF)));
 
     *project.chain_mut(ChainId::new(0)).entry_mut(0) = Some(ChainEntry::new(PhraseId::new(0)));
     let mut lowered = ChainEntry::new(PhraseId::new(1));
@@ -221,13 +218,9 @@ fn random_project(random: &mut SeededRandom) -> Project {
     project.set_default_speed(i32::from(random.below(255)) + 1);
     let loop_row = random.flip().then(|| usize::from(random.below(256)));
     project.set_song_loop_row(loop_row);
-    for channel in 0..4 {
-        let track = random.flip().then_some(channel as u8 + 1);
-        project.set_export_track(channel, track);
-    }
     for _ in 0..40 {
         let row = usize::from(random.below(256));
-        let track = usize::from(random.below(8));
+        let track = usize::from(random.below(4));
         let chain = ChainId::new(random.below(256));
         project.set_song_cell(row, track, Some(chain));
 
@@ -363,9 +356,7 @@ fn values_outside_their_limits_are_refused() {
             "detune: 3,\n            reverb: 2",
         ),
         ("default_speed: 12", "default_speed: 0"),
-        ("Some(1),\n    export", "Some(256),\n    export"),
-        ("[Some(1), Some(3)", "[Some(9), Some(3)"),
-        ("[Some(1), Some(3)", "[Some(3), Some(3)"),
+        ("song_loop_row: Some(1)", "song_loop_row: Some(256)"),
         ("[3, 4, 50]", "[3, 4, 64]"),
         ("(first: 24, last: 29)", "(first: 30, last: 29)"),
         ("(first: 24, last: 29)", "(first: 24, last: 64)"),

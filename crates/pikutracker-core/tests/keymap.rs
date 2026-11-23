@@ -64,8 +64,8 @@ fn the_pc_tracker_preset_matches_the_keys_table() {
 }
 
 #[test]
-fn function_keys_mute_and_solo_tracks_one_to_eight() {
-    for track in 1..=8 {
+fn function_keys_mute_and_solo_tracks_one_to_four() {
+    for track in 1..=4 {
         assert_eq!(
             action(Key::F(track), NONE),
             Some(Action::Mute {

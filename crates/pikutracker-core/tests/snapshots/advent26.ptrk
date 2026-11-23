@@ -2,12 +2,6 @@
     version: 1,
     default_speed: 16,
     song_loop_row: Some(1),
-    export_tracks: [
-        Some(1),
-        Some(2),
-        Some(3),
-        Some(4),
-    ],
     target_cart: Some((
         path: "advent26.p8",
         claim: (
@@ -34,31 +28,31 @@
     song: [
         (
             row: 0,
-            tracks: "00 01 02 02 -- -- -- --",
+            tracks: "00 01 02 02",
         ),
         (
             row: 1,
-            tracks: "03 04 02 02 -- -- -- --",
+            tracks: "03 04 02 02",
         ),
         (
             row: 2,
-            tracks: "05 06 02 02 -- -- -- --",
+            tracks: "05 06 02 02",
         ),
         (
             row: 3,
-            tracks: "03 04 02 02 -- -- -- --",
+            tracks: "03 04 02 02",
         ),
         (
             row: 4,
-            tracks: "07 06 02 02 -- -- -- --",
+            tracks: "07 06 02 02",
         ),
         (
             row: 5,
-            tracks: "08 09 02 02 -- -- -- --",
+            tracks: "08 09 02 02",
         ),
         (
             row: 6,
-            tracks: "0A 0B 02 02 -- -- -- --",
+            tracks: "0A 0B 02 02",
         ),
     ],
     chains: [

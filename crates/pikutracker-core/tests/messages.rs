@@ -117,7 +117,7 @@ fn a_result_with_items_opens_the_log_without_taking_focus() {
     app.report(Report::warning("IMPORTED").with_items(vec![item("ONE")]));
 
     assert_eq!(right_slot(&app, 0), "LOG");
-    assert_eq!(song_line(&app, 2), "00 [--]-- -- -- -- -- -- --");
+    assert_eq!(song_line(&app, 2), "00 [--]-- -- --");
 }
 
 #[test]
@@ -125,7 +125,7 @@ fn a_result_without_items_leaves_the_right_hand_view_alone() {
     let mut app = App::new();
     app.report(Report::failure("CANNOT SAVE"));
 
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
+    assert_eq!(right_slot(&app, 0), "SCOPE");
 }
 
 #[test]
@@ -138,7 +138,7 @@ fn ctrl_l_opens_the_log_with_focus_and_closes_it_back_to_the_pane_you_came_from(
     assert!(!app.grid().text_dump().contains("0[--]---"));
 
     app.apply(Action::ToggleLog);
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
+    assert_eq!(right_slot(&app, 0), "SCOPE");
     assert!(app.grid().text_dump().contains("0[--]---"));
 }
 
@@ -149,8 +149,8 @@ fn esc_in_the_log_closes_it() {
 
     app.apply(Action::Cancel);
 
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
-    assert_eq!(song_line(&app, 2), "00 [--]-- -- -- -- -- -- --");
+    assert_eq!(right_slot(&app, 0), "SCOPE");
+    assert_eq!(song_line(&app, 2), "00 [--]-- -- --");
 }
 
 #[test]
@@ -164,7 +164,7 @@ fn esc_clears_a_failure_before_it_closes_the_log() {
     assert!(!status_line(&app).contains("EXPORT FAILED"));
 
     app.apply(Action::Cancel);
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
+    assert_eq!(right_slot(&app, 0), "SCOPE");
 }
 
 #[test]
@@ -184,7 +184,7 @@ fn the_log_joins_the_tab_cycle_as_the_visible_right_hand_view() {
 
     app.apply(Action::FocusNext);
     assert_eq!(right_slot(&app, 0), "LOG");
-    assert_eq!(song_line(&app, 2), "00 [--]-- -- -- -- -- -- --");
+    assert_eq!(song_line(&app, 2), "00 [--]-- -- --");
 }
 
 #[test]

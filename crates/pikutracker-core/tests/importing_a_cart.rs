@@ -119,7 +119,7 @@ fn selecting_a_p8_cart_opens_it_as_a_new_project() {
     assert!(project.chain_row_entry(1, 1, 0).is_some());
     assert_eq!(project.target_cart().unwrap().path, "demo.p8");
     assert_eq!(status_line(&app), "IMPORTED SONG 1 OF DEMO.P8");
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
+    assert_eq!(right_slot(&app, 0), "SCOPE");
 }
 
 #[test]
@@ -193,7 +193,7 @@ fn leaving_the_file_list_changes_nothing() {
     answer_listing(&mut app, vec![file("demo.p8")]);
     app.apply(Action::Cancel);
 
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
+    assert_eq!(right_slot(&app, 0), "SCOPE");
     assert_eq!(app.project(), &edited);
 }
 
@@ -276,7 +276,7 @@ fn a_damaged_cart_is_refused_and_the_project_stays() {
         "! CANNOT IMPORT DEMO.P8: NOT A PICO-8 CART"
     );
     assert_eq!(app.project(), &edited);
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
+    assert_eq!(right_slot(&app, 0), "SCOPE");
 }
 
 #[test]
@@ -448,7 +448,7 @@ fn esc_leaves_the_song_picker_and_keeps_the_project() {
     app.apply(Action::Cancel);
 
     assert_eq!(app.project(), &edited);
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
+    assert_eq!(right_slot(&app, 0), "SCOPE");
     assert_eq!(app.take_audio_requests(), [AudioRequest::Stop]);
     assert_eq!(app.chain_under_cursor(), edited.song_cell(0, 0));
 }

@@ -134,9 +134,7 @@ fn one_phrase_project() -> Project {
     app.apply(Action::HexDigit(0));
     app.apply(Action::FocusNext);
     app.apply(Action::PianoKey(0));
-    let mut project = app.project().clone();
-    project.set_export_track(0, Some(1));
-    project
+    app.project().clone()
 }
 
 #[test]
@@ -183,7 +181,7 @@ fn ctrl_t_again_closes_the_cart_view_and_returns_focus() {
     open_cart_view(&mut app, original);
     app.apply(Action::ToggleCart);
 
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
+    assert_eq!(right_slot(&app, 0), "SCOPE");
     app.apply(Action::HexDigit(1));
     assert_eq!(app.project().song_cell(0, 0).map(|id| id.number()), Some(1));
 }
@@ -352,7 +350,7 @@ fn enter_on_the_patterns_field_closes_the_view() {
     app.apply(DOWN);
     app.apply(Action::Confirm);
 
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
+    assert_eq!(right_slot(&app, 0), "SCOPE");
 }
 
 #[test]
@@ -367,7 +365,7 @@ fn esc_restores_the_claim_from_when_the_view_opened() {
     app.apply(Action::Cancel);
 
     assert_eq!(claim(&app), before);
-    assert_eq!(right_slot(&app, 0), "OVERVIEW");
+    assert_eq!(right_slot(&app, 0), "SCOPE");
 }
 
 #[test]
