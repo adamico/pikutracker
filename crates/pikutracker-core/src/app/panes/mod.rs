@@ -7,7 +7,6 @@ pub mod midi_dialog;
 pub mod phrase;
 pub mod scope;
 pub mod song;
-pub mod song_picker;
 
 use crate::screen::grid::{Grid, Style};
 use crate::screen::palette::Colour;
