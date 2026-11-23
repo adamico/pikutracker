@@ -1,6 +1,6 @@
 use super::Binding;
 use super::key::Key;
-use super::shared::{self, NONE, SHIFT, anywhere, common_presses, in_context, nudge};
+use super::shared::{self, ARROWS, NONE, SHIFT, anywhere, common_presses, in_context, nudge};
 use super::trigger::{Scope, Trigger};
 use crate::app::{Action, Direction, KeyContext};
 
@@ -46,6 +46,15 @@ pub(super) fn bindings() -> Vec<Binding> {
     });
     let moving_rows = [(Key::Up, true), (Key::Down, false)]
         .map(|(key, up)| chord(Scope::Selecting, OPTION, key, Action::MoveRows { up }));
+    let growing_selection = ARROWS.map(|(key, direction)| Binding {
+        scope: Scope::Selecting,
+        trigger: Trigger::Press(key, NONE),
+        action: Action::Select(direction),
+    });
+    let jumping_selection =
+        [(Key::Left, Direction::Left), (Key::Right, Direction::Right)].map(|(key, direction)| {
+            chord(Scope::Selecting, OPTION, key, Action::SelectJump(direction))
+        });
     let in_midi_import = Scope::Context(KeyContext::MidiImport);
     let midi_import = [
         in_context(KeyContext::MidiImport, Key::Space, Action::ToggleVoice),
@@ -75,6 +84,8 @@ pub(super) fn bindings() -> Vec<Binding> {
         .chain([double_tap])
         .chain(selecting)
         .chain(moving_rows)
+        .chain(growing_selection)
+        .chain(jumping_selection)
         .chain(shared::piano(PIANO_KEYS.chars()))
         .chain(shared::typed_characters())
         .chain(midi_import)

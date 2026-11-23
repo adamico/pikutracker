@@ -7,9 +7,10 @@ use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project, Step};
 use support::{apply, status_line};
 
 const DOWN: Action = Action::Move(Direction::Down);
-const RIGHT: Action = Action::Move(Direction::Right);
 const TAB: Action = Action::FocusNext;
 const SELECT: Action = Action::StartSelection;
+const SELECT_DOWN: Action = Action::Select(Direction::Down);
+const SELECT_RIGHT: Action = Action::Select(Direction::Right);
 
 fn scale_speed(app: &mut App, high: u8, low: u8) {
     apply(
@@ -116,7 +117,7 @@ fn the_question_names_the_selection_when_one_is_in_scope() {
 fn the_question_names_the_whole_song_for_a_selection_of_steps() {
     let mut app = App::with_project(two_rows());
 
-    apply(&mut app, &[TAB, TAB, SELECT, DOWN, Action::ScaleSpeed]);
+    apply(&mut app, &[TAB, TAB, SELECT_DOWN, Action::ScaleSpeed]);
 
     assert!(
         status_line(&app).contains("WHOLE SONG"),
@@ -197,8 +198,7 @@ fn a_song_selection_scales_only_the_phrases_of_its_chains() {
     set_speed(&mut project, 3, 12);
     let mut app = App::with_project(project);
 
-    apply(&mut app, &[SELECT, RIGHT]);
-    app.apply(Action::Move(Direction::Left));
+    apply(&mut app, &[SELECT_RIGHT, Action::Select(Direction::Left)]);
     scale_speed(&mut app, 0x2, 0x0);
 
     assert_eq!(speed(&app, 0), 32);
@@ -223,7 +223,7 @@ fn a_chain_selection_scales_only_the_phrases_of_its_entries() {
 fn a_selection_of_steps_leaves_the_whole_song_in_scope() {
     let mut app = App::with_project(two_rows());
 
-    apply(&mut app, &[TAB, TAB, SELECT, DOWN]);
+    apply(&mut app, &[TAB, TAB, SELECT_DOWN]);
     scale_speed(&mut app, 0x2, 0x0);
 
     assert_eq!(speed(&app, 2), 40);
@@ -295,7 +295,7 @@ fn a_chain_selected_in_every_place_it_is_placed_is_not_used_elsewhere() {
     project.set_song_cell(1, 0, Some(ChainId::new(0)));
     let mut app = App::with_project(project);
 
-    apply(&mut app, &[SELECT, DOWN]);
+    apply(&mut app, &[SELECT_DOWN]);
     scale_speed(&mut app, 0x2, 0x0);
 
     assert!(status_line(&app).contains("0 USED ELSEWHERE"));

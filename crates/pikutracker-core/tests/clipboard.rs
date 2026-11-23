@@ -12,6 +12,8 @@ const RIGHT: Action = Action::Move(Direction::Right);
 const TAB: Action = Action::FocusNext;
 const BACK: Action = Action::FocusPrevious;
 const SELECT: Action = Action::StartSelection;
+const SELECT_DOWN: Action = Action::Select(Direction::Down);
+const SELECT_RIGHT: Action = Action::Select(Direction::Right);
 
 fn song_cell(app: &App, row: usize, track: usize) -> Option<u8> {
     app.project().song_cell(row, track).map(ChainId::number)
@@ -64,7 +66,7 @@ fn phrase_music() -> Project {
 #[test]
 fn a_song_block_pastes_from_the_cursor() {
     let mut app = App::with_project(song_block());
-    apply(&mut app, &[SELECT, DOWN, RIGHT, Action::Copy]);
+    apply(&mut app, &[SELECT_DOWN, SELECT_RIGHT, Action::Copy]);
     apply(&mut app, &moves(DOWN, 3));
 
     app.apply(Action::Paste);
@@ -81,9 +83,8 @@ fn a_whole_song_block_keeps_its_shape_and_its_references() {
     apply(
         &mut app,
         &[
-            SELECT,
-            DOWN,
-            RIGHT,
+            SELECT_DOWN,
+            SELECT_RIGHT,
             Action::Copy,
             UP,
             Action::Move(Direction::Left),
@@ -120,7 +121,7 @@ fn paste_overwrites_with_empty_cells_too() {
 fn paste_is_one_undo_step() {
     let start = song_block();
     let mut app = App::with_project(start.clone());
-    apply(&mut app, &[SELECT, DOWN, RIGHT, Action::Copy]);
+    apply(&mut app, &[SELECT_DOWN, SELECT_RIGHT, Action::Copy]);
     apply(&mut app, &moves(DOWN, 4));
     app.apply(Action::Paste);
 
@@ -149,7 +150,7 @@ fn cut_copies_and_clears_without_shifting_as_one_step() {
 #[test]
 fn copy_changes_no_music_and_is_not_an_undo_step() {
     let mut app = App::with_project(song_block());
-    apply(&mut app, &[SELECT, DOWN, Action::Copy, Action::Undo]);
+    apply(&mut app, &[SELECT_DOWN, Action::Copy, Action::Undo]);
 
     assert_eq!(status_line(&app), "NOTHING TO UNDO");
 }
@@ -157,7 +158,7 @@ fn copy_changes_no_music_and_is_not_an_undo_step() {
 #[test]
 fn a_song_paste_past_the_last_row_reports_the_rows_lost() {
     let mut app = App::with_project(song_block());
-    apply(&mut app, &[SELECT, DOWN, Action::Copy]);
+    apply(&mut app, &[SELECT_DOWN, Action::Copy]);
     apply(&mut app, &moves(DOWN, 254));
 
     app.apply(Action::Paste);
@@ -169,7 +170,7 @@ fn a_song_paste_past_the_last_row_reports_the_rows_lost() {
 #[test]
 fn a_song_paste_past_the_last_track_counts_every_clipped_row() {
     let mut app = App::with_project(song_block());
-    apply(&mut app, &[SELECT, DOWN, RIGHT, Action::Copy, UP]);
+    apply(&mut app, &[SELECT_DOWN, SELECT_RIGHT, Action::Copy, UP]);
     apply(&mut app, &moves(RIGHT, 6));
 
     app.apply(Action::Paste);
@@ -181,7 +182,7 @@ fn a_song_paste_past_the_last_track_counts_every_clipped_row() {
 #[test]
 fn chain_entries_paste_with_their_transpose() {
     let mut app = App::with_project(chain_music());
-    apply(&mut app, &[TAB, SELECT, RIGHT, RIGHT, Action::Copy]);
+    apply(&mut app, &[TAB, SELECT_RIGHT, SELECT_RIGHT, Action::Copy]);
     apply(&mut app, &moves(DOWN, 4));
 
     app.apply(Action::Paste);
@@ -205,7 +206,7 @@ fn a_partial_chain_copy_lands_in_its_own_columns() {
 #[test]
 fn a_chain_paste_past_the_last_entry_reports_the_rows_lost() {
     let mut app = App::with_project(chain_music());
-    apply(&mut app, &[TAB, SELECT, DOWN, Action::Copy]);
+    apply(&mut app, &[TAB, SELECT_DOWN, Action::Copy]);
     apply(&mut app, &moves(DOWN, 14));
 
     app.apply(Action::Paste);
@@ -218,7 +219,15 @@ fn steps_paste_as_values() {
     let mut app = App::with_project(phrase_music());
     apply(
         &mut app,
-        &[TAB, TAB, SELECT, DOWN, RIGHT, RIGHT, RIGHT, Action::Copy],
+        &[
+            TAB,
+            TAB,
+            SELECT_DOWN,
+            SELECT_RIGHT,
+            SELECT_RIGHT,
+            SELECT_RIGHT,
+            Action::Copy,
+        ],
     );
     apply(&mut app, &moves(DOWN, 3));
 
@@ -260,8 +269,8 @@ fn a_silent_step_pasted_over_a_note_silences_it() {
 #[test]
 fn a_phrase_paste_reaches_past_len_stops_at_step_31_and_never_changes_len() {
     let mut app = App::with_project(phrase_music());
-    apply(&mut app, &[TAB, TAB, SELECT]);
-    apply(&mut app, &moves(DOWN, 3));
+    apply(&mut app, &[TAB, TAB]);
+    apply(&mut app, &moves(SELECT_DOWN, 3));
     app.apply(Action::Copy);
     apply(&mut app, &moves(DOWN, 27));
 

@@ -97,6 +97,10 @@ _Avoid_: Full copy
 The position currently being played. It is separate from the cursor, which is where the user is editing.
 _Avoid_: Play cursor
 
+**Selection**:
+A rectangle of cells in the focused pane, from the cell where it was started to the cursor. Copy, Cut, nudges, moving rows, Clone and Change Speed act on it instead of the cell under the cursor. Changing pane clears it.
+_Avoid_: Block, mark
+
 **Follow**:
 A mode in which the panes track the Playhead. Moving the cursor by hand turns it off.
 _Avoid_: Auto-scroll

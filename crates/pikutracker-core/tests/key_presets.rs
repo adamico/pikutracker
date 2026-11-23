@@ -1,4 +1,4 @@
-use pikutracker_core::app::{Action, KeyContext};
+use pikutracker_core::app::{Action, Direction, KeyContext};
 use pikutracker_core::keymap::{
     Binding, Key, KeyPress, Keyboard, Keymap, Modifiers, Preset, Scope, Trigger, named_actions,
 };
@@ -36,6 +36,16 @@ fn press(keymap: &Keymap, binding: Binding) -> Vec<Action> {
     actions
 }
 
+fn left_unbound(preset: Preset) -> Vec<Action> {
+    match preset {
+        Preset::PcTracker => vec![Action::StartSelection],
+        Preset::M8Style => vec![
+            Action::SelectJump(Direction::Up),
+            Action::SelectJump(Direction::Down),
+        ],
+    }
+}
+
 fn typed_characters(preset: Preset) -> Vec<Action> {
     let semitones = match preset {
         Preset::PcTracker => 24,
@@ -61,16 +71,21 @@ fn every_binding_of_both_presets_reaches_its_action() {
 }
 
 #[test]
-fn both_presets_reach_every_named_action_and_typed_character() {
+fn both_presets_reach_every_named_action_and_typed_character_they_do_not_leave_unbound() {
     for preset in PRESETS {
         let bound: Vec<Action> = Keymap::preset(preset)
             .bindings()
             .iter()
             .map(|binding| binding.action)
             .collect();
+        let unbound = left_unbound(preset);
         let named = named_actions().into_iter().map(|(_, action)| action);
         for action in named.chain(typed_characters(preset)) {
-            assert!(bound.contains(&action), "{preset:?} misses {action:?}");
+            assert_eq!(
+                bound.contains(&action),
+                !unbound.contains(&action),
+                "{preset:?} {action:?}"
+            );
         }
     }
 }
@@ -164,6 +179,19 @@ fn the_m8_style_preset_matches_the_keys_table() {
                 coarse: true,
             },
         ),
+        Binding {
+            scope: Scope::Selecting,
+            trigger: Trigger::Press(Key::Down, Modifiers::NONE),
+            action: Action::Select(Direction::Down),
+        },
+        Binding {
+            scope: Scope::Selecting,
+            trigger: Trigger::Chord {
+                held: x,
+                key: Key::Left,
+            },
+            action: Action::SelectJump(Direction::Left),
+        },
     ];
 
     let bindings = keymap.bindings();
@@ -200,7 +228,6 @@ fn the_example_config_with_every_key_uncommented_keeps_the_pc_tracker_preset() {
 
 #[test]
 fn x_with_the_arrows_jumps_in_the_m8_style_preset_and_alt_with_them_in_the_pc_tracker_preset() {
-    use pikutracker_core::app::Direction;
     let jumps = [
         (Key::Up, Direction::Up),
         (Key::Down, Direction::Down),

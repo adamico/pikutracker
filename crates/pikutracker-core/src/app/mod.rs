@@ -485,8 +485,22 @@ impl App {
             Action::ScaleSpeed => self.ask_for_speed(SpeedChange::Scale),
             Action::Confirm => self.confirm(),
             Action::Cancel => self.cancel(),
-            Action::Move(direction) => self.move_cursor(direction),
-            Action::Jump(direction) => self.jump(direction),
+            Action::Move(direction) => {
+                self.selection_start = None;
+                self.move_cursor(direction);
+            }
+            Action::Jump(direction) => {
+                self.selection_start = None;
+                self.jump(direction);
+            }
+            Action::Select(direction) => {
+                self.start_selection_unless_started();
+                self.move_cursor(direction);
+            }
+            Action::SelectJump(direction) => {
+                self.start_selection_unless_started();
+                self.jump(direction);
+            }
             Action::FocusNext => self.set_focus(self.focus.next()),
             Action::FocusPrevious => self.set_focus(self.focus.previous()),
             Action::PlayFocusedPane => self.play_or_stop(),

@@ -9,6 +9,14 @@ pub(super) const CTRL: Modifiers = Modifiers::CTRL;
 pub(super) const SHIFT: Modifiers = Modifiers::SHIFT;
 pub(super) const CTRL_SHIFT: Modifiers = Modifiers::CTRL_SHIFT;
 pub(super) const ALT: Modifiers = Modifiers::ALT;
+pub(super) const ALT_SHIFT: Modifiers = Modifiers::ALT_SHIFT;
+
+pub(super) const ARROWS: [(Key, Direction); 4] = [
+    (Key::Up, Direction::Up),
+    (Key::Down, Direction::Down),
+    (Key::Left, Direction::Left),
+    (Key::Right, Direction::Right),
+];
 
 const HEX_DIGITS: &str = "0123456789abcdef";
 

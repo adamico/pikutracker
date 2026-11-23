@@ -8,7 +8,8 @@ use support::{apply, status_line};
 const DOWN: Action = Action::Move(Direction::Down);
 const RIGHT: Action = Action::Move(Direction::Right);
 const TAB: Action = Action::FocusNext;
-const SELECT: Action = Action::StartSelection;
+const SELECT_DOWN: Action = Action::Select(Direction::Down);
+const SELECT_RIGHT: Action = Action::Select(Direction::Right);
 
 fn song_cell(app: &App, row: usize, track: usize) -> Option<u8> {
     app.project().song_cell(row, track).map(ChainId::number)
@@ -142,7 +143,7 @@ fn cloning_a_song_selection_makes_one_copy_per_distinct_chain() {
     put_entry(&mut project, 5, 0, 1);
     let mut app = App::with_project(project);
 
-    apply(&mut app, &[SELECT, DOWN, RIGHT, Action::Clone]);
+    apply(&mut app, &[SELECT_DOWN, SELECT_RIGHT, Action::Clone]);
 
     assert_eq!(song_cell(&app, 0, 0), Some(1));
     assert_eq!(song_cell(&app, 1, 0), Some(1));
@@ -158,7 +159,7 @@ fn deep_cloning_a_song_selection_keeps_phrases_shared_between_the_new_chains() {
     put_entry(&mut project, 5, 0, 1);
     let mut app = App::with_project(project);
 
-    apply(&mut app, &[SELECT, RIGHT, Action::DeepClone]);
+    apply(&mut app, &[SELECT_RIGHT, Action::DeepClone]);
 
     let (first, second) = (
         song_cell(&app, 0, 0).unwrap(),
@@ -174,7 +175,7 @@ fn deep_cloning_a_song_selection_keeps_phrases_shared_between_the_new_chains() {
 fn cloning_a_chain_selection_makes_one_copy_per_distinct_phrase() {
     let mut app = App::with_project(project_with_a_song());
 
-    apply(&mut app, &[TAB, SELECT, DOWN, DOWN, Action::Clone]);
+    apply(&mut app, &[TAB, SELECT_DOWN, SELECT_DOWN, Action::Clone]);
 
     assert_eq!(entry_phrase(&app, 0, 0), Some(2));
     assert_eq!(entry_phrase(&app, 0, 1), Some(3));
@@ -185,7 +186,7 @@ fn cloning_a_chain_selection_makes_one_copy_per_distinct_phrase() {
 fn a_chain_selection_only_clones_the_entries_inside_it() {
     let mut app = App::with_project(project_with_a_song());
 
-    apply(&mut app, &[TAB, SELECT, DOWN, Action::Clone]);
+    apply(&mut app, &[TAB, SELECT_DOWN, Action::Clone]);
 
     assert_eq!(entry_phrase(&app, 0, 2), Some(0));
 }
@@ -242,7 +243,7 @@ fn a_selection_too_big_for_the_free_slots_clones_nothing() {
     let mut app = App::with_project(project);
     let before = app.project().clone();
 
-    apply(&mut app, &[SELECT, RIGHT, Action::Clone]);
+    apply(&mut app, &[SELECT_RIGHT, Action::Clone]);
 
     assert!(app.project() == &before);
     assert!(status_line(&app).contains("NO UNUSED CHAIN LEFT"));
@@ -336,7 +337,7 @@ fn a_clone_of_a_whole_selection_is_one_undo_step() {
     let mut app = App::with_project(project);
     let before = app.project().clone();
 
-    apply(&mut app, &[SELECT, RIGHT, Action::DeepClone, Action::Undo]);
+    apply(&mut app, &[SELECT_RIGHT, Action::DeepClone, Action::Undo]);
 
     assert!(app.project() == &before);
 }

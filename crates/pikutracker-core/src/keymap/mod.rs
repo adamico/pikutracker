@@ -246,7 +246,10 @@ fn repeats_or_new(press: KeyPress, action: Action) -> Option<Action> {
 }
 
 const fn repeats_while_held(action: Action) -> bool {
-    matches!(action, Action::Move(_) | Action::Nudge { .. })
+    matches!(
+        action,
+        Action::Move(_) | Action::Select(_) | Action::Nudge { .. }
+    )
 }
 
 const fn typing_a_name(context: KeyContext) -> bool {
