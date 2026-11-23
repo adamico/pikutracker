@@ -1,4 +1,5 @@
 # Moving rows leaves the Song loop row where it is
+_Partly superseded by [ADR 0023](0023-the-song-mirrors-the-carts-pattern-list.md): the Song loop row became the Loop start, Loop back and Stop marks, which follow the same rule._
 
 While a selection is held, Move Rows Up / Down moves the selected Steps, Chain entries or Song cells one row, and the row they pass swaps to the other side. In the Song pane only the selected Tracks' cells move. The Song loop row keeps its row number.
 
