@@ -1,26 +1,19 @@
 mod support;
 
+use pikutracker_core::app::layout;
 use pikutracker_core::app::{Action, App, Direction, DirectoryEntry, FileRequest, FileResponse};
 use pikutracker_core::keymap::{Key, KeyPress, Keymap, Modifiers};
 use pikutracker_core::project::{Claim, Project, TargetCart};
 use std::path::{Path, PathBuf};
-use support::status_line;
 use support::{TestCart, TestPattern, TestSfx};
+use support::{pane_text, status_line};
 
 const UP: Action = Action::Move(Direction::Up);
 const DOWN: Action = Action::Move(Direction::Down);
 const CART_NAME: &str = "game.p8";
 
 fn right_slot(app: &App, index: usize) -> String {
-    let line = app
-        .grid()
-        .text_dump()
-        .lines()
-        .nth(index)
-        .unwrap()
-        .to_owned();
-    let text: String = line.chars().skip(83).collect();
-    text.trim_end().to_owned()
+    pane_text(app, layout::RIGHT_SLOT, index)
 }
 
 fn right_slot_rows(app: &App) -> Vec<String> {
@@ -181,7 +174,7 @@ fn ctrl_t_again_closes_the_cart_view_and_returns_focus() {
     open_cart_view(&mut app, original);
     app.apply(Action::ToggleCart);
 
-    assert_eq!(right_slot(&app, 0), "SCOPE");
+    assert_eq!(right_slot(&app, 0), "");
     app.apply(Action::HexDigit(1));
     assert_eq!(app.project().song_cell(0, 0).map(|id| id.number()), Some(1));
 }
@@ -350,7 +343,7 @@ fn enter_on_the_patterns_field_closes_the_view() {
     app.apply(DOWN);
     app.apply(Action::Confirm);
 
-    assert_eq!(right_slot(&app, 0), "SCOPE");
+    assert_eq!(right_slot(&app, 0), "");
 }
 
 #[test]
@@ -365,7 +358,7 @@ fn esc_restores_the_claim_from_when_the_view_opened() {
     app.apply(Action::Cancel);
 
     assert_eq!(claim(&app), before);
-    assert_eq!(right_slot(&app, 0), "SCOPE");
+    assert_eq!(right_slot(&app, 0), "");
 }
 
 #[test]

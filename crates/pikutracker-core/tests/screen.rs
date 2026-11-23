@@ -143,6 +143,38 @@ fn a_separator_is_an_unbroken_line_down_the_cell() {
     }
 }
 
+#[test]
+fn a_horizontal_separator_is_an_unbroken_line_across_the_cell() {
+    let mut grid = Grid::new();
+    grid.put(0, 0, "─", Style::fg(Colour::White));
+    let frame = Frame::from_grid(&grid);
+
+    for x in 0..6 {
+        assert_eq!(pixel(&frame, x, 3), Colour::White.rgba(), "column {x}");
+    }
+}
+
+#[test]
+fn separator_junctions_join_the_vertical_line_to_one_side() {
+    let mut grid = Grid::new();
+    grid.put(0, 0, "├", Style::fg(Colour::White));
+    grid.put(1, 0, "┤", Style::fg(Colour::White));
+    let frame = Frame::from_grid(&grid);
+
+    for y in 0..8 {
+        assert_eq!(pixel(&frame, 2, y), Colour::White.rgba(), "row {y}");
+        assert_eq!(pixel(&frame, 8, y), Colour::White.rgba(), "row {y}");
+    }
+    for x in 2..6 {
+        assert_eq!(pixel(&frame, x, 3), Colour::White.rgba(), "column {x}");
+    }
+    for x in 6..9 {
+        assert_eq!(pixel(&frame, x, 3), Colour::White.rgba(), "column {x}");
+    }
+    assert_eq!(pixel(&frame, 1, 3), Colour::Black.rgba());
+    assert_eq!(pixel(&frame, 9, 3), Colour::Black.rgba());
+}
+
 fn assert_matches_snapshot(frame: &Frame, scale: usize, path: &str) {
     let width = LOGICAL_WIDTH as usize * scale;
     let height = LOGICAL_HEIGHT as usize * scale;

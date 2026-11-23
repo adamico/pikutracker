@@ -64,49 +64,6 @@ const AUDITION_PITCH: u8 = 24;
 const AUDITION_VOLUME: u8 = 5;
 const AUDITION_SPEED: u8 = 255;
 
-pub const SCOPE_COLUMNS: usize = 23;
-pub const SCOPE_RANGE: i8 = 100;
-const SAMPLES_PER_SCOPE_COLUMN: usize = 8;
-const SCOPE_SAMPLES: usize = SCOPE_COLUMNS * SAMPLES_PER_SCOPE_COLUMN;
-
-#[derive(Clone, Copy, Debug)]
-struct ScopeTrace {
-    samples: [f32; SCOPE_SAMPLES],
-    next: usize,
-}
-
-impl ScopeTrace {
-    const fn new() -> Self {
-        Self {
-            samples: [0.0; SCOPE_SAMPLES],
-            next: 0,
-        }
-    }
-
-    fn push(&mut self, sample: f32) {
-        self.samples[self.next] = sample;
-        self.next = (self.next + 1) % SCOPE_SAMPLES;
-    }
-
-    fn loudest_per_column(&self) -> [i8; SCOPE_COLUMNS] {
-        let mut columns = [0; SCOPE_COLUMNS];
-        for (column, value) in columns.iter_mut().enumerate() {
-            let start = self.next + column * SAMPLES_PER_SCOPE_COLUMN;
-            let loudest = (start..start + SAMPLES_PER_SCOPE_COLUMN)
-                .map(|index| self.samples[index % SCOPE_SAMPLES])
-                .fold(0.0_f32, |loudest, sample| {
-                    if sample.abs() > loudest.abs() {
-                        sample
-                    } else {
-                        loudest
-                    }
-                });
-            *value = (loudest * f32::from(SCOPE_RANGE)).round() as i8;
-        }
-        columns
-    }
-}
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TrackMix {
     muted: [bool; TRACKS],
@@ -158,7 +115,6 @@ impl Playhead {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PlaybackReport {
     pub playhead: Option<Playhead>,
-    pub scope: [i8; SCOPE_COLUMNS],
     pub finished_play: u64,
 }
 
@@ -338,7 +294,6 @@ pub struct Player {
     playback: Option<Playback>,
     track_mix: TrackMix,
     preview: Option<Preview>,
-    scope: ScopeTrace,
     plays: u64,
     finished_play: u64,
 }
@@ -350,7 +305,6 @@ impl Default for Player {
             playback: None,
             track_mix: TrackMix::default(),
             preview: None,
-            scope: ScopeTrace::new(),
             plays: 0,
             finished_play: 0,
         }
@@ -419,7 +373,6 @@ impl Player {
     pub fn report(&self) -> PlaybackReport {
         PlaybackReport {
             playhead: self.playback.as_ref().map(Playback::playhead),
-            scope: self.scope.loudest_per_column(),
             finished_play: self.finished_play,
         }
     }
@@ -427,7 +380,6 @@ impl Player {
     fn cut(&mut self) {
         self.playback = None;
         self.preview = None;
-        self.scope = ScopeTrace::new();
         for voice in &mut self.voices {
             voice.stop();
         }
@@ -612,9 +564,7 @@ impl Player {
                 mix += sample;
             }
         }
-        let output = saturated(mix);
-        self.scope.push(output);
-        output
+        saturated(mix)
     }
 
     pub fn render(&mut self, samples: usize) -> Vec<f32> {

@@ -12,8 +12,11 @@ use crate::screen::grid::Grid;
 use crate::settings::{DEFAULT_OCTAVE, MAX_OCTAVE};
 use std::ops::RangeInclusive;
 
-const HEADER_ROWS: usize = 5;
 const FIRST_HEADER_ROW: usize = 1;
+const STEP_HEADING_ROW: usize = FIRST_HEADER_ROW + HEADER_CELLS.len();
+const FIRST_STEP_ROW: usize = STEP_HEADING_ROW + 1;
+const OUT_OF_RANGE_COLUMN: usize = 20;
+const BPM_COLUMN: usize = 20;
 
 const SEMITONES_PER_OCTAVE: i32 = 12;
 const COARSE_SPEED: i32 = 16;
@@ -30,10 +33,12 @@ pub(super) enum StepCell {
 
 pub(super) const STEP_CELLS: [(StepCell, usize, &str); 4] = [
     (StepCell::Pitch, 3, "..."),
-    (StepCell::Instrument, 7, "."),
-    (StepCell::Volume, 9, "."),
-    (StepCell::Effect, 11, "."),
+    (StepCell::Instrument, 8, "."),
+    (StepCell::Volume, 13, "."),
+    (StepCell::Effect, 17, "."),
 ];
+
+pub(super) const STEP_HEADING: &str = "   NOTE INST VOL FX";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum HeaderCell {
@@ -50,15 +55,21 @@ enum HeaderCell {
 const HEADER_CELLS: [&[(HeaderCell, usize)]; 3] = [
     &[
         (HeaderCell::Speed, 4),
-        (HeaderCell::LoopStart, 12),
-        (HeaderCell::LoopEnd, 15),
+        (HeaderCell::LoopStart, 13),
+        (HeaderCell::LoopEnd, 16),
     ],
-    &[(HeaderCell::Noiz, 12), (HeaderCell::Buzz, 17)],
+    &[(HeaderCell::Noiz, 5), (HeaderCell::Buzz, 13)],
     &[
-        (HeaderCell::Detune, 3),
-        (HeaderCell::Reverb, 8),
-        (HeaderCell::Dampen, 13),
+        (HeaderCell::Detune, 7),
+        (HeaderCell::Reverb, 17),
+        (HeaderCell::Dampen, 27),
     ],
+];
+
+const HEADER_LABELS: [&[(&str, usize)]; 3] = [
+    &[("SPD", 0), ("LOOP", 8)],
+    &[("NOIZ", 0), ("BUZZ", 8)],
+    &[("DETUNE", 0), ("REVERB", 10), ("DAMPEN", 20)],
 ];
 
 #[derive(Clone, Copy, Debug)]
@@ -364,7 +375,7 @@ impl PhrasePane {
             for column in cells.columns() {
                 if (index, column) != (self.step, self.column) {
                     let (_, offset, empty) = STEP_CELLS[column];
-                    let row = HEADER_ROWS + index;
+                    let row = area.row + FIRST_STEP_ROW + index;
                     grid.restyle(area.column + offset, row, empty.len(), SELECTED);
                 }
             }
@@ -387,13 +398,18 @@ impl PhrasePane {
         } = view;
         let number = id_text(id.map(PhraseId::number));
         let title = format!("PHRASE {number}   OCT {}", self.octave);
-        draw_title(grid, area.column, 0, &title, focused);
+        draw_title(grid, area.column, area.row, &title, focused);
         self.draw_header(grid, area, focused, phrase);
-        grid.put(area.column, HEADER_ROWS - 1, "   NOT I V F", HEADING);
+        grid.put(
+            area.column,
+            area.row + STEP_HEADING_ROW,
+            STEP_HEADING,
+            HEADING,
+        );
         let loop_start = phrase.phrase_loop().map(|steps| steps.start);
 
         for index in 0..MAX_STEPS {
-            let row = HEADER_ROWS + index;
+            let row = area.row + FIRST_STEP_ROW + index;
             let label = format!("{index:02X}");
             let plays = index < phrase.length();
             if plays {
@@ -418,21 +434,22 @@ impl PhrasePane {
                 draw_styled_value(grid, area.column + offset, row, text, is_cursor, style);
             }
             if phrase.step_is_out_of_range(index, transpose) {
-                draw_out_of_range_flag(grid, area.column, row);
+                draw_out_of_range_flag(grid, area.column + OUT_OF_RANGE_COLUMN, row);
             }
         }
     }
 
     fn draw_header(&self, grid: &mut Grid, area: Area, focused: bool, phrase: &Phrase) {
         let filters = phrase.filters();
-        let labels = [
-            "SPD    LOOP".to_owned(),
-            format!("BPM {:<5}NZ   BZ", phrase.bpm()),
-            "DT   RV   DP".to_owned(),
-        ];
-        for (row, label) in labels.iter().enumerate() {
-            grid.put(area.column, FIRST_HEADER_ROW + row, label, HEADING);
+        for (row, labels) in HEADER_LABELS.iter().enumerate() {
+            for (label, offset) in *labels {
+                let screen_row = area.row + FIRST_HEADER_ROW + row;
+                grid.put(area.column + offset, screen_row, label, HEADING);
+            }
         }
+        let bpm = format!("BPM {}", phrase.bpm());
+        let bpm_row = area.row + FIRST_HEADER_ROW;
+        grid.put(area.column + BPM_COLUMN, bpm_row, &bpm, HEADING);
 
         for (row, cells) in HEADER_CELLS.iter().enumerate() {
             for (column, (cell, offset)) in cells.iter().enumerate() {
@@ -447,7 +464,7 @@ impl PhrasePane {
                     HeaderCell::Dampen => filters.dampen().to_string(),
                 };
                 let is_cursor = focused && self.header_row == Some(row) && self.column == column;
-                let screen_row = FIRST_HEADER_ROW + row;
+                let screen_row = area.row + FIRST_HEADER_ROW + row;
                 draw_styled_value(
                     grid,
                     area.column + offset,

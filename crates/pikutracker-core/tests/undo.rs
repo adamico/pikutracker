@@ -1,5 +1,6 @@
 mod support;
 
+use pikutracker_core::app::layout;
 use pikutracker_core::app::{Action, App, Direction, DirectoryEntry, FileRequest, FileResponse};
 use pikutracker_core::player::Player;
 use pikutracker_core::project::{
@@ -9,7 +10,7 @@ use pikutracker_core::project::{
 use pikutracker_core::project_file;
 use pikutracker_core::synth::SAMPLES_PER_TICK;
 use std::path::PathBuf;
-use support::{apply, status_line};
+use support::{apply, pane_text, status_line};
 
 const DOWN: Action = Action::Move(Direction::Down);
 const UP: Action = Action::Move(Direction::Up);
@@ -305,12 +306,12 @@ fn undo_leaves_mute_and_solo_alone() {
         &mut app,
         &[Action::HexDigit(1), Action::Mute { track_number: 1 }],
     );
-    let muted = app.grid().text_dump().lines().nth(1).unwrap().to_owned();
+    let muted = pane_text(&app, layout::SONG, 1);
+    assert_eq!(muted, "    M1 T2 T3 T4");
 
     app.apply(Action::Undo);
 
-    let after = app.grid().text_dump().lines().nth(1).unwrap().to_owned();
-    assert_eq!(after[..28], muted[..28]);
+    assert_eq!(pane_text(&app, layout::SONG, 1), muted);
 }
 
 #[test]

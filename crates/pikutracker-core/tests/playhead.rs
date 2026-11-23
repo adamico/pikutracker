@@ -1,10 +1,11 @@
 mod support;
 
+use pikutracker_core::app::layout::{self, Area};
 use pikutracker_core::app::{Action, App, Direction};
 use pikutracker_core::player::Player;
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
 use pikutracker_core::synth::SAMPLES_PER_TICK;
-use support::status_line;
+use support::{pane_text, status_line};
 
 const DOWN: Action = Action::Move(Direction::Down);
 const TAB: Action = Action::FocusNext;
@@ -18,8 +19,6 @@ const STEP_SAMPLES: usize = SPEED as usize * SAMPLES_PER_TICK as usize;
 const FIRST_SONG_ROW: usize = 2;
 const FIRST_CHAIN_ROW: usize = 2;
 const FIRST_STEP_ROW: usize = 5;
-const CHAIN_COLUMN: usize = 29;
-const PHRASE_COLUMN: usize = 63;
 
 fn write(project: &mut Project, id: u8, steps: usize) -> PhraseId {
     let id = PhraseId::new(id);
@@ -66,37 +65,32 @@ fn play_on(app: &mut App, player: &mut Player, steps: usize) {
     app.show_playback(&player.report());
 }
 
-fn line(app: &App, row: usize) -> String {
-    app.grid().text_dump().lines().nth(row).unwrap().to_owned()
-}
-
-fn pane_text(app: &App, column: usize, row: usize) -> String {
-    let text: String = line(app, row).chars().skip(column).take(2).collect();
-    text.trim_end().to_owned()
+fn label(app: &App, area: Area, row: usize) -> String {
+    pane_text(app, area, row).chars().take(2).collect()
 }
 
 #[test]
 fn the_song_pane_marks_the_row_being_played() {
     let (app, _) = played(&[PLAY_SONG], 4);
 
-    assert_eq!(pane_text(&app, 0, FIRST_SONG_ROW), "00");
-    assert_eq!(pane_text(&app, 0, FIRST_SONG_ROW + 1), ">1");
+    assert_eq!(label(&app, layout::SONG, FIRST_SONG_ROW), "00");
+    assert_eq!(label(&app, layout::SONG, FIRST_SONG_ROW + 1), ">1");
 }
 
 #[test]
 fn the_chain_pane_marks_the_entry_being_played() {
     let (app, _) = played(&[PLAY_SONG], 2);
 
-    assert_eq!(pane_text(&app, CHAIN_COLUMN, FIRST_CHAIN_ROW), "0");
-    assert_eq!(pane_text(&app, CHAIN_COLUMN, FIRST_CHAIN_ROW + 1), ">");
+    assert_eq!(label(&app, layout::CHAIN, FIRST_CHAIN_ROW), "00");
+    assert_eq!(label(&app, layout::CHAIN, FIRST_CHAIN_ROW + 1), ">1");
 }
 
 #[test]
 fn the_phrase_pane_marks_the_step_being_played() {
     let (app, _) = played(&[PLAY_SONG], 1);
 
-    assert_eq!(pane_text(&app, PHRASE_COLUMN, FIRST_STEP_ROW), "00");
-    assert_eq!(pane_text(&app, PHRASE_COLUMN, FIRST_STEP_ROW + 1), ">1");
+    assert_eq!(label(&app, layout::PHRASE, FIRST_STEP_ROW), "00");
+    assert_eq!(label(&app, layout::PHRASE, FIRST_STEP_ROW + 1), ">1");
 }
 
 #[test]
@@ -106,23 +100,26 @@ fn the_marker_is_separate_from_the_cursor() {
         0,
     );
 
-    assert_eq!(pane_text(&app, 0, FIRST_SONG_ROW + 1), ">1");
-    assert!(line(&app, FIRST_STEP_ROW).contains('['), "cursor stays put");
+    assert_eq!(label(&app, layout::SONG, FIRST_SONG_ROW + 1), ">1");
+    assert!(
+        pane_text(&app, layout::PHRASE, FIRST_STEP_ROW).contains('['),
+        "cursor stays put"
+    );
 }
 
 #[test]
 fn a_pane_showing_something_else_has_no_marker() {
     let (app, _) = played(&[PLAY_SONG, DOWN], 1);
 
-    assert_eq!(pane_text(&app, CHAIN_COLUMN, FIRST_CHAIN_ROW), "0");
-    assert_eq!(pane_text(&app, PHRASE_COLUMN, FIRST_STEP_ROW + 1), "01");
+    assert_eq!(label(&app, layout::CHAIN, FIRST_CHAIN_ROW), "00");
+    assert_eq!(label(&app, layout::PHRASE, FIRST_STEP_ROW + 1), "01");
 }
 
 #[test]
 fn the_phrase_pane_marks_a_phrase_playing_alone() {
     let (app, _) = played(&[TAB, TAB, SPACE], 1);
 
-    assert_eq!(pane_text(&app, PHRASE_COLUMN, FIRST_STEP_ROW + 1), ">1");
+    assert_eq!(label(&app, layout::PHRASE, FIRST_STEP_ROW + 1), ">1");
 }
 
 #[test]
@@ -132,8 +129,8 @@ fn the_marker_goes_away_when_playback_stops() {
     app.apply(SPACE);
     play_on(&mut app, &mut player, 0);
 
-    assert_eq!(pane_text(&app, 0, FIRST_SONG_ROW), "00");
-    assert_eq!(pane_text(&app, PHRASE_COLUMN, FIRST_STEP_ROW + 1), "01");
+    assert_eq!(label(&app, layout::SONG, FIRST_SONG_ROW), "00");
+    assert_eq!(label(&app, layout::PHRASE, FIRST_STEP_ROW + 1), "01");
 }
 
 #[test]
@@ -167,7 +164,7 @@ fn follow_moves_the_cursor_down_the_chain_and_the_phrase() {
     let (app, _) = played(&[FOLLOW, TAB, TAB, PLAY_SONG], 3);
 
     assert_eq!(app.phrase_under_cursor(), Some(PhraseId::new(2)));
-    assert!(line(&app, FIRST_STEP_ROW + 1).contains('['));
+    assert!(pane_text(&app, layout::PHRASE, FIRST_STEP_ROW + 1).contains('['));
 }
 
 #[test]

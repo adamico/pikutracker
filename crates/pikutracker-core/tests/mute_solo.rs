@@ -1,8 +1,11 @@
-use pikutracker_core::app::{Action, App};
+mod support;
+
+use pikutracker_core::app::{Action, App, layout};
 use pikutracker_core::player::Player;
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
 use pikutracker_core::screen::palette::Colour;
 use pikutracker_core::synth::{SAMPLE_RATE, SAMPLES_PER_TICK};
+use support::pane_text;
 
 const PLAY_SONG: Action = Action::PlaySongFromCursor;
 const TAB: Action = Action::FocusNext;
@@ -84,12 +87,8 @@ fn assert_near(actual: f32, expected: f32) {
 }
 
 fn headers(app: &App) -> String {
-    app.grid()
-        .text_dump()
-        .lines()
-        .nth(TRACK_HEADER_ROW)
-        .unwrap()[4..28]
-        .trim_end()
+    pane_text(app, layout::SONG, TRACK_HEADER_ROW)
+        .trim_start()
         .to_owned()
 }
 
@@ -252,7 +251,10 @@ fn a_muted_track_is_dimmed_on_its_header() {
     app.apply(Action::Mute { track_number: 1 });
 
     assert_eq!(
-        app.grid().cell(4, TRACK_HEADER_ROW).style.fg,
+        app.grid()
+            .cell(layout::SONG.column + 4, layout::SONG.row + TRACK_HEADER_ROW)
+            .style
+            .fg,
         Colour::DarkGrey
     );
 }

@@ -1,28 +1,20 @@
 mod support;
 
+use pikutracker_core::app::layout;
 use pikutracker_core::app::{
     Action, App, Direction, DirectoryEntry, FileRequest, FileResponse, Launch, SettingsContents,
 };
 use pikutracker_core::project::Project;
 use pikutracker_core::project_file;
 use std::path::PathBuf;
-use support::state_ron;
+use support::{pane_text, state_ron};
 
 const DOWN: Action = Action::Move(Direction::Down);
 const HOME: &str = "/home/user";
 const STATE_FILE: &str = "/state/state.ron";
 
 fn right_slot(app: &App, line: usize) -> String {
-    let text: String = app
-        .grid()
-        .text_dump()
-        .lines()
-        .nth(line)
-        .unwrap()
-        .chars()
-        .skip(83)
-        .collect();
-    text.trim_end().to_owned()
+    pane_text(app, layout::RIGHT_SLOT, line)
 }
 
 fn launch_remembering(paths: &[&str]) -> App {

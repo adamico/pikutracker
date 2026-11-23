@@ -183,7 +183,7 @@ impl SongPane {
             for track in cells.columns() {
                 if (song_row, track) != (self.row, self.track) {
                     let column = area.column + FIRST_TRACK_COLUMN + track * TRACK_WIDTH;
-                    grid.restyle(column, HEADER_ROWS + song_row - top, 2, SELECTED);
+                    grid.restyle(column, area.row + HEADER_ROWS + song_row - top, 2, SELECTED);
                 }
             }
         }
@@ -207,17 +207,22 @@ impl SongPane {
         let playing_row = playhead
             .and_then(|playhead| playhead.chain_row)
             .map(|(row, _)| row);
-        draw_title(grid, area.column, 0, "SONG", focused);
+        draw_title(grid, area.column, area.row, "SONG", focused);
         for track in 0..TRACKS {
             let column = area.column + FIRST_TRACK_COLUMN + track * TRACK_WIDTH;
             let (letter, style) = track_header(track_mix, track);
-            grid.put(column, 1, &format!("{letter}{}", track + 1), style);
+            grid.put(
+                column,
+                area.row + 1,
+                &format!("{letter}{}", track + 1),
+                style,
+            );
         }
 
         let visible = area.rows - HEADER_ROWS;
         let top = self.top_row(visible);
         for offset in 0..visible {
-            let row = HEADER_ROWS + offset;
+            let row = area.row + HEADER_ROWS + offset;
             let song_row = top + offset;
             let label = format!("{song_row:02X}");
             draw_row_label(

@@ -9,7 +9,7 @@ mod focus;
 mod history;
 mod importing;
 mod launching;
-mod layout;
+pub mod layout;
 mod messages;
 mod panes;
 mod paths;
@@ -25,7 +25,7 @@ pub use messages::{LogItem, Report, Severity};
 use crate::export;
 use crate::keymap::{Key, KeyPress, Keyboard};
 use crate::midi_import::MidiTable;
-use crate::player::{AudioRequest, PlaybackReport, Playhead, SCOPE_COLUMNS, TrackMix};
+use crate::player::{AudioRequest, PlaybackReport, Playhead, TrackMix};
 use crate::project::{CHAIN_ENTRIES, FIRST_CUSTOM_INSTRUMENT, LAST_CUSTOM_INSTRUMENT, SONG_ROWS};
 use crate::project::{
     Chain, ChainEntry, ChainId, Phrase, PhraseId, Project, SongRowEnding, SongRowMarks, Step,
@@ -45,7 +45,6 @@ use panes::instrument::InstrumentView;
 use panes::log::LogPane;
 use panes::midi_dialog::MidiDialog;
 use panes::phrase::{PhrasePane, PhraseView};
-use panes::scope;
 use panes::song::SongPane;
 use selection::CellPosition;
 use status_line::StatusLine;
@@ -92,7 +91,6 @@ pub struct App {
     track_mix: TrackMix,
     playhead: Option<Playhead>,
     follow: bool,
-    scope: [i8; SCOPE_COLUMNS],
     previewing: bool,
     remark: Option<&'static str>,
     notice: Option<Notice>,
@@ -129,7 +127,6 @@ impl App {
             track_mix: TrackMix::default(),
             playhead: None,
             follow: false,
-            scope: [0; SCOPE_COLUMNS],
             previewing: false,
             project,
             history: History::default(),
@@ -236,13 +233,11 @@ impl App {
         self.playback_finished(report.finished_play);
         let playhead = report.playhead.filter(|_| self.playing);
         let moved = playhead != self.playhead;
-        let changed = moved || report.scope != self.scope;
         self.playhead = playhead;
-        self.scope = report.scope;
         if moved && self.follow && self.selection_start.is_none() {
             self.follow_playhead();
         }
-        changed
+        moved
     }
 
     pub fn key_down(&mut self, press: KeyPress, pressed_at: Duration) -> Option<Action> {
@@ -905,13 +900,6 @@ impl App {
                 right_slot_focused,
                 self.project.target_cart(),
                 &export::needs(&self.project),
-            );
-        } else {
-            scope::draw(
-                &mut grid,
-                layout::RIGHT_SLOT,
-                right_slot_focused,
-                &self.scope,
             );
         }
         layout::draw_separators(&mut grid);

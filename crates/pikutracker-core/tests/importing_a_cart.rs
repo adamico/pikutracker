@@ -1,26 +1,18 @@
 mod support;
 
+use pikutracker_core::app::layout;
 use pikutracker_core::app::{Action, App, Direction, DirectoryEntry, FileRequest, FileResponse};
 use pikutracker_core::player::AudioRequest;
 use pikutracker_core::project::{SongRowEnding, SongRowMarks};
 use std::path::{Path, PathBuf};
-use support::status_line;
 use support::{TestCart, TestPattern, TestSfx};
+use support::{pane_text, status_line};
 
 const DOWN: Action = Action::Move(Direction::Down);
 const UNSAVED_QUESTION: &str = "UNSAVED CHANGES WILL BE LOST  ENTER DISCARD  ESC CANCEL";
 
 fn right_slot(app: &App, line: usize) -> String {
-    let text: String = app
-        .grid()
-        .text_dump()
-        .lines()
-        .nth(line)
-        .unwrap()
-        .chars()
-        .skip(83)
-        .collect();
-    text.trim_end().to_owned()
+    pane_text(app, layout::RIGHT_SLOT, line)
 }
 
 fn file(name: &str) -> DirectoryEntry {
@@ -115,7 +107,7 @@ fn selecting_a_p8_cart_opens_it_as_a_new_project() {
     assert!(project.chain_row_entry(1, 1, 0).is_some());
     assert_eq!(project.target_cart().unwrap().path, "demo.p8");
     assert_eq!(status_line(&app), "IMPORTED DEMO.P8");
-    assert_eq!(right_slot(&app, 0), "SCOPE");
+    assert_eq!(right_slot(&app, 0), "");
 }
 
 #[test]
@@ -189,7 +181,7 @@ fn leaving_the_file_list_changes_nothing() {
     answer_listing(&mut app, vec![file("demo.p8")]);
     app.apply(Action::Cancel);
 
-    assert_eq!(right_slot(&app, 0), "SCOPE");
+    assert_eq!(right_slot(&app, 0), "");
     assert_eq!(app.project(), &edited);
 }
 
@@ -272,7 +264,7 @@ fn a_damaged_cart_is_refused_and_the_project_stays() {
         "! CANNOT IMPORT DEMO.P8: NOT A PICO-8 CART"
     );
     assert_eq!(app.project(), &edited);
-    assert_eq!(right_slot(&app, 0), "SCOPE");
+    assert_eq!(right_slot(&app, 0), "");
 }
 
 #[test]
