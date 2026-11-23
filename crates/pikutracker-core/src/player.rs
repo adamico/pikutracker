@@ -143,7 +143,6 @@ impl TrackMix {
 pub struct Playhead {
     pub chain_row: Option<(usize, usize)>,
     pub tracks: [Option<(PhraseId, usize)>; TRACKS],
-    /// Tracks whose Phrase has ended and that wait for the Chain row to end.
     pub waiting: [bool; TRACKS],
 }
 
