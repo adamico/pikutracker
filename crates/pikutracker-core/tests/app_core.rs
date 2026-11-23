@@ -104,7 +104,7 @@ fn the_song_pane_scrolls_to_keep_the_cursor_visible() {
 }
 
 #[test]
-fn tab_cycles_focus_through_song_chain_phrase_and_the_right_hand_view() {
+fn tab_goes_through_song_chain_phrase_and_the_multitrack_then_back_to_the_phrase() {
     let app = app_after(&[Action::FocusNext]);
     assert_eq!(song_text(&app, 2), "00  -- -- -- --");
     assert_eq!(chain_text(&app, 2), "00[--]    ---");
@@ -118,7 +118,8 @@ fn tab_cycles_focus_through_song_chain_phrase_and_the_right_hand_view() {
     assert_eq!(song_text(&app, 2), "00  -- -- -- --");
 
     let app = app_after(&[Action::FocusNext; 4]);
-    assert_eq!(song_text(&app, 2), "00 [--]-- -- --");
+    assert_eq!(song_text(&app, 2), "00  -- -- -- --");
+    assert_eq!(phrase_text(&app, 7), "00[...] .    .   .");
 }
 
 #[test]

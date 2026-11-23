@@ -290,6 +290,7 @@ impl App {
         self.song = Default::default();
         self.chain = Default::default();
         self.phrase.return_to_top();
+        self.multitrack = Default::default();
         self.shown = Default::default();
         self.show_what_the_cursors_point_at();
         self.cart_view = None;

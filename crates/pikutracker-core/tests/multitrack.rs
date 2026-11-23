@@ -290,3 +290,124 @@ fn muted_tracks_are_still_shown() {
 
     assert_eq!(line(&app, FIRST_LINE), "00  C-2 2 5 0");
 }
+
+const UP: Action = Action::Move(Direction::Up);
+const LEFT: Action = Action::Move(Direction::Left);
+const RIGHT: Action = Action::Move(Direction::Right);
+const TO_MULTITRACK: [Action; 3] = [TAB, TAB, TAB];
+
+fn fast_beside_slow() -> (Project, PhraseId, PhraseId) {
+    let mut project = Project::new();
+    let fast = write(&mut project, 1, 8, &[C2, D2, E2, F2]);
+    let slow = write(&mut project, 2, 16, &[C2, E2]);
+    place(&mut project, 0, 0, 0, &[ChainEntry::new(fast)]);
+    place(&mut project, 0, 1, 1, &[ChainEntry::new(slow)]);
+    (project, fast, slow)
+}
+
+#[test]
+fn the_focused_multitrack_shows_its_cursor_on_the_first_step_of_track_1() {
+    let (project, _, _) = fast_beside_slow();
+    let mut app = App::with_project(project);
+
+    apply(&mut app, &TO_MULTITRACK);
+
+    assert_eq!(line(&app, FIRST_LINE), "00 [C-2]2 5 0   C-2 2 5 0");
+}
+
+#[test]
+fn moving_down_and_up_goes_to_the_next_and_previous_step_of_that_track_and_never_to_padding() {
+    let (project, _, _) = fast_beside_slow();
+    let mut app = App::with_project(project);
+    apply(&mut app, &TO_MULTITRACK);
+
+    apply(&mut app, &[RIGHT, DOWN]);
+    assert_eq!(line(&app, FIRST_LINE + 1), "    D-2 2 5 0   |");
+    assert_eq!(line(&app, FIRST_LINE + 2), "    E-2 2 5 0  [E-2]2 5 0");
+
+    apply(&mut app, &[DOWN, UP]);
+    assert_eq!(line(&app, FIRST_LINE), "00  C-2 2 5 0  [C-2]2 5 0");
+}
+
+#[test]
+fn moving_left_or_right_goes_to_the_step_sounding_at_that_time_on_the_neighbouring_track() {
+    let (project, _, _) = fast_beside_slow();
+    let mut app = App::with_project(project);
+    apply(&mut app, &TO_MULTITRACK);
+
+    apply(&mut app, &[DOWN, DOWN, DOWN, RIGHT]);
+    assert_eq!(line(&app, FIRST_LINE + 2), "    E-2 2 5 0  [E-2]2 5 0");
+
+    app.apply(LEFT);
+    assert_eq!(line(&app, FIRST_LINE + 2), "   [E-2]2 5 0   E-2 2 5 0");
+}
+
+#[test]
+fn the_cursor_drives_the_song_row_the_chain_on_that_track_and_the_phrase_and_step() {
+    let (mut project, fast, slow) = fast_beside_slow();
+    place(
+        &mut project,
+        1,
+        1,
+        2,
+        &[ChainEntry::new(fast), ChainEntry::new(slow)],
+    );
+    let mut app = App::with_project(project);
+    apply(&mut app, &TO_MULTITRACK);
+
+    apply(&mut app, &[RIGHT, DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, DOWN]);
+
+    assert_eq!(app.shown_chain(), Some(ChainId::new(2)));
+    assert_eq!(app.shown_phrase(), Some(slow));
+    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusPrevious);
+    assert_eq!(pane_text(&app, layout::CHAIN, 3), "01[02]    +00");
+    app.apply(Action::FocusPrevious);
+    assert_eq!(pane_text(&app, layout::SONG, 3), "01  --[02]-- --");
+}
+
+#[test]
+fn moving_left_or_right_passes_over_tracks_with_no_step_sounding_and_stays_when_none_is_left() {
+    let mut project = Project::new();
+    let fast = write(&mut project, 1, 8, &[C2, D2]);
+    let slow = write(&mut project, 2, 16, &[E2]);
+    place(&mut project, 0, 0, 0, &[ChainEntry::new(fast)]);
+    place(&mut project, 0, 2, 1, &[ChainEntry::new(slow)]);
+    let mut app = App::with_project(project);
+    apply(&mut app, &TO_MULTITRACK);
+
+    apply(&mut app, &[DOWN, RIGHT]);
+    assert_eq!(
+        line(&app, FIRST_LINE),
+        "00  C-2 2 5 0              [E-2]2 5 0"
+    );
+
+    app.apply(RIGHT);
+    assert_eq!(
+        line(&app, FIRST_LINE),
+        "00  C-2 2 5 0              [E-2]2 5 0"
+    );
+}
+
+#[test]
+fn tab_focuses_the_phrase_pane_on_the_step_under_the_cursor() {
+    let (project, _, slow) = fast_beside_slow();
+    let mut app = App::with_project(project);
+    apply(&mut app, &TO_MULTITRACK);
+
+    apply(&mut app, &[RIGHT, DOWN, TAB, Action::PianoKey(0)]);
+
+    assert_eq!(app.project().phrase(slow).step(1).pitch(), C2 as u8);
+}
+
+#[test]
+fn moving_the_cursor_left_or_right_by_hand_turns_follow_off() {
+    let (project, _, _) = fast_beside_slow();
+    let mut app = App::with_project(project);
+    apply(&mut app, &TO_MULTITRACK);
+    app.apply(FOLLOW);
+
+    app.apply(RIGHT);
+
+    assert_eq!(status_line(&app), "FOLLOW OFF");
+}

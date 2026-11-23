@@ -1,8 +1,9 @@
 use super::phrase::step_texts;
 use super::{
-    DIMMED, EMPTY, HEADING, LOOP_MARK, OUT_OF_RANGE, VALUE, draw_row_label, draw_title, mark_text,
-    stepped,
+    DIMMED, EMPTY, HEADING, LOOP_MARK, OUT_OF_RANGE, VALUE, draw_row_label, draw_styled_value,
+    draw_title, mark_text,
 };
+use crate::app::Direction;
 use crate::app::layout::Area;
 use crate::multitrack::{TimedStep, Timeline};
 use crate::project::{Project, Step, TRACKS};
@@ -14,10 +15,12 @@ const FIRST_TRACK_COLUMN: usize = 4;
 const TRACK_WIDTH: usize = 12;
 const TAIL: &str = "|";
 const OUT_OF_RANGE_PITCH: &str = "!!!";
+const SILENCE: &str = "   ";
 
 #[derive(Debug, Default)]
 pub struct MultitrackPane {
-    line: usize,
+    track: usize,
+    tick: u32,
 }
 
 pub struct MultitrackView<'a> {
@@ -27,26 +30,68 @@ pub struct MultitrackView<'a> {
 }
 
 impl MultitrackPane {
-    pub fn scroll(&mut self, lines: isize, timeline: &Timeline) {
-        self.line = stepped(self.line, lines, timeline.line_starts().len());
+    pub fn track(&self) -> usize {
+        self.track
+    }
+
+    pub fn step<'a>(&self, timeline: &'a Timeline) -> Option<&'a TimedStep> {
+        timeline.step_sounding_at(self.track, self.tick)
+    }
+
+    pub fn move_cursor(&mut self, direction: Direction, timeline: &Timeline) {
+        let steps = timeline.steps(self.track);
+        let tick = self.tick;
+        match direction {
+            Direction::Up => {
+                if let Some(step) = steps.iter().rev().find(|step| step.start < tick) {
+                    self.tick = step.start;
+                }
+            }
+            Direction::Down => {
+                if let Some(step) = steps.iter().find(|step| step.start > tick) {
+                    self.tick = step.start;
+                }
+            }
+            Direction::Left => self.go_to_the_first_step_sounding((0..self.track).rev(), timeline),
+            Direction::Right => {
+                self.go_to_the_first_step_sounding(self.track + 1..TRACKS, timeline);
+            }
+        }
+    }
+
+    fn go_to_the_first_step_sounding(
+        &mut self,
+        mut tracks: impl Iterator<Item = usize>,
+        timeline: &Timeline,
+    ) {
+        let tick = self.tick;
+        let found = tracks.find_map(|track| Some((track, timeline.step_sounding_at(track, tick)?)));
+        if let Some((track, step)) = found {
+            self.track = track;
+            self.tick = step.start;
+        }
     }
 
     pub fn follow(&mut self, tick: u32, timeline: &Timeline) {
-        let starts = timeline.line_starts();
-        self.line = starts
-            .partition_point(|&start| start <= tick)
-            .saturating_sub(1);
+        self.tick = timeline
+            .step_sounding_at(self.track, tick)
+            .map_or(tick, |step| step.start);
     }
 
-    fn top_line(&self, visible: usize, lines: usize) -> usize {
-        self.line
-            .saturating_sub(visible / 2)
+    fn line(&self, starts: &[u32]) -> usize {
+        starts
+            .partition_point(|&start| start <= self.tick)
+            .saturating_sub(1)
+    }
+
+    fn top_line(line: usize, visible: usize, lines: usize) -> usize {
+        line.saturating_sub(visible / 2)
             .min(lines.saturating_sub(visible))
     }
 
     pub fn draw(&self, grid: &mut Grid, area: Area, focused: bool, view: &MultitrackView) {
         let starts = view.timeline.line_starts();
-        let line = self.line.min(starts.len().saturating_sub(1));
+        let line = self.line(&starts);
         let song_row = starts
             .get(line)
             .and_then(|&tick| view.timeline.chain_row_at(tick))
@@ -64,7 +109,7 @@ impl MultitrackPane {
         }
 
         let visible = area.rows - HEADER_ROWS;
-        let top = self.top_line(visible, starts.len());
+        let top = Self::top_line(line, visible, starts.len());
         for (offset, &tick) in starts.iter().skip(top).take(visible).enumerate() {
             let row = area.row + HEADER_ROWS + offset;
             let starting_song_row = view
@@ -81,9 +126,13 @@ impl MultitrackPane {
             }
             for track in 0..TRACKS {
                 let column = area.column + FIRST_TRACK_COLUMN + track * TRACK_WIDTH;
+                let is_cursor = focused && track == self.track && tick == self.tick;
                 match view.timeline.step_sounding_at(track, tick) {
-                    Some(step) if step.start == tick => draw_step(grid, column, row, step),
-                    Some(_) => grid.put(column, row, TAIL, DIMMED),
+                    Some(step) if step.start == tick => {
+                        draw_step(grid, column, row, step, is_cursor);
+                    }
+                    Some(_) => draw_styled_value(grid, column, row, TAIL, is_cursor, DIMMED),
+                    None if is_cursor => draw_styled_value(grid, column, row, SILENCE, true, EMPTY),
                     None => {}
                 }
             }
@@ -91,7 +140,7 @@ impl MultitrackPane {
     }
 }
 
-fn draw_step(grid: &mut Grid, column: usize, row: usize, step: &TimedStep) {
+fn draw_step(grid: &mut Grid, column: usize, row: usize, step: &TimedStep, is_cursor: bool) {
     let (texts, pitch_style) = match step.pitch() {
         Some(pitch) => (step_texts(transposed(step.step, pitch)), VALUE),
         None => {
@@ -104,7 +153,7 @@ fn draw_step(grid: &mut Grid, column: usize, row: usize, step: &TimedStep) {
     let mut at = column;
     for (index, text) in texts.iter().enumerate() {
         let base = if index == 0 { pitch_style } else { VALUE };
-        grid.put(at, row, text, style(base));
+        draw_styled_value(grid, at, row, text, is_cursor && index == 0, style(base));
         at += text.chars().count() + 1;
     }
 }

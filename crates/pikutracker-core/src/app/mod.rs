@@ -521,7 +521,7 @@ impl App {
                 self.start_selection_unless_started();
                 self.jump(direction);
             }
-            Action::FocusNext => self.set_focus(self.focus.next()),
+            Action::FocusNext => self.focus_next(),
             Action::FocusPrevious => self.set_focus(self.focus.previous()),
             Action::PlayFocusedPane => self.play_or_stop(),
             Action::PlaySongFromCursor => self.play_song(),
@@ -924,10 +924,37 @@ impl App {
             Focus::RightSlot if self.log_open => self.log.move_cursor(direction),
             Focus::RightSlot if self.shows_multitrack() => {
                 self.stop_following();
-                let (_, lines) = direction.column_and_row_delta();
-                self.multitrack.scroll(lines, &Timeline::of(&self.project));
+                let timeline = Timeline::of(&self.project);
+                self.multitrack.move_cursor(direction, &timeline);
+                self.show_what_the_multitrack_cursor_points_at(&timeline);
             }
             Focus::RightSlot => {}
+        }
+    }
+
+    fn show_what_the_multitrack_cursor_points_at(&mut self, timeline: &Timeline) {
+        let track = self.multitrack.track();
+        let Some(step) = self.multitrack.step(timeline) else {
+            return;
+        };
+        let place = step.place;
+        self.show_song_place(SongPlace {
+            song_row: place.song_row,
+            track,
+            chain_row: place.chain_row,
+            step: place.step,
+        });
+        if let Some(chain) = self.project.song_cell(place.song_row, track) {
+            self.shown.open_chain(chain);
+        }
+        self.shown.open_phrase(place.phrase);
+    }
+
+    fn focus_next(&mut self) {
+        if self.focus == Focus::RightSlot && self.shows_multitrack() {
+            self.set_focus(Focus::Phrase);
+        } else {
+            self.set_focus(self.focus.next());
         }
     }
 
