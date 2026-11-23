@@ -4,19 +4,26 @@ use crate::project::{ChainEntry, ChainId, PhraseId, Project};
 pub(super) struct Shown {
     chain: Option<ChainId>,
     phrase: Option<PhraseId>,
-    song_cursor_saw: Option<SongCursorSight>,
-    chain_cursor_saw: Option<ChainCursorSight>,
+    song_cursor_last_seen: Option<SongCursorPlaceSeen>,
+    chain_cursor_last_seen: Option<ChainCursorPlaceSeen>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct SongCursorSight {
+pub(super) struct CursorPlaces {
+    pub(super) song_row: usize,
+    pub(super) track: usize,
+    pub(super) chain_entry: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct SongCursorPlaceSeen {
     row: usize,
     track: usize,
     chain: Option<ChainId>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct ChainCursorSight {
+struct ChainCursorPlaceSeen {
     chain: Option<ChainId>,
     entry: usize,
     phrase: Option<PhraseId>,
@@ -39,32 +46,32 @@ impl Shown {
         self.phrase = Some(phrase);
     }
 
-    pub(super) fn follow_cursors(
-        &mut self,
-        project: &Project,
-        (row, track): (usize, usize),
-        entry: usize,
-    ) {
-        let song_sight = SongCursorSight {
-            row,
+    pub(super) fn follow_cursors(&mut self, project: &Project, cursors: CursorPlaces) {
+        let CursorPlaces {
+            song_row,
             track,
-            chain: project.song_cell(row, track),
+            chain_entry,
+        } = cursors;
+        let song_cursor = SongCursorPlaceSeen {
+            row: song_row,
+            track,
+            chain: project.song_cell(song_row, track),
         };
-        if self.song_cursor_saw != Some(song_sight) {
-            self.song_cursor_saw = Some(song_sight);
-            self.chain = song_sight.chain;
+        if self.song_cursor_last_seen != Some(song_cursor) {
+            self.song_cursor_last_seen = Some(song_cursor);
+            self.chain = song_cursor.chain;
         }
-        let chain_sight = ChainCursorSight {
+        let chain_cursor = ChainCursorPlaceSeen {
             chain: self.chain,
-            entry,
+            entry: chain_entry,
             phrase: self
                 .chain
-                .and_then(|chain| project.chain(chain).entry(entry))
+                .and_then(|chain| project.chain(chain).entry(chain_entry))
                 .map(ChainEntry::phrase),
         };
-        if self.chain_cursor_saw != Some(chain_sight) {
-            self.chain_cursor_saw = Some(chain_sight);
-            self.phrase = chain_sight.phrase;
+        if self.chain_cursor_last_seen != Some(chain_cursor) {
+            self.chain_cursor_last_seen = Some(chain_cursor);
+            self.phrase = chain_cursor.phrase;
         }
     }
 }

@@ -41,7 +41,7 @@ fn phrase_app(actions: &[Action]) -> App {
 }
 
 fn phrase(app: &App) -> &Phrase {
-    app.project().phrase(app.shown_phrase().unwrap())
+    app.project().phrase(app.shown_phrase_id().unwrap())
 }
 
 fn phrase_line(app: &App, line: usize) -> String {

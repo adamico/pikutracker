@@ -212,7 +212,7 @@ fn editing_with_no_phrase_under_the_cursor_says_so() {
     let app = app_after(&[SHIFT_TAB, SHIFT_TAB, Action::PianoKey(0)]);
 
     assert_eq!(status_line(&app), "NO PHRASE HERE");
-    assert_eq!(app.shown_phrase(), None);
+    assert_eq!(app.shown_phrase_id(), None);
 }
 
 #[test]
@@ -235,11 +235,11 @@ fn the_phrase_pane_follows_the_chain_cursor() {
     apply(&mut app, &[DOWN]);
     apply(&mut app, &id(9));
 
-    assert_eq!(app.shown_phrase(), Some(PhraseId::new(9)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(9)));
     assert_eq!(phrase_text(&app, 0), "PHRASE 09");
 
     app.apply(UP);
-    assert_eq!(app.shown_phrase(), Some(PhraseId::new(7)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(7)));
     assert_eq!(phrase_text(&app, 0), "PHRASE 07");
 }
 

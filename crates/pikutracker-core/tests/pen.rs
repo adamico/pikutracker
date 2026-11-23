@@ -73,7 +73,7 @@ fn step(app: &App, index: usize) -> Step {
 }
 
 fn phrase(app: &App) -> &Phrase {
-    app.project().phrase(app.shown_phrase().unwrap())
+    app.project().phrase(app.shown_phrase_id().unwrap())
 }
 
 #[test]

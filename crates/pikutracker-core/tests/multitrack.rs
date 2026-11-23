@@ -377,8 +377,8 @@ fn the_cursor_drives_the_song_row_the_chain_on_that_track_and_the_phrase_and_ste
 
     apply(&mut app, &[RIGHT, DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, DOWN]);
 
-    assert_eq!(app.shown_chain(), Some(ChainId::new(2)));
-    assert_eq!(app.shown_phrase(), Some(slow));
+    assert_eq!(app.shown_chain_id(), Some(ChainId::new(2)));
+    assert_eq!(app.shown_phrase_id(), Some(slow));
     app.apply(Action::FocusNext);
     app.apply(Action::FocusNext);
     assert_eq!(pane_text(&app, layout::CHAIN, 3), "01[02]    +00");

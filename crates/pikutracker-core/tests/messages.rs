@@ -260,8 +260,8 @@ fn enter_on_an_item_jumps_to_its_location_and_the_panes_stay_usable() {
 
     app.apply(Action::Confirm);
 
-    assert_eq!(app.shown_chain(), Some(ChainId::new(4)));
-    assert_eq!(app.shown_phrase(), Some(PhraseId::new(7)));
+    assert_eq!(app.shown_chain_id(), Some(ChainId::new(4)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(7)));
     assert!(app.grid().text_dump().contains("05[...]"));
     assert_eq!(right_slot(&app, 0), "LOG");
 

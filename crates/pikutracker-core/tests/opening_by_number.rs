@@ -71,7 +71,7 @@ fn typing_a_number_in_the_phrase_title_shows_that_phrase_and_changes_no_chain() 
         &[to_the_phrase_title(), number(5).to_vec()].concat(),
     );
 
-    assert_eq!(app.shown_phrase(), Some(PhraseId::new(5)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(5)));
     assert!(phrase_text(&app, 0).starts_with("PHRASE[05]"));
     assert_eq!(phrase_text(&app, FIRST_STEP_LINE), "00 A-2  0    7   0");
     assert_eq!(app.project(), &project);
@@ -87,7 +87,7 @@ fn typing_a_number_in_the_chain_title_shows_that_chain_and_changes_no_song_row()
         &[to_the_chain_title(), number(3).to_vec()].concat(),
     );
 
-    assert_eq!(app.shown_chain(), Some(ChainId::new(3)));
+    assert_eq!(app.shown_chain_id(), Some(ChainId::new(3)));
     assert_eq!(chain_text(&app, 0), "CHAIN[03]");
     assert_eq!(chain_text(&app, 2), "00 05     +00");
     assert_eq!(chain_text(&app, 3), "01 01     +00");
@@ -103,10 +103,10 @@ fn the_phrase_pane_shows_the_phrase_under_the_chain_cursor_of_a_chain_opened_by_
         &mut app,
         &[to_the_chain_title(), number(3).to_vec()].concat(),
     );
-    assert_eq!(app.shown_phrase(), Some(PhraseId::new(5)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(5)));
 
     apply(&mut app, &[DOWN, DOWN]);
-    assert_eq!(app.shown_phrase(), Some(PhraseId::new(1)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(1)));
     assert!(phrase_text(&app, 0).starts_with("PHRASE 01"));
 }
 
@@ -119,10 +119,10 @@ fn moving_the_chain_cursor_shows_the_phrase_under_it_again() {
     );
 
     apply(&mut app, &[TAB, DOWN]);
-    assert_eq!(app.shown_phrase(), None);
+    assert_eq!(app.shown_phrase_id(), None);
 
     app.apply(UP);
-    assert_eq!(app.shown_phrase(), Some(PhraseId::new(0)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(0)));
 }
 
 #[test]
@@ -134,11 +134,11 @@ fn moving_the_song_cursor_shows_the_chain_under_it_again() {
     );
 
     apply(&mut app, &[TAB, RIGHT]);
-    assert_eq!(app.shown_chain(), None);
+    assert_eq!(app.shown_chain_id(), None);
 
     app.apply(Action::Move(Direction::Left));
-    assert_eq!(app.shown_chain(), Some(ChainId::new(0)));
-    assert_eq!(app.shown_phrase(), Some(PhraseId::new(0)));
+    assert_eq!(app.shown_chain_id(), Some(ChainId::new(0)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(0)));
 }
 
 #[test]
@@ -161,11 +161,11 @@ fn a_note_goes_into_the_phrase_opened_by_number_and_undo_returns_to_it() {
     );
 
     apply(&mut app, &[Action::FocusNext, DOWN]);
-    assert_eq!(app.shown_phrase(), None);
+    assert_eq!(app.shown_phrase_id(), None);
 
     app.apply(Action::Undo);
     assert_eq!(app.project(), &project);
-    assert_eq!(app.shown_phrase(), Some(PhraseId::new(5)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(5)));
 }
 
 #[test]
@@ -181,7 +181,7 @@ fn an_entry_typed_into_a_chain_opened_by_number_goes_into_that_chain() {
 
     let entry = app.project().chain(ChainId::new(3)).entry(2);
     assert_eq!(entry.map(ChainEntry::phrase), Some(PhraseId::new(7)));
-    assert_eq!(app.shown_phrase(), Some(PhraseId::new(7)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(7)));
     assert_eq!(app.project().song_cell(0, 0), Some(ChainId::new(0)));
 }
 
@@ -198,7 +198,7 @@ fn nudging_the_title_number_opens_the_next_phrase() {
         coarse: false,
     });
 
-    assert_eq!(app.shown_phrase(), Some(PhraseId::new(5)));
+    assert_eq!(app.shown_phrase_id(), Some(PhraseId::new(5)));
 }
 
 const SPEED: i32 = 8;

@@ -78,7 +78,7 @@ impl App {
     }
 
     fn clone_phrases(&mut self, cells: CellRange) {
-        let Some(chain) = self.shown_chain() else {
+        let Some(chain) = self.shown_chain_id() else {
             self.remark = Some(NO_CHAIN_HERE);
             return;
         };
@@ -188,14 +188,14 @@ impl App {
         match self.focus {
             Focus::Song => shift_song(&mut self.project, self.song.row()),
             Focus::Chain => {
-                let Some(chain) = self.shown_chain() else {
+                let Some(chain) = self.shown_chain_id() else {
                     self.remark = Some(NO_CHAIN_HERE);
                     return;
                 };
                 shift_chain(self.project.chain_mut(chain), self.chain.entry());
             }
             Focus::Phrase => {
-                let Some(phrase) = self.shown_phrase() else {
+                let Some(phrase) = self.shown_phrase_id() else {
                     self.remark = Some(NO_PHRASE_HERE);
                     return;
                 };
@@ -248,7 +248,7 @@ impl App {
     }
 
     fn new_unused_phrase(&mut self) {
-        let Some(chain) = self.shown_chain() else {
+        let Some(chain) = self.shown_chain_id() else {
             self.remark = Some(NO_CHAIN_HERE);
             return;
         };
