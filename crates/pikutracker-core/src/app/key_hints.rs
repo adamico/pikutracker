@@ -10,6 +10,8 @@ pub(super) const CHOOSE: &str = "CHOOSE";
 const TYPE_A_NAME: &str = "TYPE A NAME";
 const EDIT_CLAIM: &str = "EDIT CLAIM";
 const PICKS_ONE: &str = "PICKS ONE";
+const GO_TO_NOTE: &str = "GO TO NOTE";
+const GO_TO_SONG: &str = "GO TO SONG";
 
 pub(super) fn asked(keymap: &Keymap, context: KeyContext, question: &str, answer: &str) -> String {
     format!("{question}{HINT_GAP}{}", answers(keymap, context, answer))
@@ -59,11 +61,31 @@ pub(super) fn picks_one(keymap: &Keymap) -> String {
     )
 }
 
-pub(super) fn edit_claim_hint(keymap: &Keymap) -> String {
+fn edit_claim_hint(keymap: &Keymap) -> String {
     keymap.hint_line(
         KeyContext::Navigation,
         &[KeyHint::labelled(&CART, EDIT_CLAIM)],
     )
+}
+
+pub(super) struct ExportFailureHints {
+    pub edit_claim: String,
+    pub go_to_note: String,
+    pub go_to_song: String,
+}
+
+pub(super) fn export_failure_hints(keymap: &Keymap) -> ExportFailureHints {
+    let confirm = |label| {
+        keymap.hint_line(
+            KeyContext::Navigation,
+            &[KeyHint::labelled(&CONFIRM, label)],
+        )
+    };
+    ExportFailureHints {
+        edit_claim: edit_claim_hint(keymap),
+        go_to_note: confirm(GO_TO_NOTE),
+        go_to_song: confirm(GO_TO_SONG),
+    }
 }
 
 pub(super) fn help_hint(keymap: &Keymap) -> String {
