@@ -100,6 +100,7 @@ pub struct App {
     track_mix: TrackMix,
     playhead: Option<Playhead>,
     follow: bool,
+    follow_set_by_key: bool,
     previewing: bool,
     remark: Option<Cow<'static, str>>,
     notice: Option<Notice>,
@@ -138,6 +139,7 @@ impl App {
             track_mix: TrackMix::default(),
             playhead: None,
             follow: false,
+            follow_set_by_key: false,
             previewing: false,
             project,
             history: History::default(),
@@ -374,6 +376,7 @@ impl App {
 
     fn toggle_follow(&mut self) {
         self.follow = !self.follow;
+        self.follow_set_by_key = self.follow;
         self.remark = Some(if self.follow { FOLLOW_ON } else { FOLLOW_OFF }.into());
     }
 

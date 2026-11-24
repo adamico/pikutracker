@@ -121,7 +121,7 @@ The view listing the keys of the focused pane, or of the open list or dialog whe
 _Avoid_: Cheat sheet, help screen
 
 **Follow**:
-A mode in which the Chain and Phrase panes track the Playhead. Moving the cursor by hand turns it off. The Song cursor and the Multitrack track the Playhead whenever the Song plays, with or without Follow.
+A mode in which the Chain and Phrase panes track the Playhead. Moving the cursor by hand turns it off until the next launch; the app remembers Follow as last set with the Follow key. The Song cursor and the Multitrack track the Playhead whenever the Song plays, with or without Follow.
 _Avoid_: Auto-scroll
 
 **Preset**:
