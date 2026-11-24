@@ -44,6 +44,7 @@ use messages::Notice;
 use panes::cart_view::CartView;
 use panes::chain::{ChainPane, ChainView};
 use panes::file_list::FileList;
+use panes::help::FocusPlace;
 use panes::instrument::InstrumentView;
 use panes::log::LogPane;
 use panes::midi_dialog::MidiDialog;
@@ -988,6 +989,21 @@ impl App {
         self.help_open && self.focus != Focus::RightSlot
     }
 
+    fn help_covers_the_left(&self) -> bool {
+        self.help_open && self.focus == Focus::RightSlot && self.file_list.is_none()
+    }
+
+    fn help_focus_place(&self) -> FocusPlace {
+        match self.focus {
+            Focus::Phrase => FocusPlace::Phrase,
+            Focus::Chain => FocusPlace::Chain,
+            Focus::Song => FocusPlace::Song,
+            Focus::RightSlot if self.log_open => FocusPlace::Log,
+            Focus::RightSlot if self.cart_view.is_some() => FocusPlace::CartView,
+            Focus::RightSlot => FocusPlace::Multitrack,
+        }
+    }
+
     fn shows_multitrack(&self) -> bool {
         self.file_list.is_none() && !self.log_open && self.cart_view.is_none()
     }
@@ -1079,7 +1095,7 @@ impl App {
                 &mut grid,
                 layout::RIGHT_SLOT,
                 self.keyboard.keymap(),
-                self.focus,
+                self.help_focus_place(),
             );
         } else if self.log_open {
             self.log
@@ -1109,6 +1125,15 @@ impl App {
             );
         }
         layout::draw_separators(&mut grid);
+        if self.help_covers_the_left() {
+            panes::help::draw(
+                &mut grid,
+                layout::LEFT_AREA,
+                self.keyboard.keymap(),
+                self.help_focus_place(),
+            );
+            layout::draw_the_right_separator(&mut grid);
+        }
         let project = self.project_name();
         status_line::draw(&mut grid, &self.status_line(&project));
         grid

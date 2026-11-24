@@ -44,7 +44,20 @@ pub const RIGHT_SLOT: Area = Area {
     rows: PANE_ROWS,
 };
 
+pub const LEFT_AREA: Area = Area {
+    column: 0,
+    row: 0,
+    width: RIGHT_SEPARATOR_COLUMN,
+    rows: PANE_ROWS,
+};
+
 const SEPARATOR: Style = Style::fg(Colour::DarkBlue);
+
+pub(super) fn draw_the_right_separator(grid: &mut Grid) {
+    for row in 0..PANE_ROWS {
+        grid.put(RIGHT_SEPARATOR_COLUMN, row, "│", SEPARATOR);
+    }
+}
 
 pub(super) fn draw_separators(grid: &mut Grid) {
     for column in [LEFT_SEPARATOR_COLUMN, RIGHT_SEPARATOR_COLUMN] {

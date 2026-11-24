@@ -1,5 +1,4 @@
 use super::{HEADING, VALUE, draw_title};
-use crate::app::focus::Focus;
 use crate::app::layout::Area;
 use crate::app::{Action, Direction, KeyContext};
 use crate::keymap::Keymap;
@@ -154,6 +153,61 @@ const SONG_KEYS: &[Entry] = &[
     Entry::named(Keys::Of(&[Action::FocusPrevious])),
 ];
 
+const MOVE_UP_DOWN: Entry = Entry::group(
+    "MOVE",
+    Keys::Of(&[Action::Move(Direction::Up), Action::Move(Direction::Down)]),
+);
+
+const NAVIGATION_CONTEXTS: &[KeyContext] = &[KeyContext::Navigation];
+
+const MULTITRACK_KEYS: &[Entry] = &[
+    Entry::group("MOVE", Keys::Arrows(&[], Action::Move)),
+    Entry::named(Keys::Of(&[Action::Undo])),
+    Entry::named(Keys::Of(&[Action::Redo])),
+    Entry::named(Keys::Of(&[Action::PlayFocusedPane])),
+    Entry::named(Keys::Of(&[Action::Cancel])),
+    Entry::named(Keys::Of(&[Action::FocusNext])),
+    Entry::named(Keys::Of(&[Action::FocusPrevious])),
+];
+
+const CLAIM_TEXT_CONTEXTS: &[KeyContext] = &[KeyContext::ClaimText];
+
+const CART_VIEW_KEYS: &[Entry] = &[
+    MOVE_UP_DOWN,
+    Entry::named(Keys::Digits),
+    Entry::group("DASH", Keys::Of(&[Action::TypeChar('-')])),
+    Entry::named(Keys::Of(&[Action::Backspace])),
+    Entry::named(Keys::Of(&[Action::SuggestClaim])),
+    Entry::named(Keys::Of(&[Action::Confirm])),
+    Entry::named(Keys::Of(&[Action::Cancel])),
+    Entry::named(Keys::Of(&[Action::Undo])),
+    Entry::named(Keys::Of(&[Action::Redo])),
+    Entry::named(Keys::Of(&[Action::PlayFocusedPane])),
+    Entry::named(Keys::Of(&[Action::FocusNext])),
+    Entry::named(Keys::Of(&[Action::FocusPrevious])),
+];
+
+const LOG_KEYS: &[Entry] = &[
+    MOVE_UP_DOWN,
+    Entry::named(Keys::Of(&[Action::Confirm])),
+    Entry::named(Keys::Of(&[Action::Cancel])),
+    Entry::named(Keys::Of(&[Action::Undo])),
+    Entry::named(Keys::Of(&[Action::Redo])),
+    Entry::named(Keys::Of(&[Action::PlayFocusedPane])),
+    Entry::named(Keys::Of(&[Action::FocusNext])),
+    Entry::named(Keys::Of(&[Action::FocusPrevious])),
+];
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FocusPlace {
+    Phrase,
+    Chain,
+    Song,
+    Multitrack,
+    CartView,
+    Log,
+}
+
 enum Keys {
     Of(&'static [Action]),
     Arrows(&'static [Action], fn(Direction) -> Action),
@@ -195,13 +249,14 @@ impl Entry {
 struct Lookup<'a> {
     keymap: &'a Keymap,
     contexts: &'static [KeyContext],
+    selecting: &'static [bool],
 }
 
 impl Lookup<'_> {
     fn keys(&self, action: Action) -> Vec<String> {
         let mut keys: Vec<String> = Vec::new();
         for &context in self.contexts {
-            for selecting in [false, true] {
+            for &selecting in self.selecting {
                 for trigger in self.keymap.triggers_when(action, context, selecting) {
                     let key = trigger.to_string();
                     if !keys.contains(&key) {
@@ -301,9 +356,13 @@ struct Placed {
     line: Line,
 }
 
-pub fn draw(grid: &mut Grid, area: Area, keymap: &Keymap, focus: Focus) {
+pub fn draw(grid: &mut Grid, area: Area, keymap: &Keymap, place: FocusPlace) {
+    let blank = " ".repeat(area.width);
+    for row in area.row..area.row + area.rows {
+        grid.put(area.column, row, &blank, VALUE);
+    }
     draw_title(grid, area.column, area.row, TITLE, false);
-    let entries = entries_with_keys(keymap, focus);
+    let entries = entries_with_keys(keymap, place);
     let body = Area {
         column: area.column,
         row: area.row + FIRST_LINE_ROW,
@@ -323,14 +382,21 @@ pub fn draw(grid: &mut Grid, area: Area, keymap: &Keymap, focus: Focus) {
     }
 }
 
-fn entries_with_keys(keymap: &Keymap, focus: Focus) -> Vec<(Cow<'static, str>, Vec<String>)> {
-    let (entries, contexts): (&[Entry], &'static [KeyContext]) = match focus {
-        Focus::Phrase => (PHRASE_KEYS, PHRASE_CONTEXTS),
-        Focus::Chain => (CHAIN_KEYS, REFERENCE_CONTEXTS),
-        Focus::Song => (SONG_KEYS, REFERENCE_CONTEXTS),
-        Focus::RightSlot => (&[], &[]),
+fn entries_with_keys(keymap: &Keymap, place: FocusPlace) -> Vec<(Cow<'static, str>, Vec<String>)> {
+    let (entries, contexts, selecting): (&[Entry], &'static [KeyContext], &'static [bool]) =
+        match place {
+            FocusPlace::Phrase => (PHRASE_KEYS, PHRASE_CONTEXTS, &[false, true]),
+            FocusPlace::Chain => (CHAIN_KEYS, REFERENCE_CONTEXTS, &[false, true]),
+            FocusPlace::Song => (SONG_KEYS, REFERENCE_CONTEXTS, &[false, true]),
+            FocusPlace::Multitrack => (MULTITRACK_KEYS, NAVIGATION_CONTEXTS, &[false]),
+            FocusPlace::CartView => (CART_VIEW_KEYS, CLAIM_TEXT_CONTEXTS, &[false]),
+            FocusPlace::Log => (LOG_KEYS, NAVIGATION_CONTEXTS, &[false]),
+        };
+    let lookup = Lookup {
+        keymap,
+        contexts,
+        selecting,
     };
-    let lookup = Lookup { keymap, contexts };
     entries
         .iter()
         .map(|entry| (entry.name(), lookup.entry_keys(&entry.keys)))
