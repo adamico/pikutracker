@@ -116,9 +116,17 @@ _Avoid_: Block, mark
 The view of the Song as it plays: each Track's Steps in time order with their transposes applied, spaced by Ticks so that Steps side by side start together. The cursor moves only from Step to Step.
 _Avoid_: Pattern view
 
+**Help**:
+The view listing the keys of the focused pane, on the half of the screen away from it. It never takes focus, so editing and playback carry on while it is open.
+_Avoid_: Cheat sheet, help screen
+
 **Follow**:
 A mode in which the Chain and Phrase panes track the Playhead. Moving the cursor by hand turns it off. The Song cursor and the Multitrack track the Playhead whenever the Song plays, with or without Follow.
 _Avoid_: Auto-scroll
+
+**Preset**:
+The set of keys the tracker starts from, PcTracker or M8Style, before the user's own key changes apply.
+_Avoid_: Mode, layout
 
 **Mute**:
 Silencing a Track without changing timing. A muted Track can still set the length of a Chain row.
