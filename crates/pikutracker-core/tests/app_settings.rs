@@ -525,3 +525,26 @@ fn the_pc_tracker_preset_drops_a_selection_on_a_plain_arrow() {
         ]
     );
 }
+
+#[test]
+fn help_is_not_remembered_and_starts_closed() {
+    let mut app = launch(None, None);
+    app.apply(Action::ToggleHelp);
+    assert_eq!(pane_text(&app, layout::RIGHT_SLOT, 0), "HELP");
+
+    app.apply(Action::ToggleFollow);
+    let written = app
+        .take_file_requests()
+        .into_iter()
+        .find_map(|request| match request {
+            FileRequest::Write { path, contents } if path == Path::new(STATE_FILE) => {
+                Some(contents)
+            }
+            _ => None,
+        });
+    let state = written.expect("Follow is saved");
+
+    assert!(!state.to_lowercase().contains("help"), "{state}");
+    let next = launch(None, Some(&state));
+    assert_ne!(pane_text(&next, layout::RIGHT_SLOT, 0), "HELP");
+}

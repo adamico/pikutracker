@@ -153,6 +153,7 @@ impl App {
             FileResponse::Missing { path } => self.file_missing(&path),
             FileResponse::Failed { path, reason } => self.file_failed(&path, &reason),
         }
+        self.announce_help_when_free();
     }
 
     fn finish_reading(&mut self, path: PathBuf, contents: &str) {

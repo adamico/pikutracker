@@ -65,3 +65,10 @@ pub(super) fn edit_claim_hint(keymap: &Keymap) -> String {
         &[KeyHint::labelled(&CART, EDIT_CLAIM)],
     )
 }
+
+pub(super) fn help_hint(keymap: &Keymap) -> String {
+    keymap.hint_line(
+        KeyContext::Navigation,
+        &[KeyHint::named(&Action::ToggleHelp)],
+    )
+}

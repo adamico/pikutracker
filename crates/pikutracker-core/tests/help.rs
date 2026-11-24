@@ -11,7 +11,7 @@ use pikutracker_core::player::AudioRequest;
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
 use std::path::PathBuf;
 use std::time::Duration;
-use support::{M8_STYLE, apply, launched, pane_text, status_line};
+use support::{M8_STYLE, apply, launched, let_the_notice_fade, pane_text, status_line};
 
 const PC_TRACKER: &str = "(version: 1)";
 const TO_THE_PHRASE_PANE: [Action; 2] = [Action::FocusPrevious, Action::FocusPrevious];
@@ -949,4 +949,56 @@ fn help_hides_while_the_save_lists_overwrite_question_is_open() {
     app.apply(Action::Cancel);
 
     assert_eq!(left_area(&app)[0], "HELP");
+}
+
+fn assert_launch_announces(config: &str, help_key: &str) {
+    let mut app = launched(App::new(), config);
+
+    assert!(
+        status_line(&app).starts_with(&format!("{help_key} HELP")),
+        "{}",
+        status_line(&app)
+    );
+    let_the_notice_fade(&mut app);
+    assert!(!status_line(&app).contains("HELP"), "{}", status_line(&app));
+}
+
+#[test]
+fn launch_announces_the_help_key_in_a_fading_notice() {
+    assert_launch_announces(PC_TRACKER, "^H");
+    assert_launch_announces(M8_STYLE, "X+H");
+}
+
+#[test]
+fn the_launch_notice_names_a_rebound_help_key() {
+    assert_launch_announces(r#"(version: 1, keys: {"ToggleHelp": "Ctrl+K"})"#, "^K");
+}
+
+#[test]
+fn a_settings_report_at_launch_stays_and_the_help_notice_follows_it() {
+    let mut app = launched(App::new(), r#"(version: 1, keys: {"Sav": "Ctrl+W"})"#);
+
+    assert!(
+        status_line(&app).starts_with("! CONFIG.RON: IGNORED 1 KEY"),
+        "{}",
+        status_line(&app)
+    );
+    app.apply(Action::Cancel);
+    assert!(
+        status_line(&app).starts_with("^H HELP"),
+        "{}",
+        status_line(&app)
+    );
+}
+
+#[test]
+fn the_launch_notice_stays_out_of_the_log() {
+    let mut app = launched(App::new(), PC_TRACKER);
+
+    app.apply(Action::ToggleLog);
+
+    let log: Vec<String> = (0..layout::RIGHT_SLOT.rows)
+        .map(|line| pane_text(&app, layout::RIGHT_SLOT, line))
+        .collect();
+    assert!(!log.iter().any(|line| line.contains("HELP")), "{log:?}");
 }

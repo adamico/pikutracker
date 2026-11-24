@@ -11,6 +11,7 @@ use pikutracker_core::synth::{
 use std::fmt::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 pub const HEADER: &str = "pico-8 cartridge // http://www.pico-8.com\nversion 43\n";
 
@@ -31,6 +32,10 @@ pub fn launched(mut app: App, config: &str) -> App {
         directory: PathBuf::from("."),
     });
     app
+}
+
+pub fn let_the_notice_fade(app: &mut App) {
+    app.advance_time(Duration::from_secs(3));
 }
 
 pub fn apply(app: &mut App, actions: &[Action]) {

@@ -21,6 +21,7 @@ mod status_line;
 
 pub use action::{Action, Direction, KeyContext};
 pub use files::{DirectoryEntry, FileRequest, FileResponse};
+use launching::HelpAnnouncement;
 pub use launching::{Launch, SettingsContents};
 pub use messages::{LogItem, Report, Severity};
 
@@ -107,6 +108,7 @@ pub struct App {
     log: LogPane,
     log_open: bool,
     help_open: bool,
+    help_announcement: HelpAnnouncement,
     focus_before_log: Focus,
     file_list: Option<FileList>,
     midi_dialog: Option<Box<MidiDialog>>,
@@ -165,6 +167,7 @@ impl App {
             log: LogPane::default(),
             log_open: false,
             help_open: false,
+            help_announcement: HelpAnnouncement::default(),
             focus_before_log: Focus::default(),
             file_list: None,
             midi_dialog: None,
@@ -385,6 +388,9 @@ impl App {
         let log_pointer = key_hints::log_pointer(self.keyboard.keymap());
         let text = report.status_text(&log_pointer);
         self.notice = Some(Notice::new(report.severity, text));
+        if self.help_announcement == HelpAnnouncement::Showing {
+            self.help_announcement = HelpAnnouncement::Over;
+        }
         if !report.items.is_empty() && !self.log_open {
             self.log_open = true;
             self.help_open = false;
@@ -410,6 +416,7 @@ impl App {
     }
 
     pub fn apply(&mut self, action: Action) {
+        self.end_help_announcement(action);
         let merge = match action {
             _ if self.cart_view_has_focus() => Some(Merge::CartVisit(self.cart_visits)),
             Action::Nudge { .. } if self.selection_start.is_none() => Some(Merge::Nudge),
@@ -663,9 +670,14 @@ impl App {
         }
     }
 
+    fn persistent_notice_showing(&self) -> bool {
+        self.notice.as_ref().is_some_and(Notice::is_persistent)
+    }
+
     fn cancel(&mut self) {
-        if self.notice.as_ref().is_some_and(Notice::is_persistent) {
+        if self.persistent_notice_showing() {
             self.notice = None;
+            self.announce_help_when_free();
         } else if self.log_has_focus() {
             self.close_log();
         } else if self.focus == Focus::RightSlot {

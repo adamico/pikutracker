@@ -1,6 +1,7 @@
-use super::App;
 use super::files::{FileRequest, Waiting};
-use super::messages::{LogItem, Report, Severity};
+use super::key_hints;
+use super::messages::{LogItem, Notice, Report, Severity};
+use super::{Action, App};
 use crate::keymap::{Keyboard, Keymap, RebindProblem};
 use crate::settings::{AppState, Config, SettingsRead, read_config, read_state, write_state};
 use crate::wording::counted;
@@ -21,6 +22,14 @@ pub enum SettingsContents {
     Missing,
     Bytes(Vec<u8>),
     Unreadable { reason: String },
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) enum HelpAnnouncement {
+    Due,
+    Showing,
+    #[default]
+    Over,
 }
 
 const CONFIG_RON: &str = "CONFIG.RON";
@@ -94,6 +103,30 @@ impl App {
         }
         if let Some(state_file) = launch.state_file {
             self.launch_state(state_file, launch.state);
+        }
+        self.help_announcement = HelpAnnouncement::Due;
+        self.announce_help_when_free();
+    }
+
+    pub(super) fn announce_help_when_free(&mut self) {
+        let free = !self.persistent_notice_showing() && self.waiting.is_none();
+        if self.help_announcement != HelpAnnouncement::Due || !free {
+            return;
+        }
+        self.help_announcement = HelpAnnouncement::Showing;
+        let help_hint = key_hints::help_hint(self.keyboard.keymap());
+        self.notice = Some(Notice::new(Severity::Info, help_hint));
+    }
+
+    pub(super) fn end_help_announcement(&mut self, action: Action) {
+        let dismissing = action == Action::Cancel && self.persistent_notice_showing();
+        match self.help_announcement {
+            HelpAnnouncement::Due if dismissing => {}
+            HelpAnnouncement::Showing => {
+                self.notice = None;
+                self.help_announcement = HelpAnnouncement::Over;
+            }
+            _ => self.help_announcement = HelpAnnouncement::Over,
         }
     }
 

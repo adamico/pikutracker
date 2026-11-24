@@ -1,13 +1,13 @@
 mod support;
 
 use pikutracker_core::app::{
-    Action, App, DirectoryEntry, FileRequest, FileResponse, Launch, SettingsContents,
+    Action, App, Direction, DirectoryEntry, FileRequest, FileResponse, Launch, SettingsContents,
 };
 use pikutracker_core::project::Project;
 use pikutracker_core::project_file;
 use pikutracker_core::settings::{SettingsRead, read_state};
 use std::path::PathBuf;
-use support::{state_ron, status_line};
+use support::{let_the_notice_fade, state_ron, status_line};
 
 const STATE_FILE: &str = "/state/pikutracker/state.ron";
 const HOME: &str = "/home/user";
@@ -94,7 +94,12 @@ fn the_last_opened_project_is_opened_at_launch() {
         contents: project_text(),
     });
 
-    assert!(status_line(&app).starts_with("OPENED B.PTRK"));
+    let_the_notice_fade(&mut app);
+    assert!(
+        status_line(&app).ends_with("B.PTRK"),
+        "{}",
+        status_line(&app)
+    );
     app.take_file_requests();
     app.apply(Action::Save);
     assert_eq!(
@@ -343,4 +348,51 @@ fn with_no_place_for_a_state_file_the_app_still_starts_in_the_launch_folder() {
         }]
     );
     assert!(save_a_new_project(&mut app, HOME).is_empty());
+}
+
+#[test]
+fn the_help_notice_follows_the_reopened_project() {
+    let mut app = launch(Some(state_ron(&["/music/b.ptrk"])));
+    app.take_file_requests();
+
+    app.receive_file(FileResponse::Read {
+        path: PathBuf::from("/music/b.ptrk"),
+        contents: project_text(),
+    });
+
+    assert!(
+        status_line(&app).starts_with("^H HELP"),
+        "{}",
+        status_line(&app)
+    );
+}
+
+#[test]
+fn the_help_notice_is_not_announced_once_the_user_has_acted() {
+    let mut app = launch_with(SettingsContents::Unreadable {
+        reason: "permission denied".to_owned(),
+    });
+    assert!(status_line(&app).starts_with("! CANNOT READ STATE.RON"));
+
+    app.apply(Action::OpenProject);
+    app.receive_file(FileResponse::Listed {
+        directory: PathBuf::from(HOME),
+        entries: vec![DirectoryEntry {
+            name: "b.ptrk".to_owned(),
+            is_directory: false,
+        }],
+    });
+    app.apply(Action::Move(Direction::Down));
+    app.apply(Action::Confirm);
+    app.take_file_requests();
+    app.receive_file(FileResponse::Read {
+        path: PathBuf::from(HOME).join("b.ptrk"),
+        contents: project_text(),
+    });
+
+    assert!(
+        status_line(&app).starts_with("OPENED B.PTRK"),
+        "{}",
+        status_line(&app)
+    );
 }
