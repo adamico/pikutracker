@@ -5,10 +5,10 @@ use pikutracker_core::project::{Phrase, Project, Step};
 use pikutracker_core::screen::palette::Colour;
 use support::pane_text;
 
-const OCT_INS_LINE: usize = 4;
-const VOL_FX_LINE: usize = 5;
-const STEP_HEADING_LINE: usize = 6;
-const FIRST_STEP_LINE: usize = 7;
+const OCT_INS_LINE: usize = 3;
+const VOL_FX_LINE: usize = 4;
+const STEP_HEADING_LINE: usize = 5;
+const FIRST_STEP_LINE: usize = 6;
 const SETTINGS_LINE: usize = 1;
 
 fn phrase_app(actions: &[Action]) -> App {

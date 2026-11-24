@@ -286,8 +286,8 @@ fn the_whole_pen_is_remembered_and_restored_on_launch() {
 
     assert_eq!(state.pen, Pen::new(2, 9, 7, 3).unwrap());
     let next = launch(None, Some(&write_state(&state)));
-    assert_eq!(pane_text(&next, layout::PHRASE, 4), "OCT 2  INS 9");
-    assert_eq!(pane_text(&next, layout::PHRASE, 5), "VOL 7  FX  3 DROP");
+    assert_eq!(pane_text(&next, layout::PHRASE, 3), "OCT 2  INS 9");
+    assert_eq!(pane_text(&next, layout::PHRASE, 4), "VOL 7  FX  3 DROP");
 }
 
 #[test]

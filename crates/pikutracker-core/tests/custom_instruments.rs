@@ -169,7 +169,7 @@ fn a_step_instrument_is_one_hex_digit() {
 
     assert_eq!(first_step(&app).instrument(), 0x0A);
     assert_eq!(
-        support::pane_text(&app, layout::PHRASE, 7),
+        support::pane_text(&app, layout::PHRASE, 6),
         "00 C-2 [A]   5   0"
     );
 }
@@ -194,7 +194,7 @@ fn nudging_the_pen_instrument_past_f_stays_on_f_with_a_remark() {
     let mut app = on_the_pen_instrument();
     apply(&mut app, &[Action::HexDigit(0x0F), NUDGE_UP]);
 
-    assert_eq!(support::pane_text(&app, layout::PHRASE, 4), "OCT 2  INS[F]");
+    assert_eq!(support::pane_text(&app, layout::PHRASE, 3), "OCT 2  INS[F]");
     assert_eq!(support::status_line(&app), CUSTOM_INSTRUMENTS_END_AT_F);
 }
 
@@ -226,7 +226,7 @@ fn setting_the_pen_to_an_undefined_custom_instrument_keeps_it_with_a_remark() {
     let mut app = on_the_pen_instrument();
     app.apply(Action::HexDigit(0x0C));
 
-    assert_eq!(support::pane_text(&app, layout::PHRASE, 4), "OCT 2  INS[C]");
+    assert_eq!(support::pane_text(&app, layout::PHRASE, 3), "OCT 2  INS[C]");
     assert_eq!(
         support::status_line(&app),
         "CUSTOM INSTRUMENT C IS NOT DEFINED"

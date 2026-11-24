@@ -18,10 +18,9 @@ const NUDGE_DOWN: Action = Action::Nudge {
 };
 
 const SPEED_LINE: usize = 1;
-const NOIZ_LINE: usize = 2;
-const FILTER_LINE: usize = 3;
-const STEP_HEADING_LINE: usize = 6;
-const FIRST_STEP_LINE: usize = 7;
+const FILTER_LINE: usize = 2;
+const STEP_HEADING_LINE: usize = 5;
+const FIRST_STEP_LINE: usize = 6;
 
 fn phrase_app(actions: &[Action]) -> App {
     let mut app = App::new();
@@ -48,8 +47,8 @@ fn phrase_line(app: &App, line: usize) -> String {
     pane_text(app, layout::PHRASE, line)
 }
 
-const LOOP_START: [Action; 6] = [UP, UP, UP, UP, UP, RIGHT];
-const LOOP_END: [Action; 7] = [UP, UP, UP, UP, UP, RIGHT, RIGHT];
+const LOOP_START: [Action; 5] = [UP, UP, UP, UP, RIGHT];
+const LOOP_END: [Action; 6] = [UP, UP, UP, UP, RIGHT, RIGHT];
 
 fn typed(cell: &[Action], value: u8) -> Vec<Action> {
     [
@@ -81,10 +80,9 @@ fn a_new_phrase_has_16_steps_at_speed_16_and_loop_10_00() {
     );
     assert_eq!(phrase(&app).phrase_loop(), None);
     assert_eq!(phrase_line(&app, SPEED_LINE), "SPD 10  LOOP 10 00  BPM 113");
-    assert_eq!(phrase_line(&app, NOIZ_LINE), "NOIZ 0  BUZZ 0");
     assert_eq!(
         phrase_line(&app, FILTER_LINE),
-        "DETUNE 0  REVERB 0  DAMPEN 0"
+        "NZ 0  BZ 0  DT 0  RV 0  DP 0"
     );
     assert_eq!(phrase_line(&app, STEP_HEADING_LINE), "   NOTE INST VOL FX");
 }
@@ -94,13 +92,10 @@ fn the_cursor_moves_up_from_the_first_step_into_the_header() {
     let app = phrase_app(&[UP; 3]);
     assert_eq!(
         phrase_line(&app, FILTER_LINE),
-        "DETUNE[0] REVERB 0  DAMPEN 0"
+        "NZ[0] BZ 0  DT 0  RV 0  DP 0"
     );
 
     let app = phrase_app(&[UP; 4]);
-    assert_eq!(phrase_line(&app, NOIZ_LINE), "NOIZ[0] BUZZ 0");
-
-    let app = phrase_app(&[UP; 5]);
     assert_eq!(phrase_line(&app, SPEED_LINE), "SPD[10] LOOP 10 00  BPM 113");
 }
 
@@ -127,7 +122,6 @@ fn two_typed_digits_set_the_speed_and_update_the_bpm_readout() {
         UP,
         UP,
         UP,
-        UP,
         Action::HexDigit(0x2),
         Action::HexDigit(0x0),
     ]);
@@ -138,7 +132,7 @@ fn two_typed_digits_set_the_speed_and_update_the_bpm_readout() {
 
 #[test]
 fn the_speed_stops_at_1_and_255() {
-    let app = phrase_app(&[UP, UP, UP, UP, UP, Action::HexDigit(0), Action::HexDigit(0)]);
+    let app = phrase_app(&[UP, UP, UP, UP, Action::HexDigit(0), Action::HexDigit(0)]);
     assert_eq!(phrase(&app).speed(), 1);
     assert_eq!(
         phrase_line(&app, SPEED_LINE),
@@ -146,7 +140,6 @@ fn the_speed_stops_at_1_and_255() {
     );
 
     let app = phrase_app(&[
-        UP,
         UP,
         UP,
         UP,
@@ -161,7 +154,6 @@ fn the_speed_stops_at_1_and_255() {
 #[test]
 fn moving_the_cursor_starts_a_new_typed_value() {
     let app = phrase_app(&[
-        UP,
         UP,
         UP,
         UP,
@@ -257,7 +249,7 @@ fn after_shortening_len_the_cursor_still_reaches_the_steps_past_it() {
             &[UP; 10],
             &typed(&LOOP_START, 0x02),
             &[LEFT],
-            &[DOWN; 12],
+            &[DOWN; 11],
         ]
         .concat(),
     );
@@ -271,7 +263,7 @@ fn shortening_and_lengthening_the_phrase_keeps_the_steps_past_the_end() {
         &[
             &[DOWN; 8][..],
             &[Action::PianoKey(0)],
-            &[UP; 14],
+            &[UP; 13],
             &[RIGHT, Action::HexDigit(0), Action::HexDigit(4)],
             &[Action::HexDigit(1), Action::HexDigit(0)],
         ]
@@ -301,13 +293,15 @@ fn shortening_and_lengthening_keeps_the_steps_past_the_end() {
 
 #[test]
 fn noiz_and_buzz_switch_on_and_off() {
-    let app = phrase_app(&[UP, UP, UP, UP, Action::HexDigit(1), RIGHT, NUDGE_UP]);
+    let app = phrase_app(&[UP, UP, UP, Action::HexDigit(1), RIGHT, NUDGE_UP]);
     assert!(phrase(&app).filters().noiz());
     assert!(phrase(&app).filters().buzz());
-    assert_eq!(phrase_line(&app, NOIZ_LINE), "NOIZ 1  BUZZ[1]");
+    assert_eq!(
+        phrase_line(&app, FILTER_LINE),
+        "NZ 1  BZ[1] DT 0  RV 0  DP 0"
+    );
 
     let app = phrase_app(&[
-        UP,
         UP,
         UP,
         UP,
@@ -327,6 +321,8 @@ fn detune_reverb_and_dampen_run_from_0_to_2() {
         UP,
         UP,
         UP,
+        RIGHT,
+        RIGHT,
         Action::HexDigit(1),
         RIGHT,
         Action::HexDigit(2),
@@ -340,16 +336,21 @@ fn detune_reverb_and_dampen_run_from_0_to_2() {
     assert_eq!(filters.dampen(), 2);
     assert_eq!(
         phrase_line(&app, FILTER_LINE),
-        "DETUNE 1  REVERB 2  DAMPEN[2]"
+        "NZ 0  BZ 0  DT 1  RV 2  DP[2]"
     );
 }
 
 #[test]
 fn the_cursor_stops_at_the_ends_of_a_header_row() {
-    let app = phrase_app(&[UP, UP, UP, LEFT, LEFT, RIGHT, RIGHT, RIGHT, RIGHT]);
-
+    let app = phrase_app(&[UP, UP, UP, LEFT]);
     assert_eq!(
         phrase_line(&app, FILTER_LINE),
-        "DETUNE 0  REVERB 0  DAMPEN[0]"
+        "NZ[0] BZ 0  DT 0  RV 0  DP 0"
+    );
+
+    let app = phrase_app(&[&[UP, UP, UP][..], &[RIGHT; 5]].concat());
+    assert_eq!(
+        phrase_line(&app, FILTER_LINE),
+        "NZ 0  BZ 0  DT 0  RV 0  DP[0]"
     );
 }

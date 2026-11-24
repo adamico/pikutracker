@@ -57,16 +57,17 @@ enum HeaderCell {
     Pen(PenField),
 }
 
-const HEADER_CELLS: [&[(HeaderCell, usize)]; 5] = [
+const HEADER_CELLS: [&[(HeaderCell, usize)]; 4] = [
     &[
         (HeaderCell::Speed, 4),
         (HeaderCell::LoopStart, 13),
         (HeaderCell::LoopEnd, 16),
     ],
-    &[(HeaderCell::Noiz, 5), (HeaderCell::Buzz, 13)],
     &[
-        (HeaderCell::Detune, 7),
-        (HeaderCell::Reverb, 17),
+        (HeaderCell::Noiz, 3),
+        (HeaderCell::Buzz, 9),
+        (HeaderCell::Detune, 15),
+        (HeaderCell::Reverb, 21),
         (HeaderCell::Dampen, 27),
     ],
     &[
@@ -79,10 +80,9 @@ const HEADER_CELLS: [&[(HeaderCell, usize)]; 5] = [
     ],
 ];
 
-const HEADER_LABELS: [&[(&str, usize)]; 3] = [
+const HEADER_LABELS: [&[(&str, usize)]; 2] = [
     &[("SPD", 0), ("LOOP", 8)],
-    &[("NOIZ", 0), ("BUZZ", 8)],
-    &[("DETUNE", 0), ("REVERB", 10), ("DAMPEN", 20)],
+    &[("NZ", 0), ("BZ", 6), ("DT", 12), ("RV", 18), ("DP", 24)],
 ];
 
 const PEN_LABELS: [&[(&str, usize)]; 2] = [&[("OCT", 0), ("INS", 7)], &[("VOL", 0), ("FX", 7)]];

@@ -6,8 +6,8 @@ use pikutracker_core::project::{Phrase, Step};
 use pikutracker_core::screen::palette::Colour;
 use support::pane_text;
 
-const PEN_OCTAVE_LINE: usize = 4;
-const FIRST_STEP_LINE: usize = 7;
+const PEN_OCTAVE_LINE: usize = 3;
+const FIRST_STEP_LINE: usize = 6;
 const UP: Action = Action::Move(Direction::Up);
 const DOWN: Action = Action::Move(Direction::Down);
 const LEFT: Action = Action::Move(Direction::Left);
@@ -363,8 +363,7 @@ fn the_pc_tracker_brackets_change_the_octave_and_modified_arrows_nudge() {
 }
 
 const PITCH_OFFSET: usize = 3;
-const LEN_8: [Action; 14] = [
-    UP,
+const LEN_8: [Action; 12] = [
     UP,
     UP,
     UP,
@@ -373,7 +372,6 @@ const LEN_8: [Action; 14] = [
     Action::HexDigit(0),
     Action::HexDigit(8),
     LEFT,
-    DOWN,
     DOWN,
     DOWN,
     DOWN,
@@ -422,7 +420,6 @@ fn lengthening_shows_the_steps_in_the_normal_style_with_no_data_change() {
             &[UP; 11],
             &LEN_8,
             &[
-                UP,
                 UP,
                 UP,
                 UP,

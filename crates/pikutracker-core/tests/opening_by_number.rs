@@ -13,8 +13,8 @@ const SHIFT_TAB: Action = Action::FocusPrevious;
 const TAB: Action = Action::FocusNext;
 const SPACE: Action = Action::PlayFocusedPane;
 
-const PHRASE_HEADER_ROWS: usize = 5;
-const FIRST_STEP_LINE: usize = 7;
+const PHRASE_HEADER_ROWS: usize = 4;
+const FIRST_STEP_LINE: usize = 6;
 
 fn number(value: u8) -> [Action; 2] {
     [Action::HexDigit(value >> 4), Action::HexDigit(value & 0xF)]
