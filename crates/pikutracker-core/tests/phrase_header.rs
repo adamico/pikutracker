@@ -117,14 +117,7 @@ fn the_cursor_moves_back_down_from_the_header_to_the_first_step() {
 
 #[test]
 fn two_typed_digits_set_the_speed_and_update_the_bpm_readout() {
-    let app = phrase_app(&[
-        UP,
-        UP,
-        UP,
-        UP,
-        Action::HexDigit(0x2),
-        Action::HexDigit(0x0),
-    ]);
+    let app = phrase_app(&[UP, UP, UP, UP, Action::HexDigit(0x2), Action::HexDigit(0x0)]);
 
     assert_eq!(phrase(&app).speed(), 32);
     assert_eq!(phrase_line(&app, SPEED_LINE), "SPD[20] LOOP 10 00  BPM 56");
