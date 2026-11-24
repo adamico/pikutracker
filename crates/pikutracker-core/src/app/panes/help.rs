@@ -160,16 +160,6 @@ const MOVE_UP_DOWN: Entry = Entry::group(
 
 const NAVIGATION_CONTEXTS: &[KeyContext] = &[KeyContext::Navigation];
 
-const MULTITRACK_KEYS: &[Entry] = &[
-    Entry::group("MOVE", Keys::Arrows(&[], Action::Move)),
-    Entry::named(Keys::Of(&[Action::Undo])),
-    Entry::named(Keys::Of(&[Action::Redo])),
-    Entry::named(Keys::Of(&[Action::PlayFocusedPane])),
-    Entry::named(Keys::Of(&[Action::Cancel])),
-    Entry::named(Keys::Of(&[Action::FocusNext])),
-    Entry::named(Keys::Of(&[Action::FocusPrevious])),
-];
-
 const CLAIM_TEXT_CONTEXTS: &[KeyContext] = &[KeyContext::ClaimText];
 
 const CART_VIEW_KEYS: &[Entry] = &[
@@ -203,7 +193,6 @@ pub enum FocusPlace {
     Phrase,
     Chain,
     Song,
-    Multitrack,
     CartView,
     Log,
 }
@@ -388,7 +377,6 @@ fn entries_with_keys(keymap: &Keymap, place: FocusPlace) -> Vec<(Cow<'static, st
             FocusPlace::Phrase => (PHRASE_KEYS, PHRASE_CONTEXTS, &[false, true]),
             FocusPlace::Chain => (CHAIN_KEYS, REFERENCE_CONTEXTS, &[false, true]),
             FocusPlace::Song => (SONG_KEYS, REFERENCE_CONTEXTS, &[false, true]),
-            FocusPlace::Multitrack => (MULTITRACK_KEYS, NAVIGATION_CONTEXTS, &[false]),
             FocusPlace::CartView => (CART_VIEW_KEYS, CLAIM_TEXT_CONTEXTS, &[false]),
             FocusPlace::Log => (LOG_KEYS, NAVIGATION_CONTEXTS, &[false]),
         };

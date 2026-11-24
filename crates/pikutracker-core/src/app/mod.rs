@@ -985,22 +985,18 @@ impl App {
         self.shown.open_phrase(step.phrase);
     }
 
-    fn help_covers_the_right_slot(&self) -> bool {
-        self.help_open && self.focus != Focus::RightSlot
-    }
-
-    fn help_covers_the_left(&self) -> bool {
-        self.help_open && self.focus == Focus::RightSlot && self.file_list.is_none()
-    }
-
-    fn help_focus_place(&self) -> FocusPlace {
+    fn shown_help(&self) -> Option<FocusPlace> {
+        if !self.help_open {
+            return None;
+        }
         match self.focus {
-            Focus::Phrase => FocusPlace::Phrase,
-            Focus::Chain => FocusPlace::Chain,
-            Focus::Song => FocusPlace::Song,
-            Focus::RightSlot if self.log_open => FocusPlace::Log,
-            Focus::RightSlot if self.cart_view.is_some() => FocusPlace::CartView,
-            Focus::RightSlot => FocusPlace::Multitrack,
+            Focus::Phrase => Some(FocusPlace::Phrase),
+            Focus::Chain => Some(FocusPlace::Chain),
+            Focus::Song => Some(FocusPlace::Song),
+            Focus::RightSlot if self.file_list.is_some() => None,
+            Focus::RightSlot if self.log_open => Some(FocusPlace::Log),
+            Focus::RightSlot if self.cart_view.is_some() => Some(FocusPlace::CartView),
+            Focus::RightSlot => None,
         }
     }
 
@@ -1090,13 +1086,8 @@ impl App {
         let right_slot_focused = focus == Some(Focus::RightSlot);
         if let Some(list) = &self.file_list {
             list.draw(&mut grid, layout::RIGHT_SLOT);
-        } else if self.help_covers_the_right_slot() {
-            panes::help::draw(
-                &mut grid,
-                layout::RIGHT_SLOT,
-                self.keyboard.keymap(),
-                self.help_focus_place(),
-            );
+        } else if let Some(place) = self.shown_help().filter(|_| self.focus != Focus::RightSlot) {
+            panes::help::draw(&mut grid, layout::RIGHT_SLOT, self.keyboard.keymap(), place);
         } else if self.log_open {
             self.log
                 .draw(&mut grid, layout::RIGHT_SLOT, right_slot_focused);
@@ -1125,13 +1116,8 @@ impl App {
             );
         }
         layout::draw_separators(&mut grid);
-        if self.help_covers_the_left() {
-            panes::help::draw(
-                &mut grid,
-                layout::LEFT_AREA,
-                self.keyboard.keymap(),
-                self.help_focus_place(),
-            );
+        if let Some(place) = self.shown_help().filter(|_| self.focus == Focus::RightSlot) {
+            panes::help::draw(&mut grid, layout::LEFT_AREA, self.keyboard.keymap(), place);
             layout::draw_the_right_separator(&mut grid);
         }
         let project = self.project_name();

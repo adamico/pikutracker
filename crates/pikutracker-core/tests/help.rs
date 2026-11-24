@@ -502,45 +502,36 @@ fn help_shows_keys_rebound_in_config_ron_in_the_chain_and_song_panes() {
 }
 
 #[test]
-fn help_opens_over_the_left_area_from_the_multitrack_and_lists_its_pc_tracker_keys() {
-    let mut app = in_the_multitrack(PC_TRACKER);
-    let multitrack = right_slot(&app);
+fn help_hides_while_the_multitrack_has_focus_and_shows_again_on_a_left_pane() {
+    for config in [PC_TRACKER, M8_STYLE] {
+        let mut app = in_the_multitrack(config);
+        let panes = left_area(&app);
+        let multitrack = right_slot(&app);
 
-    app.apply(Action::ToggleHelp);
+        app.apply(Action::ToggleHelp);
 
-    assert_eq!(right_slot(&app), multitrack);
-    assert_lists_on_the_left(
-        &app,
-        &[
-            ("MOVE", "ARROWS"),
-            ("UNDO", "^Z"),
-            ("PLAY", "SPACE"),
-            ("CANCEL", "ESC"),
-            ("NEXT PANE", "TAB"),
-        ],
-    );
+        assert_eq!(left_area(&app), panes);
+        assert_eq!(right_slot(&app), multitrack);
+
+        app.apply(Action::FocusNext);
+
+        assert!(help_names(&app).contains(&"NOTE".to_owned()));
+    }
 }
 
 #[test]
-fn help_opens_over_the_left_area_from_the_multitrack_and_lists_its_m8_style_keys() {
-    let mut app = in_the_multitrack(M8_STYLE);
+fn toggle_help_in_the_multitrack_still_opens_and_closes_help() {
+    let mut app = in_the_multitrack(PC_TRACKER);
 
-    app.apply(Action::ToggleHelp);
+    apply(&mut app, &[Action::ToggleHelp, Action::ToggleHelp]);
+    app.apply(Action::FocusPrevious);
 
-    assert_lists_on_the_left(
-        &app,
-        &[
-            ("MOVE", "ARROWS"),
-            ("NEXT PANE", "TAB/SHIFT+DOWN/SHIFT+RIGHT"),
-        ],
-    );
-    let names = help_names_over(&app, layout::LEFT_AREA);
-    for name in ["NOTE", "DIGIT", "COPY", "CLONE", "JUMP", "SELECT"] {
-        assert!(
-            !names.iter().any(|shown| shown == name),
-            "{name} in {names:#?}"
-        );
-    }
+    assert_ne!(pane_text(&app, layout::RIGHT_SLOT, 0), "HELP");
+
+    apply(&mut app, &[Action::FocusNext, Action::ToggleHelp]);
+    app.apply(Action::FocusPrevious);
+
+    assert!(help_names(&app).contains(&"LOOP START".to_owned()));
 }
 
 #[test]
@@ -586,16 +577,17 @@ fn help_opens_over_the_left_area_from_the_log_and_lists_its_keys() {
 #[test]
 fn focus_crossing_sides_moves_help_to_the_other_half() {
     for config in [PC_TRACKER, M8_STYLE] {
-        let mut app = in_the_song_pane(config);
+        let mut app = in_the_cart_view(config);
+        app.apply(Action::FocusPrevious);
         let panes = left_area(&app);
         app.apply(Action::ToggleHelp);
         assert_eq!(left_area(&app), panes);
-        let multitrack_under_help = help_lines(&app);
+        let cart_view_under_help = help_lines(&app);
 
         app.apply(Action::FocusNext);
         assert_eq!(left_area(&app)[0], "HELP");
         assert_ne!(pane_text(&app, layout::RIGHT_SLOT, 0), "HELP");
-        assert!(help_names_over(&app, layout::LEFT_AREA).contains(&"MOVE".to_owned()));
+        assert!(help_names_over(&app, layout::LEFT_AREA).contains(&"SUGGEST CLAIM".to_owned()));
 
         app.apply(Action::FocusNext);
         assert_eq!(pane_text(&app, layout::RIGHT_SLOT, 0), "HELP");
@@ -607,7 +599,7 @@ fn focus_crossing_sides_moves_help_to_the_other_half() {
         assert_ne!(pane_text(&app, layout::RIGHT_SLOT, 0), "HELP");
 
         app.apply(Action::FocusPrevious);
-        assert_eq!(help_lines(&app), multitrack_under_help);
+        assert_eq!(help_lines(&app), cart_view_under_help);
         assert_eq!(left_area(&app), panes);
     }
 }
@@ -630,14 +622,18 @@ fn opening_the_cart_view_with_help_open_moves_help_to_the_left() {
 
 #[test]
 fn closing_help_on_the_left_shows_the_phrase_and_chain_and_song_panes_as_they_were() {
-    let mut app = in_the_multitrack(PC_TRACKER);
-    let panes = left_area(&app);
-    let multitrack = right_slot(&app);
+    for in_the_view in [in_the_cart_view, in_the_log] {
+        let mut app = in_the_view(PC_TRACKER);
+        let panes = left_area(&app);
+        let view = right_slot(&app);
 
-    apply(&mut app, &[Action::ToggleHelp, Action::ToggleHelp]);
+        app.apply(Action::ToggleHelp);
+        assert_eq!(left_area(&app)[0], "HELP");
+        app.apply(Action::ToggleHelp);
 
-    assert_eq!(left_area(&app), panes);
-    assert_eq!(right_slot(&app), multitrack);
+        assert_eq!(left_area(&app), panes);
+        assert_eq!(right_slot(&app), view);
+    }
 }
 
 #[test]
@@ -657,16 +653,16 @@ fn closing_help_on_the_right_shows_the_cart_view_or_the_log_as_it_was() {
 }
 
 #[test]
-fn help_on_the_left_leaves_focus_alone_and_the_multitrack_cursor_still_moves() {
-    let mut app = in_the_multitrack(PC_TRACKER);
+fn help_on_the_left_leaves_focus_alone_and_the_cart_view_cursor_still_moves() {
+    let mut app = in_the_cart_view(PC_TRACKER);
     let context = app.key_context();
-    let multitrack = right_slot(&app);
+    let cart_view = right_slot(&app);
 
     app.apply(Action::ToggleHelp);
     app.apply(Action::Move(Direction::Down));
 
     assert_eq!(app.key_context(), context);
-    assert_ne!(right_slot(&app), multitrack);
+    assert_ne!(right_slot(&app), cart_view);
     assert_eq!(left_area(&app)[0], "HELP");
 }
 
@@ -696,7 +692,7 @@ fn the_player_keeps_playing_as_help_moves_between_halves() {
 
 #[test]
 fn help_on_the_left_meets_a_plain_right_separator() {
-    let mut app = in_the_multitrack(PC_TRACKER);
+    let mut app = in_the_cart_view(PC_TRACKER);
 
     app.apply(Action::ToggleHelp);
 
