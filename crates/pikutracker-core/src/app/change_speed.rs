@@ -9,6 +9,7 @@ const MIN_SPEED: u32 = 1;
 const MAX_SPEED: u32 = 255;
 const ARPEGGIO_SPEED: u8 = 8;
 const BAD_SPEED: &str = "SPEED MUST BE 01-FF  ";
+pub(super) const APPLY: &str = "APPLY";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum SpeedChange {
@@ -79,7 +80,7 @@ impl SpeedEntry {
             .map(|digit| format!("{digit:X}"))
             .collect();
         self.text = format!(
-            "{}PHRASE {:02X} SPEED (NOW {:02X}): {typed:_<width$}  {} {}: {}  ENTER APPLY  ESC CANCEL",
+            "{}PHRASE {:02X} SPEED (NOW {:02X}): {typed:_<width$}  {} {}: {}",
             if self.refused { BAD_SPEED } else { "" },
             self.shown.number(),
             self.shown_speed,

@@ -8,6 +8,7 @@ use crate::wording::counted;
 use std::collections::HashMap;
 
 const NO_FREE_CHAIN: &str = "NO UNUSED CHAIN LEFT";
+const PURGE: &str = "PURGE";
 const NO_FREE_PHRASE: &str = "NO UNUSED PHRASE LEFT";
 const NEEDS_A_REFERENCE: &str = "USE THE SONG OR CHAIN PANE";
 const NOTHING_TO_PURGE: &str = "NOTHING TO PURGE";
@@ -221,10 +222,10 @@ impl App {
             count => format!(" ({count} LOOSE)"),
         };
         self.selection_start = None;
-        self.question = Some(Question::purge_unused(format!(
-            "PURGE {}{loose}  ENTER PURGE  ESC CANCEL",
-            counted_items(&unused),
-        )));
+        self.question = Some(Question::purge_unused(
+            format!("PURGE {}{loose}", counted_items(&unused)),
+            PURGE,
+        ));
     }
 
     pub(super) fn purge_unused(&mut self) {

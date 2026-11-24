@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use pikutracker_core::app::layout::Area;
-use pikutracker_core::app::{Action, App};
+use pikutracker_core::app::{Action, App, Launch, SettingsContents};
 use pikutracker_core::cart::Cart;
 use pikutracker_core::player::{AudioRequest, Player};
 use pikutracker_core::project::Project;
@@ -9,6 +9,7 @@ use pikutracker_core::synth::{
     Instrument, Note, SAMPLES_PER_TICK, Sound, Voice, Waveform, packed_filters,
 };
 use std::fmt::Write;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 pub const HEADER: &str = "pico-8 cartridge // http://www.pico-8.com\nversion 43\n";
@@ -18,6 +19,19 @@ pub const SFX_AT: usize = 0x3200;
 const CART_BYTES: usize = 0x8020;
 const PNG_WIDTH: u32 = 160;
 const PNG_HEIGHT: u32 = 205;
+
+pub const M8_STYLE: &str = "(version: 1, preset: M8Style)";
+
+pub fn launched(mut app: App, config: &str) -> App {
+    app.launch(Launch {
+        config_file: Some(PathBuf::from("/config/pikutracker/config.ron")),
+        config: SettingsContents::Bytes(config.as_bytes().to_vec()),
+        state_file: None,
+        state: SettingsContents::Missing,
+        directory: PathBuf::from("."),
+    });
+    app
+}
 
 pub fn apply(app: &mut App, actions: &[Action]) {
     for action in actions {

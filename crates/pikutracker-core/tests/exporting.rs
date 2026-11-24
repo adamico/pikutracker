@@ -8,7 +8,7 @@ use pikutracker_core::project::{Claim, PhraseId, Project, TargetCart};
 use pikutracker_core::project_file;
 use std::path::{Path, PathBuf};
 use support::{HEADER, TestCart, TestPattern, TestSfx};
-use support::{pane_text, status_line};
+use support::{M8_STYLE, launched, pane_text, status_line};
 
 const DOWN: Action = Action::Move(Direction::Down);
 const CART_NAME: &str = "game.p8";
@@ -418,6 +418,24 @@ fn claim_failures_point_to_editing_the_claim() {
         (2..6).any(|row| right_slot(&app, row) == "     ^T EDIT CLAIM"),
         "{:?}",
         (0..8).map(|row| right_slot(&app, row)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn claim_failures_name_the_m8_style_cart_and_log_keys() {
+    let original = simple_cart().p8();
+    let mut project = imported(original.clone()).project().clone();
+    let mut target = project.target_cart().unwrap().clone();
+    target.claim.sfx = vec![0];
+    project.set_target_cart(Some(target));
+    let mut app = launched(App::with_project(project), M8_STYLE);
+
+    export_with(&mut app, original);
+
+    let slots: Vec<String> = (0..8).map(|row| right_slot(&app, row)).collect();
+    assert!(
+        slots.iter().any(|slot| slot.trim() == "X+T EDIT CLAIM"),
+        "{slots:?}"
     );
 }
 

@@ -1,6 +1,7 @@
 use super::App;
 use super::claim_text::named_slots;
-use super::files::{Accepted, OVERWRITE_ANSWERS, Waiting, shown_name};
+use super::files::{Accepted, OVERWRITE, Waiting, shown_name};
+use super::key_hints::edit_claim_hint;
 use super::messages::{LogItem, Report, Severity};
 use crate::cart::{Cart, Slots};
 use crate::export::{self, ExportFailure, Exported};
@@ -8,8 +9,7 @@ use crate::project::{ChainRowPlace, Claim, SongPlace};
 use crate::wording::counted;
 use std::path::{Path, PathBuf};
 
-const EDIT_CLAIM_HINT: &str = "^T EDIT CLAIM";
-const LOCATE_ANSWERS: &str = "ENTER LOCATE  ESC CANCEL";
+const LOCATE: &str = "LOCATE";
 
 #[derive(Debug)]
 pub(super) struct FinishedExport {
@@ -48,10 +48,10 @@ const fn is_about_the_claim(failure: ExportFailure) -> bool {
     )
 }
 
-fn failure_item(failure: ExportFailure) -> LogItem {
+fn failure_item(failure: ExportFailure, edit_claim_hint: &str) -> LogItem {
     let mut item = LogItem::new(Severity::Failure, failure.to_string());
     if is_about_the_claim(failure) {
-        item = item.with_hint(EDIT_CLAIM_HINT);
+        item = item.with_hint(edit_claim_hint);
     }
     match failure_location(failure) {
         Some(location) => item.at(location),
@@ -90,13 +90,16 @@ fn changed_slots_text(changed: &Slots) -> String {
     .join(" AND ")
 }
 
-fn failure_report(cart_name: &str, failures: &[ExportFailure]) -> Report {
+fn failure_report(cart_name: &str, failures: &[ExportFailure], edit_claim_hint: &str) -> Report {
     let summary = if failures.contains(&ExportFailure::EmptyClaim) {
         format!("EXPORT FAILED: NO CLAIM IN {cart_name}")
     } else {
         format!("EXPORT FAILED: {}", counted(failures.len(), "PROBLEM"))
     };
-    let items = failures.iter().copied().map(failure_item).collect();
+    let items = failures
+        .iter()
+        .map(|&failure| failure_item(failure, edit_claim_hint))
+        .collect();
     Report::failure(summary).with_items(items)
 }
 
@@ -138,19 +141,23 @@ impl App {
         match export::export(&self.project, &target.claim, original) {
             Ok(exported) if changed == Slots::default() => self.write_target(path, exported),
             Ok(exported) => {
-                let text = format!(
-                    "{} CHANGED IN {cart_name}  {OVERWRITE_ANSWERS}",
-                    changed_slots_text(&changed)
+                let text = format!("{} CHANGED IN {cart_name}", changed_slots_text(&changed));
+                self.ask(
+                    text,
+                    OVERWRITE,
+                    Accepted::OverwriteCart(path, Box::new(exported)),
                 );
-                self.ask(text, Accepted::OverwriteCart(path, Box::new(exported)));
             }
-            Err(failures) => self.report(failure_report(&cart_name, &failures)),
+            Err(failures) => {
+                let hint = edit_claim_hint(self.keyboard.keymap());
+                self.report(failure_report(&cart_name, &failures, &hint));
+            }
         }
     }
 
     pub(super) fn ask_to_locate(&mut self, path: &Path) {
-        let text = format!("{} NOT FOUND  {LOCATE_ANSWERS}", shown_name(path));
-        self.ask(text, Accepted::LocateCart);
+        let text = format!("{} NOT FOUND", shown_name(path));
+        self.ask(text, LOCATE, Accepted::LocateCart);
     }
 
     pub(super) fn locate_target_cart(&mut self, path: &Path) {

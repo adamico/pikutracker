@@ -1,5 +1,7 @@
 use super::{EMPTY, HEADING, INSTRUMENT_NAMES, VALUE, stepped};
-use crate::app::{Action, Direction};
+use crate::app::key_hints::{CONFIRM, PICK, UP_DOWN};
+use crate::app::{Action, Direction, KeyContext};
+use crate::keymap::{KeyHint, Keymap};
 use crate::midi_import::{
     self, Analysis, Choices, DRUM_ROWS, GridOption, Imported, MidiTable, STEPS_PER_BEAT,
     family_name,
@@ -28,13 +30,50 @@ const POINTER: Style = Style::fg(Colour::Yellow);
 const DROPPED: Style = Style::fg(Colour::Red);
 const WARNING: Style = Style::fg(Colour::Orange);
 
-const VOICES_KEYS: &str = "UP/DOWN PICK  SPACE TICK  S TICK SOURCE  ENTER NEXT  ESC CANCEL";
-const GRID_KEYS: &str = "ARROWS PICK  ENTER NEXT  ESC BACK";
-const PROGRAM_KEYS: &str =
-    "TAB TABLE  LEFT/RIGHT INSTRUMENT  R RESET  SHIFT+R RESET ALL  ENTER NEXT  ESC BACK";
-const DRUM_KEYS: &str =
-    "TAB TABLE  LEFT/RIGHT INSTRUMENT  [ ] NOTE  F EFFECT  R RESET  SHIFT+R RESET ALL  ESC BACK";
-const REVIEW_KEYS: &str = "UP/DOWN SCROLL  ENTER IMPORT  ESC BACK";
+const ARROWS: [Action; 4] = [
+    Action::Move(Direction::Up),
+    Action::Move(Direction::Down),
+    Action::Move(Direction::Left),
+    Action::Move(Direction::Right),
+];
+const LEFT_RIGHT: [Action; 2] = [
+    Action::Move(Direction::Left),
+    Action::Move(Direction::Right),
+];
+const DRUM_NOTE: [Action; 2] = [
+    Action::MidiDrumNote { up: false },
+    Action::MidiDrumNote { up: true },
+];
+const CANCEL: [Action; 1] = [Action::Cancel];
+const NEXT: KeyHint<'static> = KeyHint::labelled(&CONFIRM, "NEXT");
+const BACK: KeyHint<'static> = KeyHint::labelled(&CANCEL, "BACK");
+const TABLE: KeyHint<'static> = KeyHint::named(&Action::SwitchMidiTable);
+const INSTRUMENT: KeyHint<'static> = KeyHint::labelled(&LEFT_RIGHT, "INSTRUMENT");
+const RESET: KeyHint<'static> = KeyHint::named(&Action::ResetMidiRow);
+const RESET_ALL: KeyHint<'static> = KeyHint::named(&Action::ResetMidiTable);
+const VOICES_KEYS: [KeyHint<'static>; 5] = [
+    KeyHint::labelled(&UP_DOWN, PICK),
+    KeyHint::named(&Action::ToggleVoice),
+    KeyHint::named(&Action::ToggleSource),
+    NEXT,
+    KeyHint::named(&Action::Cancel),
+];
+const GRID_KEYS: [KeyHint<'static>; 3] = [KeyHint::labelled(&ARROWS, PICK), NEXT, BACK];
+const PROGRAM_KEYS: [KeyHint<'static>; 6] = [TABLE, INSTRUMENT, RESET, RESET_ALL, NEXT, BACK];
+const DRUM_KEYS: [KeyHint<'static>; 7] = [
+    TABLE,
+    INSTRUMENT,
+    KeyHint::labelled(&DRUM_NOTE, "NOTE"),
+    KeyHint::named(&Action::CycleDrumEffect),
+    RESET,
+    RESET_ALL,
+    BACK,
+];
+const REVIEW_KEYS: [KeyHint<'static>; 3] = [
+    KeyHint::labelled(&UP_DOWN, "SCROLL"),
+    KeyHint::labelled(&CONFIRM, "IMPORT"),
+    BACK,
+];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Page {
@@ -117,14 +156,15 @@ impl MidiDialog {
         (self.file_name, self.folder, imported, self.choices.table)
     }
 
-    pub fn hints(&self) -> &'static str {
-        match (self.page, self.table) {
-            (Page::Voices, _) => VOICES_KEYS,
-            (Page::Grid, _) => GRID_KEYS,
-            (Page::Instruments, Table::Programs) => PROGRAM_KEYS,
-            (Page::Instruments, Table::Drums) => DRUM_KEYS,
-            (Page::Review, _) => REVIEW_KEYS,
-        }
+    pub fn hints(&self, keymap: &Keymap) -> String {
+        let hints: &[KeyHint<'_>] = match (self.page, self.table) {
+            (Page::Voices, _) => &VOICES_KEYS,
+            (Page::Grid, _) => &GRID_KEYS,
+            (Page::Instruments, Table::Programs) => &PROGRAM_KEYS,
+            (Page::Instruments, Table::Drums) => &DRUM_KEYS,
+            (Page::Review, _) => &REVIEW_KEYS,
+        };
+        keymap.hint_line(KeyContext::MidiImport, hints)
     }
 
     pub fn apply(&mut self, action: Action) -> Outcome {
