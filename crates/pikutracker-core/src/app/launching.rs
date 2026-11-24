@@ -159,6 +159,7 @@ impl App {
             Err(reason) => self.report(cannot_read(STATE_RON, &reason)),
             Ok(SettingsRead::Loaded(state)) => {
                 self.follow = state.follow;
+                self.follow_set_by_key = state.follow;
                 self.phrase.set_pen(state.pen);
                 self.midi_table = state.midi_table.clone();
                 self.state_file = Some(state_file);
@@ -220,7 +221,7 @@ impl App {
 
     fn state_to_remember(&self) -> AppState {
         let mut state = self.app_state.clone();
-        state.follow = self.follow;
+        state.follow = self.follow_set_by_key;
         state.pen = self.phrase.pen();
         state.midi_table = self.midi_table.clone();
         state

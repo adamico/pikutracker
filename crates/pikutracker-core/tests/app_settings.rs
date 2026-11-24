@@ -267,6 +267,43 @@ fn follow_and_the_octave_are_remembered_and_config_ron_is_never_written() {
 }
 
 #[test]
+fn a_hand_move_turns_follow_off_for_this_session_only() {
+    let mut app = launch(None, Some("(version: 1, follow: true, octave: 3)"));
+    app.take_file_requests();
+
+    app.apply(Action::Move(Direction::Right));
+    assert!(status_line(&app).starts_with("FOLLOW OFF"), "Follow was on");
+    app.apply(Action::OctaveUp);
+    let state = state_written(&app.take_file_requests()).expect("the octave is saved");
+
+    assert!(state.follow, "the Follow key last turned Follow on");
+}
+
+#[test]
+fn a_hand_move_alone_writes_nothing() {
+    let mut app = launch(None, Some("(version: 1, follow: true, octave: 3)"));
+    app.take_file_requests();
+
+    app.apply(Action::Move(Direction::Right));
+
+    assert_eq!(state_written(&app.take_file_requests()), None);
+}
+
+#[test]
+fn the_follow_key_after_a_hand_move_sets_what_is_remembered() {
+    let mut app = launch(None, Some("(version: 1, follow: true, octave: 3)"));
+    app.take_file_requests();
+    app.apply(Action::Move(Direction::Right));
+
+    app.apply(Action::ToggleFollow);
+    assert!(status_line(&app).starts_with("FOLLOW ON"), "Follow was off");
+    app.apply(Action::ToggleFollow);
+    let state = state_written(&app.take_file_requests()).expect("Follow is saved");
+
+    assert!(!state.follow, "the Follow key last turned Follow off");
+}
+
+#[test]
 fn the_whole_pen_is_remembered_and_restored_on_launch() {
     let mut app = launch(None, None);
     for action in [
