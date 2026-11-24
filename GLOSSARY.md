@@ -117,7 +117,7 @@ The view of the Song as it plays: each Track's Steps in time order with their tr
 _Avoid_: Pattern view
 
 **Help**:
-The view listing the keys of the focused pane, on the half of the screen away from it. It never takes focus, so editing and playback carry on while it is open.
+The view listing the keys of the focused pane, or of the open list or dialog when one is open, on the half of the screen away from it. It never takes focus, so editing and playback carry on while it is open.
 _Avoid_: Cheat sheet, help screen
 
 **Follow**:

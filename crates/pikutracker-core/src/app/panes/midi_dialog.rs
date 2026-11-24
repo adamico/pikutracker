@@ -1,3 +1,4 @@
+use super::help::HelpList;
 use super::{EMPTY, HEADING, INSTRUMENT_NAMES, VALUE, stepped};
 use crate::app::key_hints::{CONFIRM, PICK, UP_DOWN};
 use crate::app::{Action, Direction, KeyContext};
@@ -30,49 +31,62 @@ const POINTER: Style = Style::fg(Colour::Yellow);
 const DROPPED: Style = Style::fg(Colour::Red);
 const WARNING: Style = Style::fg(Colour::Orange);
 
-const ARROWS: [Action; 4] = [
+pub(super) const ARROWS: [Action; 4] = [
     Action::Move(Direction::Up),
     Action::Move(Direction::Down),
     Action::Move(Direction::Left),
     Action::Move(Direction::Right),
 ];
-const LEFT_RIGHT: [Action; 2] = [
+pub(super) const LEFT_RIGHT: [Action; 2] = [
     Action::Move(Direction::Left),
     Action::Move(Direction::Right),
 ];
-const DRUM_NOTE: [Action; 2] = [
+pub(super) const DRUM_NOTE: [Action; 2] = [
     Action::MidiDrumNote { up: false },
     Action::MidiDrumNote { up: true },
 ];
-const CANCEL: [Action; 1] = [Action::Cancel];
-const NEXT: KeyHint<'static> = KeyHint::labelled(&CONFIRM, "NEXT");
-const BACK: KeyHint<'static> = KeyHint::labelled(&CANCEL, "BACK");
-const TABLE: KeyHint<'static> = KeyHint::named(&Action::SwitchMidiTable);
-const INSTRUMENT: KeyHint<'static> = KeyHint::labelled(&LEFT_RIGHT, "INSTRUMENT");
-const RESET: KeyHint<'static> = KeyHint::named(&Action::ResetMidiRow);
-const RESET_ALL: KeyHint<'static> = KeyHint::named(&Action::ResetMidiTable);
+pub(super) const CANCEL: [Action; 1] = [Action::Cancel];
+pub(super) const NEXT: &str = "NEXT";
+pub(super) const BACK: &str = "BACK";
+pub(super) const INSTRUMENT: &str = "INSTRUMENT";
+pub(super) const NOTE: &str = "NOTE";
+pub(super) const SCROLL: &str = "SCROLL";
+pub(super) const IMPORT: &str = "IMPORT";
+const NEXT_HINT: KeyHint<'static> = KeyHint::labelled(&CONFIRM, NEXT);
+const BACK_HINT: KeyHint<'static> = KeyHint::labelled(&CANCEL, BACK);
+const TABLE_HINT: KeyHint<'static> = KeyHint::named(&Action::SwitchMidiTable);
+const INSTRUMENT_HINT: KeyHint<'static> = KeyHint::labelled(&LEFT_RIGHT, INSTRUMENT);
+const RESET_HINT: KeyHint<'static> = KeyHint::named(&Action::ResetMidiRow);
+const RESET_ALL_HINT: KeyHint<'static> = KeyHint::named(&Action::ResetMidiTable);
 const VOICES_KEYS: [KeyHint<'static>; 5] = [
     KeyHint::labelled(&UP_DOWN, PICK),
     KeyHint::named(&Action::ToggleVoice),
     KeyHint::named(&Action::ToggleSource),
-    NEXT,
+    NEXT_HINT,
     KeyHint::named(&Action::Cancel),
 ];
-const GRID_KEYS: [KeyHint<'static>; 3] = [KeyHint::labelled(&ARROWS, PICK), NEXT, BACK];
-const PROGRAM_KEYS: [KeyHint<'static>; 6] = [TABLE, INSTRUMENT, RESET, RESET_ALL, NEXT, BACK];
+const GRID_KEYS: [KeyHint<'static>; 3] = [KeyHint::labelled(&ARROWS, PICK), NEXT_HINT, BACK_HINT];
+const PROGRAM_KEYS: [KeyHint<'static>; 6] = [
+    TABLE_HINT,
+    INSTRUMENT_HINT,
+    RESET_HINT,
+    RESET_ALL_HINT,
+    NEXT_HINT,
+    BACK_HINT,
+];
 const DRUM_KEYS: [KeyHint<'static>; 7] = [
-    TABLE,
-    INSTRUMENT,
-    KeyHint::labelled(&DRUM_NOTE, "NOTE"),
+    TABLE_HINT,
+    INSTRUMENT_HINT,
+    KeyHint::labelled(&DRUM_NOTE, NOTE),
     KeyHint::named(&Action::CycleDrumEffect),
-    RESET,
-    RESET_ALL,
-    BACK,
+    RESET_HINT,
+    RESET_ALL_HINT,
+    BACK_HINT,
 ];
 const REVIEW_KEYS: [KeyHint<'static>; 3] = [
-    KeyHint::labelled(&UP_DOWN, "SCROLL"),
-    KeyHint::labelled(&CONFIRM, "IMPORT"),
-    BACK,
+    KeyHint::labelled(&UP_DOWN, SCROLL),
+    KeyHint::labelled(&CONFIRM, IMPORT),
+    BACK_HINT,
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -165,6 +179,16 @@ impl MidiDialog {
             (Page::Review, _) => &REVIEW_KEYS,
         };
         keymap.hint_line(KeyContext::MidiImport, hints)
+    }
+
+    pub fn help_list(&self) -> HelpList {
+        match (self.page, self.table) {
+            (Page::Voices, _) => HelpList::MidiVoices,
+            (Page::Grid, _) => HelpList::MidiStepsPerBeat,
+            (Page::Instruments, Table::Programs) => HelpList::MidiPrograms,
+            (Page::Instruments, Table::Drums) => HelpList::MidiDrumKit,
+            (Page::Review, _) => HelpList::MidiReview,
+        }
     }
 
     pub fn apply(&mut self, action: Action) -> Outcome {

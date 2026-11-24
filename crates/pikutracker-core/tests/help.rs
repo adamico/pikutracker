@@ -1,12 +1,17 @@
+mod midi_support;
 mod support;
 
+use midi_support::{Song, TICKS_PER_STEP};
 use pikutracker_core::app::layout::{self, Area};
-use pikutracker_core::app::{Action, App, Direction, LogItem, Report, Severity};
+use pikutracker_core::app::{
+    Action, App, Direction, DirectoryEntry, FileResponse, LogItem, Report, Severity,
+};
 use pikutracker_core::keymap::{Key, KeyPress, Modifiers};
 use pikutracker_core::player::AudioRequest;
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
+use std::path::PathBuf;
 use std::time::Duration;
-use support::{M8_STYLE, apply, launched, pane_text};
+use support::{M8_STYLE, apply, launched, pane_text, status_line};
 
 const PC_TRACKER: &str = "(version: 1)";
 const TO_THE_PHRASE_PANE: [Action; 2] = [Action::FocusPrevious, Action::FocusPrevious];
@@ -703,4 +708,245 @@ fn help_on_the_left_meets_a_plain_right_separator() {
         .map(|line| line.chars().nth(layout::LEFT_AREA.width).unwrap_or(' '))
         .collect();
     assert_eq!(separators, "│".repeat(layout::RIGHT_SLOT.rows));
+}
+
+const REBOUND_ANSWERS: &str =
+    r#"(version: 1, keys: {"Confirm": "F12", "Cancel": "F11", "MoveUp": "Ctrl+W"})"#;
+
+fn list_one_project(app: &mut App) {
+    app.take_file_requests();
+    app.receive_file(FileResponse::Listed {
+        directory: PathBuf::from("."),
+        entries: vec![DirectoryEntry {
+            name: "song.ptrk".to_owned(),
+            is_directory: false,
+        }],
+    });
+}
+
+fn with_a_list_open(config: &str, open: Action) -> App {
+    let mut app = in_the_phrase_pane(config);
+    app.apply(open);
+    list_one_project(&mut app);
+    app
+}
+
+#[test]
+fn help_lists_the_open_lists_keys_over_the_left_area() {
+    let mut app = with_a_list_open(REBOUND_ANSWERS, Action::OpenProject);
+    let list = right_slot(&app);
+
+    app.apply(Action::ToggleHelp);
+
+    assert_eq!(right_slot(&app), list);
+    assert_lists_on_the_left(
+        &app,
+        &[("PICK", "^W/DOWN"), ("CHOOSE", "F12"), ("CANCEL", "F11")],
+    );
+    let names = help_names_over(&app, layout::LEFT_AREA);
+    assert!(!names.contains(&"NOTE".to_owned()), "{names:#?}");
+}
+
+#[test]
+fn help_lists_the_save_lists_keys_over_the_left_area() {
+    let mut app = with_a_list_open(M8_STYLE, Action::SaveAs);
+    let list = right_slot(&app);
+
+    app.apply(Action::ToggleHelp);
+
+    assert_eq!(right_slot(&app), list);
+    assert_lists_on_the_left(
+        &app,
+        &[
+            ("PICK", "UP/DOWN"),
+            ("BACKSPACE", "BACKSPACE"),
+            ("CHOOSE", "ENTER"),
+            ("CANCEL", "ESC"),
+        ],
+    );
+}
+
+#[test]
+fn closing_the_list_brings_help_back_to_the_focused_panes_keys() {
+    let mut app = with_a_list_open(PC_TRACKER, Action::OpenProject);
+    app.apply(Action::ToggleHelp);
+
+    app.apply(Action::Cancel);
+
+    assert_ne!(left_area(&app)[0], "HELP");
+    assert!(help_names(&app).contains(&"NOTE".to_owned()));
+}
+
+#[test]
+fn help_lists_the_speed_entrys_keys_during_change_speed_and_scale_speed() {
+    for ask in [Action::ChangeSpeed, Action::ScaleSpeed] {
+        let mut app = in_the_song_pane(REBOUND_ANSWERS);
+        app.apply(Action::ToggleHelp);
+
+        app.apply(ask);
+
+        assert_lists(
+            &app,
+            &[
+                ("DIGIT", "0-F"),
+                ("BACKSPACE", "BACKSPACE"),
+                ("APPLY", "F12"),
+                ("CANCEL", "F11"),
+            ],
+        );
+        let names = help_names(&app);
+        assert!(!names.contains(&"CLONE".to_owned()), "{names:#?}");
+
+        app.apply(Action::Cancel);
+
+        assert!(help_names(&app).contains(&"CLONE".to_owned()));
+    }
+}
+
+const KICK: u8 = 36;
+const TO_STEPS_PER_BEAT: [Action; 1] = [Action::Confirm];
+const TO_PROGRAMS: [Action; 2] = [Action::Confirm, Action::Confirm];
+const TO_DRUMS: [Action; 3] = [Action::Confirm, Action::Confirm, Action::SwitchMidiTable];
+const TO_REVIEW: [Action; 3] = [Action::Confirm, Action::Confirm, Action::Confirm];
+
+fn in_the_midi_import_dialog(config: &str, to_step: &[Action]) -> App {
+    let mut app = launched(App::new(), config);
+    let band =
+        Song::new()
+            .note(0, TICKS_PER_STEP, 1, 60, 127)
+            .note(0, TICKS_PER_STEP, 10, KICK, 127);
+    app.start_midi_import("song.mid", &band.bytes());
+    apply(&mut app, to_step);
+    app.apply(Action::ToggleHelp);
+    app
+}
+
+#[test]
+fn help_lists_the_keys_of_the_midi_import_voices_step() {
+    let app = in_the_midi_import_dialog(REBOUND_ANSWERS, &[]);
+
+    assert_lists(
+        &app,
+        &[
+            ("PICK", "^W/DOWN"),
+            ("TICK", "SPACE"),
+            ("TICK SOURCE", "S"),
+            ("NEXT", "F12"),
+            ("CANCEL", "F11"),
+        ],
+    );
+}
+
+#[test]
+fn help_lists_the_keys_of_the_midi_import_steps_per_beat_step() {
+    let app = in_the_midi_import_dialog(REBOUND_ANSWERS, &TO_STEPS_PER_BEAT);
+
+    assert_lists(&app, &[("NEXT", "F12"), ("BACK", "F11")]);
+    assert_eq!(
+        help_names(&app),
+        ["PICK", "NEXT", "BACK"],
+        "{:#?}",
+        help_lines(&app)
+    );
+}
+
+#[test]
+fn help_lists_the_keys_of_the_midi_import_programs_table() {
+    let app = in_the_midi_import_dialog(PC_TRACKER, &TO_PROGRAMS);
+
+    assert_lists(
+        &app,
+        &[
+            ("PICK", "UP/DOWN"),
+            ("INSTRUMENT", "LEFT/RIGHT"),
+            ("TABLE", "TAB"),
+            ("RESET", "R"),
+            ("RESET ALL", "SHIFT+R"),
+            ("NEXT", "ENTER"),
+            ("BACK", "ESC"),
+        ],
+    );
+    assert!(!help_names(&app).contains(&"EFFECT".to_owned()));
+}
+
+#[test]
+fn help_lists_the_keys_of_the_midi_import_drum_kit_over_the_left_area() {
+    let app = in_the_midi_import_dialog(M8_STYLE, &TO_DRUMS);
+
+    assert_ne!(pane_text(&app, layout::RIGHT_SLOT, 0), "HELP");
+    assert_lists_on_the_left(
+        &app,
+        &[
+            ("PICK", "UP/DOWN"),
+            ("INSTRUMENT", "LEFT/RIGHT"),
+            ("NOTE", "Z+DOWN/Z+UP"),
+            ("EFFECT", "F"),
+            ("TABLE", "TAB"),
+            ("RESET", "Z+X"),
+            ("RESET ALL", "SHIFT+R"),
+            ("NEXT", "ENTER"),
+            ("BACK", "ESC"),
+        ],
+    );
+}
+
+#[test]
+fn help_lists_the_keys_of_the_midi_import_review_step() {
+    let app = in_the_midi_import_dialog(REBOUND_ANSWERS, &TO_REVIEW);
+
+    assert_lists(
+        &app,
+        &[("SCROLL", "^W/DOWN"), ("IMPORT", "F12"), ("BACK", "F11")],
+    );
+}
+
+#[test]
+fn closing_the_midi_import_dialog_brings_help_back_to_the_focused_panes_keys() {
+    let mut app = in_the_midi_import_dialog(PC_TRACKER, &[]);
+
+    app.apply(Action::Cancel);
+
+    assert!(help_names(&app).contains(&"LOOP START".to_owned()));
+}
+
+#[test]
+fn help_shows_rebound_confirm_and_cancel_keys_while_typing_the_claim_text() {
+    let mut app = in_the_cart_view(REBOUND_ANSWERS);
+    app.apply(Action::Move(Direction::Down));
+
+    app.apply(Action::ToggleHelp);
+
+    assert_lists_on_the_left(
+        &app,
+        &[("DIGIT", "0-F"), ("CONFIRM", "F12"), ("CANCEL", "F11")],
+    );
+}
+
+#[test]
+fn help_hides_while_the_save_lists_overwrite_question_is_open() {
+    let mut app = with_a_list_open(PC_TRACKER, Action::SaveAs);
+    apply(
+        &mut app,
+        &[
+            Action::TypeChar('s'),
+            Action::TypeChar('o'),
+            Action::TypeChar('n'),
+            Action::TypeChar('g'),
+            Action::Confirm,
+        ],
+    );
+    assert!(
+        status_line(&app).contains("EXISTS"),
+        "{}",
+        status_line(&app)
+    );
+
+    app.apply(Action::ToggleHelp);
+
+    assert_ne!(left_area(&app)[0], "HELP");
+    assert_ne!(pane_text(&app, layout::RIGHT_SLOT, 0), "HELP");
+
+    app.apply(Action::Cancel);
+
+    assert_eq!(left_area(&app)[0], "HELP");
 }

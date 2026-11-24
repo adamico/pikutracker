@@ -150,6 +150,11 @@ impl Keymap {
         found.into_iter().map(|(_, trigger)| trigger).collect()
     }
 
+    pub fn typed_trigger(&self, action: Action, context: KeyContext) -> Option<Trigger> {
+        (typing_a_name(context) && action == Action::Backspace)
+            .then_some(Trigger::Press(Key::Backspace, Modifiers::NONE))
+    }
+
     fn first_bound(&self, trigger: Trigger, scopes: &[Scope]) -> Option<Action> {
         scopes
             .iter()
