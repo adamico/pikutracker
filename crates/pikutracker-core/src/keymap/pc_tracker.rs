@@ -19,6 +19,7 @@ pub(super) fn bindings() -> Vec<Binding> {
         (Key::Char('d'), CTRL, Action::Clone),
         (Key::Char('t'), CTRL, Action::ToggleCart),
         (Key::Char('l'), CTRL, Action::ToggleLog),
+        (Key::Char('h'), CTRL, Action::ToggleHelp),
         (Key::Char('r'), CTRL, Action::ToggleLoopStart),
         (Key::Char('r'), CTRL_SHIFT, Action::ToggleLoopBack),
         (Key::Char('p'), CTRL, Action::ToggleStop),

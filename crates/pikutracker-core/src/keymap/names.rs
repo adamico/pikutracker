@@ -1,7 +1,7 @@
 use crate::app::{Action, Direction};
 use crate::project::TRACKS;
 
-const UNIT_ACTIONS: [Action; 45] = [
+const UNIT_ACTIONS: [Action; 46] = [
     Action::FocusNext,
     Action::FocusPrevious,
     Action::NewProject,
@@ -28,6 +28,7 @@ const UNIT_ACTIONS: [Action; 45] = [
     Action::ToggleCart,
     Action::SuggestClaim,
     Action::ToggleLog,
+    Action::ToggleHelp,
     Action::PlayFocusedPane,
     Action::PlaySongFromCursor,
     Action::ClearMutesAndSolos,

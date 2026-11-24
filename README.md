@@ -123,6 +123,7 @@ These are the keys of the default PcTracker preset. The M8-style column applies 
 | --- | --- | --- |
 | Show / hide the Cart | Ctrl+T | X+T |
 | Show / hide the log | Ctrl+L | X+L |
+| Show / hide Help | Ctrl+H | X+H |
 
 ## Settings
 

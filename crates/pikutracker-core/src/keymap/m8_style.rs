@@ -22,6 +22,7 @@ pub(super) fn bindings() -> Vec<Binding> {
         (EDIT, OPTION, Action::Cut),
         (OPTION, Key::Char('t'), Action::ToggleCart),
         (OPTION, Key::Char('l'), Action::ToggleLog),
+        (OPTION, Key::Char('h'), Action::ToggleHelp),
         (OPTION, Key::Char('r'), Action::ToggleLoopStart),
         (OPTION, Key::Char('b'), Action::ToggleLoopBack),
         (OPTION, Key::Char('p'), Action::ToggleStop),

@@ -104,6 +104,7 @@ pub struct App {
     speed_entry: Option<SpeedEntry>,
     log: LogPane,
     log_open: bool,
+    help_open: bool,
     focus_before_log: Focus,
     file_list: Option<FileList>,
     midi_dialog: Option<Box<MidiDialog>>,
@@ -161,6 +162,7 @@ impl App {
             speed_entry: None,
             log: LogPane::default(),
             log_open: false,
+            help_open: false,
             focus_before_log: Focus::default(),
             file_list: None,
             midi_dialog: None,
@@ -383,6 +385,7 @@ impl App {
         self.notice = Some(Notice::new(report.severity, text));
         if !report.items.is_empty() && !self.log_open {
             self.log_open = true;
+            self.help_open = false;
             self.focus_before_log = self.focus;
         }
         self.log.add(report.into_log_items());
@@ -461,6 +464,10 @@ impl App {
     }
 
     fn perform(&mut self, action: Action) {
+        if action == Action::ToggleHelp {
+            self.help_open = !self.help_open;
+            return;
+        }
         self.remark = None;
         if !matches!(action, Action::HexDigit(_)) {
             self.song.finish_typing();
@@ -977,6 +984,10 @@ impl App {
         self.shown.open_phrase(step.phrase);
     }
 
+    fn help_covers_the_right_slot(&self) -> bool {
+        self.help_open && self.focus != Focus::RightSlot
+    }
+
     fn shows_multitrack(&self) -> bool {
         self.file_list.is_none() && !self.log_open && self.cart_view.is_none()
     }
@@ -1063,6 +1074,13 @@ impl App {
         let right_slot_focused = focus == Some(Focus::RightSlot);
         if let Some(list) = &self.file_list {
             list.draw(&mut grid, layout::RIGHT_SLOT);
+        } else if self.help_covers_the_right_slot() {
+            panes::help::draw(
+                &mut grid,
+                layout::RIGHT_SLOT,
+                self.keyboard.keymap(),
+                self.focus,
+            );
         } else if self.log_open {
             self.log
                 .draw(&mut grid, layout::RIGHT_SLOT, right_slot_focused);
