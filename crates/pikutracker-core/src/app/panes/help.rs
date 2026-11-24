@@ -1,6 +1,6 @@
-use super::{HEADING, VALUE, draw_title};
+use super::{HEADING, VALUE, draw_title, midi_dialog};
 use crate::app::layout::Area;
-use crate::app::{Action, Direction, KeyContext};
+use crate::app::{Action, Direction, KeyContext, change_speed, key_hints};
 use crate::keymap::Keymap;
 use crate::screen::grid::Grid;
 use std::borrow::Cow;
@@ -81,7 +81,7 @@ const PHRASE_KEYS: &[Entry] = &[
     Entry::named(Keys::Of(&[Action::ScaleSpeed])),
     Entry::named(Keys::Of(&[Action::PlayFocusedPane])),
     Entry::named(Keys::Of(&[Action::Confirm])),
-    Entry::named(Keys::Of(&[Action::Cancel])),
+    CANCEL,
     Entry::named(Keys::Of(&[Action::FocusNext])),
     Entry::named(Keys::Of(&[Action::FocusPrevious])),
 ];
@@ -109,7 +109,7 @@ const CHAIN_KEYS: &[Entry] = &[
     Entry::named(Keys::Of(&[Action::ChangeSpeed])),
     Entry::named(Keys::Of(&[Action::ScaleSpeed])),
     Entry::named(Keys::Of(&[Action::PlayFocusedPane])),
-    Entry::named(Keys::Of(&[Action::Cancel])),
+    CANCEL,
     Entry::named(Keys::Of(&[Action::FocusNext])),
     Entry::named(Keys::Of(&[Action::FocusPrevious])),
 ];
@@ -148,7 +148,7 @@ const SONG_KEYS: &[Entry] = &[
     Entry::named(Keys::Of(&[Action::ChangeSpeed])),
     Entry::named(Keys::Of(&[Action::ScaleSpeed])),
     Entry::named(Keys::Of(&[Action::PlayFocusedPane])),
-    Entry::named(Keys::Of(&[Action::Cancel])),
+    CANCEL,
     Entry::named(Keys::Of(&[Action::FocusNext])),
     Entry::named(Keys::Of(&[Action::FocusPrevious])),
 ];
@@ -169,7 +169,7 @@ const CART_VIEW_KEYS: &[Entry] = &[
     Entry::named(Keys::Of(&[Action::Backspace])),
     Entry::named(Keys::Of(&[Action::SuggestClaim])),
     Entry::named(Keys::Of(&[Action::Confirm])),
-    Entry::named(Keys::Of(&[Action::Cancel])),
+    CANCEL,
     Entry::named(Keys::Of(&[Action::Undo])),
     Entry::named(Keys::Of(&[Action::Redo])),
     Entry::named(Keys::Of(&[Action::PlayFocusedPane])),
@@ -180,7 +180,7 @@ const CART_VIEW_KEYS: &[Entry] = &[
 const LOG_KEYS: &[Entry] = &[
     MOVE_UP_DOWN,
     Entry::named(Keys::Of(&[Action::Confirm])),
-    Entry::named(Keys::Of(&[Action::Cancel])),
+    CANCEL,
     Entry::named(Keys::Of(&[Action::Undo])),
     Entry::named(Keys::Of(&[Action::Redo])),
     Entry::named(Keys::Of(&[Action::PlayFocusedPane])),
@@ -188,13 +188,90 @@ const LOG_KEYS: &[Entry] = &[
     Entry::named(Keys::Of(&[Action::FocusPrevious])),
 ];
 
+const CANCEL: Entry = Entry::named(Keys::Of(&midi_dialog::CANCEL));
+const BACKSPACE: Entry = Entry::named(Keys::Of(&[Action::Backspace]));
+const PICK_ENTRY: Entry = Entry::group(key_hints::PICK, Keys::Of(&key_hints::UP_DOWN));
+const CHOOSE_ENTRY: Entry = Entry::group(key_hints::CHOOSE, Keys::Of(&key_hints::CONFIRM));
+
+const OPEN_LIST_KEYS: &[Entry] = &[PICK_ENTRY, CHOOSE_ENTRY, CANCEL];
+
+const FILE_NAME_CONTEXTS: &[KeyContext] = &[KeyContext::FileName];
+
+const SAVE_LIST_KEYS: &[Entry] = &[PICK_ENTRY, BACKSPACE, CHOOSE_ENTRY, CANCEL];
+
+const SPEED_ENTRY_CONTEXTS: &[KeyContext] = &[KeyContext::SpeedEntry];
+
+const SPEED_ENTRY_KEYS: &[Entry] = &[
+    Entry::named(Keys::Digits),
+    BACKSPACE,
+    Entry::group(change_speed::APPLY, Keys::Of(&key_hints::CONFIRM)),
+    CANCEL,
+];
+
+const MIDI_IMPORT_CONTEXTS: &[KeyContext] = &[KeyContext::MidiImport];
+
+const MIDI_NEXT: Entry = Entry::group(midi_dialog::NEXT, Keys::Of(&key_hints::CONFIRM));
+const MIDI_BACK: Entry = Entry::group(midi_dialog::BACK, Keys::Of(&midi_dialog::CANCEL));
+const MIDI_INSTRUMENT: Entry =
+    Entry::group(midi_dialog::INSTRUMENT, Keys::Of(&midi_dialog::LEFT_RIGHT));
+
+const MIDI_VOICES_KEYS: &[Entry] = &[
+    PICK_ENTRY,
+    Entry::named(Keys::Of(&[Action::ToggleVoice])),
+    Entry::named(Keys::Of(&[Action::ToggleSource])),
+    MIDI_NEXT,
+    CANCEL,
+];
+
+const MIDI_STEPS_PER_BEAT_KEYS: &[Entry] = &[
+    Entry::group(key_hints::PICK, Keys::Of(&midi_dialog::ARROWS)),
+    MIDI_NEXT,
+    MIDI_BACK,
+];
+
+const MIDI_PROGRAMS_KEYS: &[Entry] = &[
+    PICK_ENTRY,
+    MIDI_INSTRUMENT,
+    Entry::named(Keys::Of(&[Action::SwitchMidiTable])),
+    Entry::named(Keys::Of(&[Action::ResetMidiRow])),
+    Entry::named(Keys::Of(&[Action::ResetMidiTable])),
+    MIDI_NEXT,
+    MIDI_BACK,
+];
+
+const MIDI_DRUM_KIT_KEYS: &[Entry] = &[
+    PICK_ENTRY,
+    MIDI_INSTRUMENT,
+    Entry::group(midi_dialog::NOTE, Keys::Of(&midi_dialog::DRUM_NOTE)),
+    Entry::named(Keys::Of(&[Action::CycleDrumEffect])),
+    Entry::named(Keys::Of(&[Action::SwitchMidiTable])),
+    Entry::named(Keys::Of(&[Action::ResetMidiRow])),
+    Entry::named(Keys::Of(&[Action::ResetMidiTable])),
+    MIDI_NEXT,
+    MIDI_BACK,
+];
+
+const MIDI_REVIEW_KEYS: &[Entry] = &[
+    Entry::group(midi_dialog::SCROLL, Keys::Of(&key_hints::UP_DOWN)),
+    Entry::group(midi_dialog::IMPORT, Keys::Of(&key_hints::CONFIRM)),
+    MIDI_BACK,
+];
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FocusPlace {
+pub enum HelpList {
     Phrase,
     Chain,
     Song,
     CartView,
     Log,
+    OpenList,
+    SaveList,
+    SpeedEntry,
+    MidiVoices,
+    MidiStepsPerBeat,
+    MidiPrograms,
+    MidiDrumKit,
+    MidiReview,
 }
 
 enum Keys {
@@ -246,7 +323,9 @@ impl Lookup<'_> {
         let mut keys: Vec<String> = Vec::new();
         for &context in self.contexts {
             for &selecting in self.selecting {
-                for trigger in self.keymap.triggers_when(action, context, selecting) {
+                let typed = self.keymap.typed_trigger(action, context);
+                let bound = self.keymap.triggers_when(action, context, selecting);
+                for trigger in typed.into_iter().chain(bound) {
                     let key = trigger.to_string();
                     if !keys.contains(&key) {
                         keys.push(key);
@@ -345,13 +424,13 @@ struct Placed {
     line: Line,
 }
 
-pub fn draw(grid: &mut Grid, area: Area, keymap: &Keymap, place: FocusPlace) {
+pub fn draw(grid: &mut Grid, area: Area, keymap: &Keymap, list: HelpList) {
     let blank = " ".repeat(area.width);
     for row in area.row..area.row + area.rows {
         grid.put(area.column, row, &blank, VALUE);
     }
     draw_title(grid, area.column, area.row, TITLE, false);
-    let entries = entries_with_keys(keymap, place);
+    let entries = entries_with_keys(keymap, list);
     let body = Area {
         column: area.column,
         row: area.row + FIRST_LINE_ROW,
@@ -371,14 +450,24 @@ pub fn draw(grid: &mut Grid, area: Area, keymap: &Keymap, place: FocusPlace) {
     }
 }
 
-fn entries_with_keys(keymap: &Keymap, place: FocusPlace) -> Vec<(Cow<'static, str>, Vec<String>)> {
+fn entries_with_keys(keymap: &Keymap, list: HelpList) -> Vec<(Cow<'static, str>, Vec<String>)> {
     let (entries, contexts, selecting): (&[Entry], &'static [KeyContext], &'static [bool]) =
-        match place {
-            FocusPlace::Phrase => (PHRASE_KEYS, PHRASE_CONTEXTS, &[false, true]),
-            FocusPlace::Chain => (CHAIN_KEYS, REFERENCE_CONTEXTS, &[false, true]),
-            FocusPlace::Song => (SONG_KEYS, REFERENCE_CONTEXTS, &[false, true]),
-            FocusPlace::CartView => (CART_VIEW_KEYS, CLAIM_TEXT_CONTEXTS, &[false]),
-            FocusPlace::Log => (LOG_KEYS, NAVIGATION_CONTEXTS, &[false]),
+        match list {
+            HelpList::Phrase => (PHRASE_KEYS, PHRASE_CONTEXTS, &[false, true]),
+            HelpList::Chain => (CHAIN_KEYS, REFERENCE_CONTEXTS, &[false, true]),
+            HelpList::Song => (SONG_KEYS, REFERENCE_CONTEXTS, &[false, true]),
+            HelpList::CartView => (CART_VIEW_KEYS, CLAIM_TEXT_CONTEXTS, &[false]),
+            HelpList::Log => (LOG_KEYS, NAVIGATION_CONTEXTS, &[false]),
+            HelpList::OpenList => (OPEN_LIST_KEYS, NAVIGATION_CONTEXTS, &[false]),
+            HelpList::SaveList => (SAVE_LIST_KEYS, FILE_NAME_CONTEXTS, &[false]),
+            HelpList::SpeedEntry => (SPEED_ENTRY_KEYS, SPEED_ENTRY_CONTEXTS, &[false]),
+            HelpList::MidiVoices => (MIDI_VOICES_KEYS, MIDI_IMPORT_CONTEXTS, &[false]),
+            HelpList::MidiStepsPerBeat => {
+                (MIDI_STEPS_PER_BEAT_KEYS, MIDI_IMPORT_CONTEXTS, &[false])
+            }
+            HelpList::MidiPrograms => (MIDI_PROGRAMS_KEYS, MIDI_IMPORT_CONTEXTS, &[false]),
+            HelpList::MidiDrumKit => (MIDI_DRUM_KIT_KEYS, MIDI_IMPORT_CONTEXTS, &[false]),
+            HelpList::MidiReview => (MIDI_REVIEW_KEYS, MIDI_IMPORT_CONTEXTS, &[false]),
         };
     let lookup = Lookup {
         keymap,

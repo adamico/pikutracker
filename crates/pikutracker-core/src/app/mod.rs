@@ -40,11 +40,12 @@ use change_speed::{SpeedChange, SpeedEntry};
 use files::{Question, Waiting};
 use focus::Focus;
 use history::{CursorPlace, History, Merge};
+use layout::Area;
 use messages::Notice;
 use panes::cart_view::CartView;
 use panes::chain::{ChainPane, ChainView};
 use panes::file_list::FileList;
-use panes::help::FocusPlace;
+use panes::help::HelpList;
 use panes::instrument::InstrumentView;
 use panes::log::LogPane;
 use panes::midi_dialog::MidiDialog;
@@ -985,18 +986,49 @@ impl App {
         self.shown.open_phrase(step.phrase);
     }
 
-    fn shown_help(&self) -> Option<FocusPlace> {
+    fn shown_help(&self) -> Option<(HelpList, Area)> {
         if !self.help_open {
             return None;
         }
-        match self.focus {
-            Focus::Phrase => Some(FocusPlace::Phrase),
-            Focus::Chain => Some(FocusPlace::Chain),
-            Focus::Song => Some(FocusPlace::Song),
-            Focus::RightSlot if self.file_list.is_some() => None,
-            Focus::RightSlot if self.log_open => Some(FocusPlace::Log),
-            Focus::RightSlot if self.cart_view.is_some() => Some(FocusPlace::CartView),
-            Focus::RightSlot => None,
+        if self.speed_entry.is_some() {
+            return Some((HelpList::SpeedEntry, self.help_area_away_from_focus()));
+        }
+        if self.question.is_some() {
+            return None;
+        }
+        if let Some(dialog) = &self.midi_dialog {
+            let keys = dialog.help_list();
+            let area = if keys == HelpList::MidiDrumKit {
+                layout::LEFT_AREA
+            } else {
+                layout::RIGHT_SLOT
+            };
+            return Some((keys, area));
+        }
+        if let Some(list) = &self.file_list {
+            let keys = if list.purpose().takes_a_name() {
+                HelpList::SaveList
+            } else {
+                HelpList::OpenList
+            };
+            return Some((keys, layout::LEFT_AREA));
+        }
+        let keys = match self.focus {
+            Focus::Phrase => HelpList::Phrase,
+            Focus::Chain => HelpList::Chain,
+            Focus::Song => HelpList::Song,
+            Focus::RightSlot if self.log_open => HelpList::Log,
+            Focus::RightSlot if self.cart_view.is_some() => HelpList::CartView,
+            Focus::RightSlot => return None,
+        };
+        Some((keys, self.help_area_away_from_focus()))
+    }
+
+    fn help_area_away_from_focus(&self) -> Area {
+        if self.focus == Focus::RightSlot {
+            layout::LEFT_AREA
+        } else {
+            layout::RIGHT_SLOT
         }
     }
 
@@ -1028,6 +1060,10 @@ impl App {
         let mut grid = Grid::new();
         if let Some(dialog) = &self.midi_dialog {
             dialog.draw(&mut grid);
+            if let Some((keys, area)) = self.shown_help() {
+                panes::help::draw(&mut grid, area, self.keyboard.keymap(), keys);
+                layout::draw_the_right_separator(&mut grid);
+            }
             let hints = dialog.hints(self.keyboard.keymap());
             status_line::draw(&mut grid, &StatusLine::Hints(hints));
             return grid;
@@ -1084,10 +1120,11 @@ impl App {
         );
         self.draw_selection(&mut grid);
         let right_slot_focused = focus == Some(Focus::RightSlot);
+        let help = self.shown_help();
         if let Some(list) = &self.file_list {
             list.draw(&mut grid, layout::RIGHT_SLOT);
-        } else if let Some(place) = self.shown_help().filter(|_| self.focus != Focus::RightSlot) {
-            panes::help::draw(&mut grid, layout::RIGHT_SLOT, self.keyboard.keymap(), place);
+        } else if let Some((keys, area)) = help.filter(|(_, area)| *area == layout::RIGHT_SLOT) {
+            panes::help::draw(&mut grid, area, self.keyboard.keymap(), keys);
         } else if self.log_open {
             self.log
                 .draw(&mut grid, layout::RIGHT_SLOT, right_slot_focused);
@@ -1116,8 +1153,8 @@ impl App {
             );
         }
         layout::draw_separators(&mut grid);
-        if let Some(place) = self.shown_help().filter(|_| self.focus == Focus::RightSlot) {
-            panes::help::draw(&mut grid, layout::LEFT_AREA, self.keyboard.keymap(), place);
+        if let Some((keys, area)) = help.filter(|(_, area)| *area == layout::LEFT_AREA) {
+            panes::help::draw(&mut grid, area, self.keyboard.keymap(), keys);
             layout::draw_the_right_separator(&mut grid);
         }
         let project = self.project_name();
