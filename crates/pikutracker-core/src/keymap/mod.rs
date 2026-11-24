@@ -1,3 +1,4 @@
+mod hints;
 mod key;
 mod m8_style;
 mod names;
@@ -5,6 +6,7 @@ mod pc_tracker;
 mod shared;
 mod trigger;
 
+pub use hints::{HINT_GAP, KeyHint};
 pub use key::{Key, KeyPress, Modifiers};
 pub use names::named_actions;
 pub use trigger::{Scope, Trigger};
@@ -122,6 +124,29 @@ impl Keymap {
             .collect()
     }
 
+    pub fn triggers_for(&self, action: Action, context: KeyContext) -> Vec<Trigger> {
+        let scopes = scopes(context, false);
+        let mut found: Vec<(Scope, Trigger)> = self
+            .bindings
+            .iter()
+            .filter(|&(&(scope, trigger), &bound)| {
+                bound == action
+                    && scopes.contains(&scope)
+                    && self.first_bound(trigger, &scopes) == Some(action)
+                    && !(typing_a_name(context) && typed_by(trigger))
+            })
+            .map(|(&key, _)| key)
+            .collect();
+        found.sort_by_key(|&(scope, trigger)| (scope.width(), trigger.rank(), trigger.to_string()));
+        found.into_iter().map(|(_, trigger)| trigger).collect()
+    }
+
+    fn first_bound(&self, trigger: Trigger, scopes: &[Scope]) -> Option<Action> {
+        scopes
+            .iter()
+            .find_map(|&scope| self.bindings.get(&(scope, trigger)).copied())
+    }
+
     pub fn action_for(&self, press: KeyPress) -> Option<Action> {
         let (_, action) = self.lookup(press, &[Scope::Anywhere], &[], false)?;
         repeats_or_new(press, action)
@@ -223,6 +248,10 @@ impl Keyboard {
         repeats_or_new(press, action)
     }
 
+    pub const fn keymap(&self) -> &Keymap {
+        &self.keymap
+    }
+
     pub fn key_up(&mut self, key: Key) -> Option<Action> {
         let key = key.with_letter_lowercased();
         self.held.retain(|&held| held != key);
@@ -254,6 +283,13 @@ const fn repeats_while_held(action: Action) -> bool {
 
 const fn typing_a_name(context: KeyContext) -> bool {
     matches!(context, KeyContext::FileName | KeyContext::InstrumentName)
+}
+
+fn typed_by(trigger: Trigger) -> bool {
+    match trigger {
+        Trigger::Press(key, modifiers) => name_action(KeyPress::new(key, modifiers)).is_some(),
+        _ => false,
+    }
 }
 
 fn name_action(press: KeyPress) -> Option<Action> {

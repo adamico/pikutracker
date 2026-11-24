@@ -3,7 +3,6 @@ use std::time::Duration;
 
 const INFO_LIFETIME: Duration = Duration::from_secs(3);
 const INFO_BRIGHT: Duration = Duration::from_secs(2);
-const LOG_POINTER: &str = "  ^L LOG";
 const ATTENTION_MARK: &str = "! ";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -78,7 +77,7 @@ impl Report {
         self
     }
 
-    pub(super) fn status_text(&self) -> String {
+    pub(super) fn status_text(&self, log_pointer: &str) -> String {
         let mark = if self.severity == Severity::Info {
             ""
         } else {
@@ -87,7 +86,7 @@ impl Report {
         let pointer = if self.items.is_empty() {
             ""
         } else {
-            LOG_POINTER
+            log_pointer
         };
         format!("{mark}{}{pointer}", self.summary)
     }

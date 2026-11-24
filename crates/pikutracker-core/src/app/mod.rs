@@ -8,6 +8,7 @@ mod files;
 mod focus;
 mod history;
 mod importing;
+mod key_hints;
 mod launching;
 pub mod layout;
 mod messages;
@@ -67,8 +68,6 @@ const FOLLOW_ON: &str = "FOLLOW ON";
 const FOLLOW_OFF: &str = "FOLLOW OFF";
 const BUILT_IN_INSTRUMENT: &str = "BUILT-IN INSTRUMENTS HAVE NO SETTINGS";
 const CUSTOM_INSTRUMENTS_END_AT_F: &str = "CUSTOM INSTRUMENTS END AT F";
-const OPEN_LIST_KEYS: &str = "UP/DOWN PICK  ENTER CHOOSE  ESC CANCEL";
-const SAVE_LIST_KEYS: &str = "TYPE A NAME  UP/DOWN PICK  ENTER CHOOSE  ESC CANCEL";
 
 #[derive(Debug)]
 pub struct App {
@@ -379,7 +378,9 @@ impl App {
     }
 
     pub fn report(&mut self, report: Report) {
-        self.notice = Some(Notice::new(report.severity, report.status_text()));
+        let log_pointer = key_hints::log_pointer(self.keyboard.keymap());
+        let text = report.status_text(&log_pointer);
+        self.notice = Some(Notice::new(report.severity, text));
         if !report.items.is_empty() && !self.log_open {
             self.log_open = true;
             self.focus_before_log = self.focus;
@@ -1004,7 +1005,8 @@ impl App {
         let mut grid = Grid::new();
         if let Some(dialog) = &self.midi_dialog {
             dialog.draw(&mut grid);
-            status_line::draw(&mut grid, &StatusLine::Hints(dialog.hints()));
+            let hints = dialog.hints(self.keyboard.keymap());
+            status_line::draw(&mut grid, &StatusLine::Hints(hints));
             return grid;
         }
         if let Some(view) = self
@@ -1071,6 +1073,7 @@ impl App {
                 right_slot_focused,
                 self.project.target_cart(),
                 &export::needs(&self.project),
+                &key_hints::picks_one(self.keyboard.keymap()),
             );
         } else {
             let timeline = Timeline::of(&self.project);
@@ -1094,11 +1097,20 @@ impl App {
     }
 
     fn status_line<'a>(&'a self, project: &'a str) -> StatusLine<'a> {
+        let keymap = self.keyboard.keymap();
         if let Some(entry) = &self.speed_entry {
-            return StatusLine::Question(entry.text());
+            let text = key_hints::asked(
+                keymap,
+                KeyContext::SpeedEntry,
+                entry.text(),
+                change_speed::APPLY,
+            );
+            return StatusLine::Question(text);
         }
         if let Some(question) = &self.question {
-            return StatusLine::Question(&question.text);
+            let context = KeyContext::Navigation;
+            let text = key_hints::asked(keymap, context, &question.text, question.answer);
+            return StatusLine::Question(text);
         }
         let notice = self.notice.as_ref();
         if let Some(notice) = notice.filter(|notice| notice.is_persistent()) {
@@ -1111,8 +1123,10 @@ impl App {
             return StatusLine::Notice(notice);
         }
         match self.file_list.as_ref().map(FileList::purpose) {
-            Some(purpose) if purpose.takes_a_name() => StatusLine::Hints(SAVE_LIST_KEYS),
-            Some(_) => StatusLine::Hints(OPEN_LIST_KEYS),
+            Some(purpose) if purpose.takes_a_name() => {
+                StatusLine::Hints(key_hints::save_list_keys(keymap))
+            }
+            Some(_) => StatusLine::Hints(key_hints::open_list_keys(keymap)),
             None => StatusLine::Idle {
                 project,
                 unsaved: self.has_unsaved_changes(),

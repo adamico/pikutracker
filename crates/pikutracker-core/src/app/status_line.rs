@@ -28,14 +28,11 @@ const QUESTION: Style = Style {
     bg: Colour::Blue,
 };
 
-const KEY_HINTS: &str =
-    "^N NEW  ^O OPEN  ^I IMPORT  ^E EXPORT  ^T CART  ^S SAVE  ^L LOG  SPACE PLAY  ^Q QUIT";
-
 pub enum StatusLine<'a> {
-    Question(&'a str),
+    Question(String),
     Notice(&'a Notice),
     Remark(&'a str),
-    Hints(&'a str),
+    Hints(String),
     Idle { project: &'a str, unsaved: bool },
 }
 
@@ -43,9 +40,10 @@ pub fn draw(grid: &mut Grid, status: &StatusLine<'_>) {
     match status {
         StatusLine::Question(text) => draw_bar(grid, text, QUESTION),
         StatusLine::Notice(notice) => draw_bar(grid, notice.text(), notice_style(notice)),
-        StatusLine::Remark(text) | StatusLine::Hints(text) => draw_bar(grid, text, BAR),
+        StatusLine::Remark(text) => draw_bar(grid, text, BAR),
+        StatusLine::Hints(text) => draw_bar(grid, text, BAR),
         StatusLine::Idle { project, unsaved } => {
-            draw_bar(grid, KEY_HINTS, BAR);
+            draw_bar(grid, "", BAR);
             let name = format!("{project}{}", if *unsaved { "*" } else { "" });
             let column = GRID_COLUMNS.saturating_sub(name.chars().count());
             grid.put(column, STATUS_ROW, &name, BAR);

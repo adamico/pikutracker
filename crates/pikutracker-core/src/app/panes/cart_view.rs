@@ -280,6 +280,7 @@ impl CartView {
         focused: bool,
         target: Option<&TargetCart>,
         needs: &ExportNeeds,
+        picks_one: &str,
     ) {
         draw_title(grid, area.column, 0, "CART", focused);
         let claimed = claimed_slots(
@@ -358,7 +359,7 @@ impl CartView {
             overwritten.push(SlotUse::overwritten(used, own, claimed));
         }
 
-        let checks = self.checks(target, &claimed, needs, &overwritten);
+        let checks = self.checks(target, &claimed, needs, &overwritten, picks_one);
         draw_checks(grid, area, &checks);
     }
 
@@ -368,13 +369,11 @@ impl CartView {
         claimed: &Slots,
         needs: &ExportNeeds,
         overwritten: &[Vec<u8>],
+        picks_one: &str,
     ) -> Vec<(Severity, String)> {
         let mut checks = Vec::new();
         if target.is_none() {
-            checks.push((
-                Severity::Failure,
-                format!("{NO_TARGET_CART}: ENTER PICKS ONE"),
-            ));
+            checks.push((Severity::Failure, format!("{NO_TARGET_CART}: {picks_one}")));
             return checks;
         }
         if let TargetCartContents::Unreadable(reason) = &self.contents {

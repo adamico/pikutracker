@@ -42,4 +42,4 @@ VOL 5  FX  0 NONE             │03 --     ---      │
                               │14  -- -- -- --    │
                               │15  -- -- -- --    │
                               │16  -- -- -- --    │
-^N NEW  ^O OPEN  ^I IMPORT  ^E EXPORT  ^T CART  ^S SAVE  ^L LOG  SPACE PLAY  ^Q QUIT              UNTITLED
+                                                                                                  UNTITLED

@@ -12,8 +12,9 @@ use std::path::{Path, PathBuf};
 const UNTITLED: &str = "Untitled";
 const ONLY_P8_NEW_CARTS: &str = "A NEW CART MUST BE A .P8 FILE, NOT .P8.PNG";
 const NOT_FOUND: &str = "not found";
-pub(super) const OVERWRITE_ANSWERS: &str = "ENTER OVERWRITE  ESC CANCEL";
-const UNSAVED_QUESTION: &str = "UNSAVED CHANGES WILL BE LOST  ENTER DISCARD  ESC CANCEL";
+pub(super) const OVERWRITE: &str = "OVERWRITE";
+const UNSAVED_QUESTION: &str = "UNSAVED CHANGES WILL BE LOST";
+const DISCARD: &str = "DISCARD";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FileRequest {
@@ -75,13 +76,15 @@ pub(super) enum Accepted {
 #[derive(Debug)]
 pub(super) struct Question {
     pub(super) text: String,
+    pub(super) answer: &'static str,
     accepted: Accepted,
 }
 
 impl Question {
-    pub(super) fn purge_unused(text: String) -> Self {
+    pub(super) fn purge_unused(text: String, answer: &'static str) -> Self {
         Self {
             text,
+            answer,
             accepted: Accepted::PurgeUnused,
         }
     }
@@ -272,8 +275,12 @@ impl App {
         }
     }
 
-    pub(super) fn ask(&mut self, text: String, accepted: Accepted) {
-        self.question = Some(Question { text, accepted });
+    pub(super) fn ask(&mut self, text: String, answer: &'static str, accepted: Accepted) {
+        self.question = Some(Question {
+            text,
+            answer,
+            accepted,
+        });
     }
 
     pub(super) fn replace_project(&mut self, project: Project, path: Option<PathBuf>) {
@@ -351,6 +358,7 @@ impl App {
     fn ask_about_unsaved_changes(&mut self, accepted: Accepted) {
         self.question = Some(Question {
             text: UNSAVED_QUESTION.to_owned(),
+            answer: DISCARD,
             accepted,
         });
     }
@@ -497,7 +505,8 @@ impl App {
             Choice::RefusedPngNewCart => self.remark = Some(ONLY_P8_NEW_CARTS.into()),
             Choice::Save { path, exists: true } => {
                 self.question = Some(Question {
-                    text: format!("{} EXISTS  {OVERWRITE_ANSWERS}", shown_name(&path)),
+                    text: format!("{} EXISTS", shown_name(&path)),
+                    answer: OVERWRITE,
                     accepted: Accepted::SaveOver(path),
                 });
             }
