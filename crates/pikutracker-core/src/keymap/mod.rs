@@ -125,7 +125,16 @@ impl Keymap {
     }
 
     pub fn triggers_for(&self, action: Action, context: KeyContext) -> Vec<Trigger> {
-        let scopes = scopes(context, false);
+        self.triggers_when(action, context, false)
+    }
+
+    pub fn triggers_when(
+        &self,
+        action: Action,
+        context: KeyContext,
+        selecting: bool,
+    ) -> Vec<Trigger> {
+        let scopes = scopes(context, selecting);
         let mut found: Vec<(Scope, Trigger)> = self
             .bindings
             .iter()

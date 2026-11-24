@@ -112,3 +112,26 @@ fn actions_are_named_in_the_glossarys_words() {
         assert_eq!(action.name(), name, "{action:?}");
     }
 }
+
+#[test]
+fn help_is_ctrl_h_in_pc_tracker_and_x_plus_h_in_m8_style() {
+    assert_eq!(
+        key_names(&Keymap::pc_tracker(), Action::ToggleHelp, NAVIGATION),
+        ["^H"]
+    );
+    assert_eq!(
+        key_names(&Keymap::m8_style(), Action::ToggleHelp, NAVIGATION),
+        ["X+H"]
+    );
+}
+
+#[test]
+fn help_is_named_in_config_ron_and_can_be_rebound() {
+    assert!(
+        pikutracker_core::keymap::named_actions()
+            .contains(&("ToggleHelp".to_owned(), Action::ToggleHelp))
+    );
+    let keymap = rebound(&[("ToggleHelp", "F12")]);
+
+    assert_eq!(key_names(&keymap, Action::ToggleHelp, NAVIGATION), ["F12"]);
+}

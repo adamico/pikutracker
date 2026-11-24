@@ -1,6 +1,7 @@
 pub mod cart_view;
 pub mod chain;
 pub mod file_list;
+pub mod help;
 pub mod instrument;
 pub mod log;
 pub mod midi_dialog;
