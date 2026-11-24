@@ -23,6 +23,41 @@ const DIRECTIONS: [Direction; 4] = [
     Direction::Right,
 ];
 
+const NUDGE: Entry = Entry::group(
+    "NUDGE",
+    Keys::Of(&[
+        Action::Nudge {
+            up: true,
+            coarse: false,
+        },
+        Action::Nudge {
+            up: false,
+            coarse: false,
+        },
+        Action::Nudge {
+            up: true,
+            coarse: true,
+        },
+        Action::Nudge {
+            up: false,
+            coarse: true,
+        },
+    ]),
+);
+
+const MOVE_ROWS: Entry = Entry::group(
+    "MOVE ROWS",
+    Keys::Of(&[
+        Action::MoveRows { up: true },
+        Action::MoveRows { up: false },
+    ]),
+);
+
+const SELECT: Entry = Entry::group(
+    "SELECT",
+    Keys::Arrows(&[Action::StartSelection], Action::Select),
+);
+
 const PHRASE_CONTEXTS: &[KeyContext] = &[KeyContext::PhrasePitch, KeyContext::PhraseValue];
 
 const PHRASE_KEYS: &[Entry] = &[
@@ -31,51 +66,89 @@ const PHRASE_KEYS: &[Entry] = &[
     Entry::named(Keys::Notes),
     Entry::named(Keys::Digits),
     Entry::group("OCTAVE", Keys::Of(&[Action::OctaveDown, Action::OctaveUp])),
-    Entry::group(
-        "NUDGE",
-        Keys::Of(&[
-            Action::Nudge {
-                up: true,
-                coarse: false,
-            },
-            Action::Nudge {
-                up: false,
-                coarse: false,
-            },
-            Action::Nudge {
-                up: true,
-                coarse: true,
-            },
-            Action::Nudge {
-                up: false,
-                coarse: true,
-            },
-        ]),
-    ),
+    NUDGE,
     Entry::named(Keys::Of(&[Action::Clear])),
     Entry::named(Keys::Of(&[Action::InsertRow])),
     Entry::named(Keys::Of(&[Action::DeleteRow])),
-    Entry::group(
-        "SELECT",
-        Keys::Arrows(&[Action::StartSelection], Action::Select),
-    ),
+    SELECT,
     Entry::group("SELECT JUMP", Keys::Arrows(&[], Action::SelectJump)),
     Entry::named(Keys::Of(&[Action::Copy])),
     Entry::named(Keys::Of(&[Action::Cut])),
     Entry::named(Keys::Of(&[Action::Paste])),
-    Entry::group(
-        "MOVE ROWS",
-        Keys::Of(&[
-            Action::MoveRows { up: true },
-            Action::MoveRows { up: false },
-        ]),
-    ),
+    MOVE_ROWS,
     Entry::named(Keys::Of(&[Action::Undo])),
     Entry::named(Keys::Of(&[Action::Redo])),
     Entry::named(Keys::Of(&[Action::ChangeSpeed])),
     Entry::named(Keys::Of(&[Action::ScaleSpeed])),
     Entry::named(Keys::Of(&[Action::PlayFocusedPane])),
     Entry::named(Keys::Of(&[Action::Confirm])),
+    Entry::named(Keys::Of(&[Action::Cancel])),
+    Entry::named(Keys::Of(&[Action::FocusNext])),
+    Entry::named(Keys::Of(&[Action::FocusPrevious])),
+];
+
+const REFERENCE_CONTEXTS: &[KeyContext] = &[KeyContext::ReferenceValue];
+
+const CHAIN_KEYS: &[Entry] = &[
+    Entry::group("MOVE", Keys::Arrows(&[], Action::Move)),
+    Entry::group("JUMP", Keys::Arrows(&[], Action::Jump)),
+    Entry::named(Keys::Digits),
+    NUDGE,
+    Entry::named(Keys::Of(&[Action::Clear])),
+    Entry::named(Keys::Of(&[Action::InsertRow])),
+    Entry::named(Keys::Of(&[Action::DeleteRow])),
+    SELECT,
+    Entry::group("SELECT JUMP", Keys::Arrows(&[], Action::SelectJump)),
+    Entry::named(Keys::Of(&[Action::Copy])),
+    Entry::named(Keys::Of(&[Action::Cut])),
+    Entry::named(Keys::Of(&[Action::Paste])),
+    Entry::named(Keys::Of(&[Action::Clone])),
+    Entry::named(Keys::Of(&[Action::NewUnused])),
+    MOVE_ROWS,
+    Entry::named(Keys::Of(&[Action::Undo])),
+    Entry::named(Keys::Of(&[Action::Redo])),
+    Entry::named(Keys::Of(&[Action::ChangeSpeed])),
+    Entry::named(Keys::Of(&[Action::ScaleSpeed])),
+    Entry::named(Keys::Of(&[Action::PlayFocusedPane])),
+    Entry::named(Keys::Of(&[Action::Cancel])),
+    Entry::named(Keys::Of(&[Action::FocusNext])),
+    Entry::named(Keys::Of(&[Action::FocusPrevious])),
+];
+
+const SONG_KEYS: &[Entry] = &[
+    Entry::group("MOVE", Keys::Arrows(&[], Action::Move)),
+    Entry::group(
+        "JUMP",
+        Keys::Of(&[Action::Jump(Direction::Up), Action::Jump(Direction::Down)]),
+    ),
+    Entry::named(Keys::Digits),
+    NUDGE,
+    Entry::named(Keys::Of(&[Action::Clear])),
+    Entry::named(Keys::Of(&[Action::InsertRow])),
+    Entry::named(Keys::Of(&[Action::DeleteRow])),
+    SELECT,
+    Entry::group(
+        "SELECT JUMP",
+        Keys::Of(&[
+            Action::SelectJump(Direction::Up),
+            Action::SelectJump(Direction::Down),
+        ]),
+    ),
+    Entry::named(Keys::Of(&[Action::Copy])),
+    Entry::named(Keys::Of(&[Action::Cut])),
+    Entry::named(Keys::Of(&[Action::Paste])),
+    Entry::named(Keys::Of(&[Action::Clone])),
+    Entry::named(Keys::Of(&[Action::DeepClone])),
+    Entry::named(Keys::Of(&[Action::NewUnused])),
+    MOVE_ROWS,
+    Entry::named(Keys::Of(&[Action::ToggleLoopStart])),
+    Entry::named(Keys::Of(&[Action::ToggleLoopBack])),
+    Entry::named(Keys::Of(&[Action::ToggleStop])),
+    Entry::named(Keys::Of(&[Action::Undo])),
+    Entry::named(Keys::Of(&[Action::Redo])),
+    Entry::named(Keys::Of(&[Action::ChangeSpeed])),
+    Entry::named(Keys::Of(&[Action::ScaleSpeed])),
+    Entry::named(Keys::Of(&[Action::PlayFocusedPane])),
     Entry::named(Keys::Of(&[Action::Cancel])),
     Entry::named(Keys::Of(&[Action::FocusNext])),
     Entry::named(Keys::Of(&[Action::FocusPrevious])),
@@ -253,7 +326,9 @@ pub fn draw(grid: &mut Grid, area: Area, keymap: &Keymap, focus: Focus) {
 fn entries_with_keys(keymap: &Keymap, focus: Focus) -> Vec<(Cow<'static, str>, Vec<String>)> {
     let (entries, contexts): (&[Entry], &'static [KeyContext]) = match focus {
         Focus::Phrase => (PHRASE_KEYS, PHRASE_CONTEXTS),
-        Focus::Chain | Focus::Song | Focus::RightSlot => (&[], &[]),
+        Focus::Chain => (CHAIN_KEYS, REFERENCE_CONTEXTS),
+        Focus::Song => (SONG_KEYS, REFERENCE_CONTEXTS),
+        Focus::RightSlot => (&[], &[]),
     };
     let lookup = Lookup { keymap, contexts };
     entries
