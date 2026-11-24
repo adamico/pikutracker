@@ -1,6 +1,7 @@
 mod support;
 
-use pikutracker_core::app::{Action, App, LogItem, Report, Severity, layout};
+use pikutracker_core::app::layout::{self, Area};
+use pikutracker_core::app::{Action, App, Direction, LogItem, Report, Severity};
 use pikutracker_core::keymap::{Key, KeyPress, Modifiers};
 use pikutracker_core::player::AudioRequest;
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
@@ -35,6 +36,31 @@ fn in_the_song_pane(config: &str) -> App {
     launched(App::with_project(one_phrase_in_the_song()), config)
 }
 
+fn in_the_multitrack(config: &str) -> App {
+    let mut app = in_the_song_pane(config);
+    app.apply(Action::FocusNext);
+    app
+}
+
+fn in_the_cart_view(config: &str) -> App {
+    let mut app = in_the_song_pane(config);
+    app.apply(Action::ToggleCart);
+    app
+}
+
+fn in_the_log(config: &str) -> App {
+    let mut app = in_the_song_pane(config);
+    app.apply(Action::ToggleLog);
+    app
+}
+
+fn assert_lists_on_the_left(app: &App, expected: &[(&str, &str)]) {
+    let lines = help_lines_over(app, layout::LEFT_AREA);
+    for &(name, keys) in expected {
+        assert_eq!(keys_of(&lines, name), Some(keys), "{name} in {lines:#?}");
+    }
+}
+
 fn assert_lists(app: &App, expected: &[(&str, &str)]) {
     let lines = help_lines(app);
     for &(name, keys) in expected {
@@ -44,7 +70,11 @@ fn assert_lists(app: &App, expected: &[(&str, &str)]) {
 }
 
 fn help_names(app: &App) -> Vec<String> {
-    right_slot(app)
+    help_names_over(app, layout::RIGHT_SLOT)
+}
+
+fn help_names_over(app: &App, area: Area) -> Vec<String> {
+    area_lines(app, area)
         .into_iter()
         .skip(1)
         .map(|line| line.chars().take(NAME_COLUMNS).collect::<String>())
@@ -54,13 +84,25 @@ fn help_names(app: &App) -> Vec<String> {
 }
 
 fn right_slot(app: &App) -> Vec<String> {
-    (0..layout::RIGHT_SLOT.rows)
-        .map(|line| pane_text(app, layout::RIGHT_SLOT, line))
+    area_lines(app, layout::RIGHT_SLOT)
+}
+
+fn left_area(app: &App) -> Vec<String> {
+    area_lines(app, layout::LEFT_AREA)
+}
+
+fn area_lines(app: &App, area: Area) -> Vec<String> {
+    (0..area.rows)
+        .map(|line| pane_text(app, area, line))
         .collect()
 }
 
 fn help_lines(app: &App) -> Vec<String> {
-    let slot = right_slot(app);
+    help_lines_over(app, layout::RIGHT_SLOT)
+}
+
+fn help_lines_over(app: &App, area: Area) -> Vec<String> {
+    let slot = area_lines(app, area);
     assert_eq!(slot[0], "HELP", "{slot:#?}");
     slot.into_iter()
         .skip(1)
@@ -457,4 +499,208 @@ fn help_shows_keys_rebound_in_config_ron_in_the_chain_and_song_panes() {
             );
         }
     }
+}
+
+#[test]
+fn help_hides_while_the_multitrack_has_focus_and_shows_again_on_a_left_pane() {
+    for config in [PC_TRACKER, M8_STYLE] {
+        let mut app = in_the_multitrack(config);
+        let panes = left_area(&app);
+        let multitrack = right_slot(&app);
+
+        app.apply(Action::ToggleHelp);
+
+        assert_eq!(left_area(&app), panes);
+        assert_eq!(right_slot(&app), multitrack);
+
+        app.apply(Action::FocusNext);
+
+        assert!(help_names(&app).contains(&"NOTE".to_owned()));
+    }
+}
+
+#[test]
+fn toggle_help_in_the_multitrack_still_opens_and_closes_help() {
+    let mut app = in_the_multitrack(PC_TRACKER);
+
+    apply(&mut app, &[Action::ToggleHelp, Action::ToggleHelp]);
+    app.apply(Action::FocusPrevious);
+
+    assert_ne!(pane_text(&app, layout::RIGHT_SLOT, 0), "HELP");
+
+    apply(&mut app, &[Action::FocusNext, Action::ToggleHelp]);
+    app.apply(Action::FocusPrevious);
+
+    assert!(help_names(&app).contains(&"LOOP START".to_owned()));
+}
+
+#[test]
+fn help_opens_over_the_left_area_from_the_cart_view_and_lists_its_keys() {
+    for config in [PC_TRACKER, M8_STYLE] {
+        let mut app = in_the_cart_view(config);
+        let cart_view = right_slot(&app);
+
+        app.apply(Action::ToggleHelp);
+
+        assert_eq!(right_slot(&app), cart_view);
+        assert_lists_on_the_left(
+            &app,
+            &[
+                ("MOVE", "UP/DOWN"),
+                ("DIGIT", "0-F"),
+                ("DASH", "-"),
+                ("BACKSPACE", "BACKSPACE"),
+                ("SUGGEST CLAIM", "="),
+                ("CONFIRM", "ENTER"),
+                ("CANCEL", "ESC"),
+            ],
+        );
+    }
+}
+
+#[test]
+fn help_opens_over_the_left_area_from_the_log_and_lists_its_keys() {
+    for config in [PC_TRACKER, M8_STYLE] {
+        let mut app = in_the_log(config);
+        let log = right_slot(&app);
+
+        app.apply(Action::ToggleHelp);
+
+        assert_eq!(right_slot(&app), log);
+        assert_lists_on_the_left(&app, &[("MOVE", "UP/DOWN")]);
+        let names = help_names_over(&app, layout::LEFT_AREA);
+        assert!(names.contains(&"CONFIRM".to_owned()), "{names:#?}");
+        assert!(names.contains(&"CANCEL".to_owned()), "{names:#?}");
+    }
+}
+
+#[test]
+fn focus_crossing_sides_moves_help_to_the_other_half() {
+    for config in [PC_TRACKER, M8_STYLE] {
+        let mut app = in_the_cart_view(config);
+        app.apply(Action::FocusPrevious);
+        let panes = left_area(&app);
+        app.apply(Action::ToggleHelp);
+        assert_eq!(left_area(&app), panes);
+        let cart_view_under_help = help_lines(&app);
+
+        app.apply(Action::FocusNext);
+        assert_eq!(left_area(&app)[0], "HELP");
+        assert_ne!(pane_text(&app, layout::RIGHT_SLOT, 0), "HELP");
+        assert!(help_names_over(&app, layout::LEFT_AREA).contains(&"SUGGEST CLAIM".to_owned()));
+
+        app.apply(Action::FocusNext);
+        assert_eq!(pane_text(&app, layout::RIGHT_SLOT, 0), "HELP");
+        assert_ne!(left_area(&app)[0], "HELP");
+        assert!(help_names(&app).contains(&"NOTE".to_owned()));
+
+        app.apply(Action::FocusPrevious);
+        assert_eq!(left_area(&app)[0], "HELP");
+        assert_ne!(pane_text(&app, layout::RIGHT_SLOT, 0), "HELP");
+
+        app.apply(Action::FocusPrevious);
+        assert_eq!(help_lines(&app), cart_view_under_help);
+        assert_eq!(left_area(&app), panes);
+    }
+}
+
+#[test]
+fn opening_the_cart_view_with_help_open_moves_help_to_the_left() {
+    for config in [PC_TRACKER, M8_STYLE] {
+        let mut app = in_the_song_pane(config);
+        app.apply(Action::ToggleHelp);
+        let context = in_the_cart_view(config).key_context();
+
+        app.apply(Action::ToggleCart);
+
+        assert_eq!(pane_text(&app, layout::RIGHT_SLOT, 0), "CART");
+        assert_eq!(left_area(&app)[0], "HELP");
+        assert!(help_names_over(&app, layout::LEFT_AREA).contains(&"SUGGEST CLAIM".to_owned()));
+        assert_eq!(app.key_context(), context);
+    }
+}
+
+#[test]
+fn closing_help_on_the_left_shows_the_phrase_and_chain_and_song_panes_as_they_were() {
+    for in_the_view in [in_the_cart_view, in_the_log] {
+        let mut app = in_the_view(PC_TRACKER);
+        let panes = left_area(&app);
+        let view = right_slot(&app);
+
+        app.apply(Action::ToggleHelp);
+        assert_eq!(left_area(&app)[0], "HELP");
+        app.apply(Action::ToggleHelp);
+
+        assert_eq!(left_area(&app), panes);
+        assert_eq!(right_slot(&app), view);
+    }
+}
+
+#[test]
+fn closing_help_on_the_right_shows_the_cart_view_or_the_log_as_it_was() {
+    for in_the_view in [in_the_cart_view, in_the_log] {
+        let mut app = in_the_view(PC_TRACKER);
+        app.apply(Action::Move(Direction::Down));
+        app.apply(Action::FocusPrevious);
+        let view = right_slot(&app);
+
+        app.apply(Action::ToggleHelp);
+        assert_eq!(pane_text(&app, layout::RIGHT_SLOT, 0), "HELP");
+        app.apply(Action::ToggleHelp);
+
+        assert_eq!(right_slot(&app), view);
+    }
+}
+
+#[test]
+fn help_on_the_left_leaves_focus_alone_and_the_cart_view_cursor_still_moves() {
+    let mut app = in_the_cart_view(PC_TRACKER);
+    let context = app.key_context();
+    let cart_view = right_slot(&app);
+
+    app.apply(Action::ToggleHelp);
+    app.apply(Action::Move(Direction::Down));
+
+    assert_eq!(app.key_context(), context);
+    assert_ne!(right_slot(&app), cart_view);
+    assert_eq!(left_area(&app)[0], "HELP");
+}
+
+#[test]
+fn the_player_keeps_playing_as_help_moves_between_halves() {
+    let mut app = in_the_multitrack(PC_TRACKER);
+    app.apply(Action::PlayFocusedPane);
+    let requests = app.take_audio_requests();
+    assert!(
+        matches!(requests.last(), Some(AudioRequest::PlaySong { .. })),
+        "{requests:?}"
+    );
+
+    apply(
+        &mut app,
+        &[
+            Action::ToggleHelp,
+            Action::FocusNext,
+            Action::FocusPrevious,
+            Action::ToggleCart,
+            Action::ToggleHelp,
+        ],
+    );
+
+    assert_eq!(app.take_audio_requests(), []);
+}
+
+#[test]
+fn help_on_the_left_meets_a_plain_right_separator() {
+    let mut app = in_the_cart_view(PC_TRACKER);
+
+    app.apply(Action::ToggleHelp);
+
+    let dump = app.grid().text_dump();
+    let separators: String = dump
+        .lines()
+        .take(layout::RIGHT_SLOT.rows)
+        .map(|line| line.chars().nth(layout::LEFT_AREA.width).unwrap_or(' '))
+        .collect();
+    assert_eq!(separators, "│".repeat(layout::RIGHT_SLOT.rows));
 }

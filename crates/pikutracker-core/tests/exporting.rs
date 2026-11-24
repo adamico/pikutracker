@@ -213,6 +213,21 @@ fn a_failed_export_writes_nothing_and_lists_every_problem() {
 }
 
 #[test]
+fn an_export_with_failures_opens_the_log_and_closes_help() {
+    let original = simple_cart().p8();
+    let mut app = with_more_song_rows_than_the_claim_holds(&imported(original.clone()));
+    app.apply(Action::ToggleHelp);
+    assert_eq!(right_slot(&app, 0), "HELP");
+
+    export_with(&mut app, original);
+
+    assert_eq!(right_slot(&app, 0), "LOG");
+    assert_ne!(pane_text(&app, layout::LEFT_AREA, 0), "HELP");
+    app.apply(Action::ToggleLog);
+    assert_ne!(right_slot(&app, 0), "HELP");
+}
+
+#[test]
 fn an_empty_claim_fails_with_the_no_claim_message() {
     let mut project = Project::new();
     project.set_target_cart(Some(TargetCart {
