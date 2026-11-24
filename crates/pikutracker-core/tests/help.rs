@@ -10,6 +10,7 @@ use support::{M8_STYLE, apply, launched, pane_text};
 const PC_TRACKER: &str = "(version: 1)";
 const TO_THE_PHRASE_PANE: [Action; 2] = [Action::FocusPrevious, Action::FocusPrevious];
 const MIDDLE_C: u8 = 0;
+const NAME_COLUMNS: usize = 14;
 
 fn one_phrase_in_the_song() -> Project {
     let mut project = Project::new();
@@ -22,6 +23,34 @@ fn in_the_phrase_pane(config: &str) -> App {
     let mut app = launched(App::with_project(one_phrase_in_the_song()), config);
     apply(&mut app, &TO_THE_PHRASE_PANE);
     app
+}
+
+fn in_the_chain_pane(config: &str) -> App {
+    let mut app = launched(App::with_project(one_phrase_in_the_song()), config);
+    app.apply(Action::FocusPrevious);
+    app
+}
+
+fn in_the_song_pane(config: &str) -> App {
+    launched(App::with_project(one_phrase_in_the_song()), config)
+}
+
+fn assert_lists(app: &App, expected: &[(&str, &str)]) {
+    let lines = help_lines(app);
+    for &(name, keys) in expected {
+        let line = format!("{name} {keys}");
+        assert!(lines.contains(&line), "{line} in {lines:#?}");
+    }
+}
+
+fn help_names(app: &App) -> Vec<String> {
+    right_slot(app)
+        .into_iter()
+        .skip(1)
+        .map(|line| line.chars().take(NAME_COLUMNS).collect::<String>())
+        .map(|name| name.trim().to_owned())
+        .filter(|name| !name.is_empty())
+        .collect()
 }
 
 fn right_slot(app: &App) -> Vec<String> {
@@ -177,8 +206,12 @@ fn help_shows_a_key_rebound_in_config_ron_instead_of_the_presets_key() {
 
 #[test]
 fn help_leaves_out_the_keys_that_work_anywhere() {
-    for config in [PC_TRACKER, M8_STYLE] {
-        let mut app = in_the_phrase_pane(config);
+    let panes: [fn(&str) -> App; 3] = [in_the_phrase_pane, in_the_chain_pane, in_the_song_pane];
+    for (config, in_the_pane) in [PC_TRACKER, M8_STYLE]
+        .into_iter()
+        .flat_map(|config| panes.map(|in_the_pane| (config, in_the_pane)))
+    {
+        let mut app = in_the_pane(config);
 
         app.apply(Action::ToggleHelp);
 
@@ -199,13 +232,12 @@ fn help_leaves_out_the_keys_that_work_anywhere() {
             "FOLLOW",
             "PLAY SONG",
         ];
+        let names = help_names(&app);
         for name in anywhere {
             assert_eq!(keys_of(&lines, name), None, "{name} in {lines:#?}");
             assert!(
-                lines
-                    .iter()
-                    .all(|line| !line.starts_with(&format!("{name} "))),
-                "{name} in {lines:#?}"
+                !names.iter().any(|shown| shown == name),
+                "{name} in {names:#?}"
             );
         }
     }
@@ -257,4 +289,172 @@ fn a_log_that_opens_on_its_own_closes_help() {
     assert_eq!(pane_text(&app, layout::RIGHT_SLOT, 0), "LOG");
     app.apply(Action::ToggleLog);
     assert_ne!(pane_text(&app, layout::RIGHT_SLOT, 0), "HELP");
+}
+
+#[test]
+fn help_lists_the_chain_panes_pc_tracker_keys() {
+    let mut app = in_the_chain_pane(PC_TRACKER);
+
+    app.apply(Action::ToggleHelp);
+
+    assert_lists(
+        &app,
+        &[
+            ("MOVE", "ARROWS"),
+            ("JUMP", "ALT+ARROWS"),
+            ("DIGIT", "0-F"),
+            ("NUDGE", "^UP/^DOWN/^SHIFT+UP/^SHIFT+DOWN"),
+            ("CLEAR", "DEL"),
+            ("SELECT", "SHIFT+ARROWS"),
+            ("COPY", "^C"),
+            ("PASTE", "^V"),
+            ("CLONE", "^D"),
+            ("NEW UNUSED", "^SHIFT+N"),
+            ("MOVE ROWS", "ALT+UP/ALT+DOWN"),
+            ("CHANGE SPEED", "^SHIFT+T"),
+            ("SCALE SPEED", "ALT+T"),
+            ("PLAY", "SPACE"),
+            ("NEXT PANE", "TAB"),
+        ],
+    );
+}
+
+#[test]
+fn help_lists_the_chain_panes_m8_style_keys() {
+    let mut app = in_the_chain_pane(M8_STYLE);
+
+    app.apply(Action::ToggleHelp);
+
+    assert_lists(
+        &app,
+        &[
+            ("JUMP", "X+ARROWS"),
+            ("NUDGE", "Z+RIGHT/Z+LEFT/Z+UP/Z+DOWN"),
+            ("SELECT", "SHIFT+X/ARROWS"),
+            ("COPY", "X"),
+            ("CUT", "Z+X"),
+            ("PASTE", "SHIFT+Z"),
+            ("CLONE", "Z"),
+            ("NEW UNUSED", "DOUBLE-TAP Z"),
+            ("MOVE ROWS", "X+UP/X+DOWN"),
+            ("SCALE SPEED", "Z+T"),
+            ("NEXT PANE", "TAB/SHIFT+DOWN/SHIFT+RIGHT"),
+        ],
+    );
+}
+
+#[test]
+fn help_lists_the_song_panes_pc_tracker_keys() {
+    let mut app = in_the_song_pane(PC_TRACKER);
+
+    app.apply(Action::ToggleHelp);
+
+    assert_lists(
+        &app,
+        &[
+            ("MOVE", "ARROWS"),
+            ("JUMP", "ALT+UP/ALT+DOWN"),
+            ("DIGIT", "0-F"),
+            ("CLONE", "^D"),
+            ("DEEP CLONE", "^SHIFT+D"),
+            ("NEW UNUSED", "^SHIFT+N"),
+            ("LOOP START", "^R"),
+            ("LOOP BACK", "^SHIFT+R"),
+            ("STOP", "^P"),
+            ("CHANGE SPEED", "^SHIFT+T"),
+            ("SCALE SPEED", "ALT+T"),
+            ("PLAY", "SPACE"),
+        ],
+    );
+}
+
+#[test]
+fn help_lists_the_song_panes_m8_style_keys() {
+    let mut app = in_the_song_pane(M8_STYLE);
+
+    app.apply(Action::ToggleHelp);
+
+    assert_lists(
+        &app,
+        &[
+            ("JUMP", "X+UP/X+DOWN"),
+            ("COPY", "X"),
+            ("CLONE", "Z"),
+            ("DEEP CLONE", "^SHIFT+D"),
+            ("NEW UNUSED", "DOUBLE-TAP Z"),
+            ("LOOP START", "X+R"),
+            ("LOOP BACK", "X+B"),
+            ("STOP", "X+P"),
+            ("SCALE SPEED", "Z+T"),
+        ],
+    );
+}
+
+#[test]
+fn only_the_song_pane_lists_deep_clone_and_the_song_row_marks() {
+    for in_the_pane in [in_the_phrase_pane, in_the_chain_pane] {
+        let mut app = in_the_pane(PC_TRACKER);
+
+        app.apply(Action::ToggleHelp);
+
+        let names = help_names(&app);
+        for name in ["DEEP CLONE", "LOOP START", "LOOP BACK", "STOP"] {
+            assert!(
+                !names.iter().any(|shown| shown == name),
+                "{name} in {names:#?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn moving_focus_with_help_open_changes_the_list_to_the_new_panes_keys() {
+    for config in [PC_TRACKER, M8_STYLE] {
+        let mut app = in_the_phrase_pane(config);
+        app.apply(Action::ToggleHelp);
+        let phrase = help_lines(&app);
+        assert!(help_names(&app).contains(&"NOTE".to_owned()), "{phrase:#?}");
+
+        app.apply(Action::FocusNext);
+        let chain = help_lines(&app);
+        let names = help_names(&app);
+        assert!(!names.contains(&"NOTE".to_owned()), "{names:#?}");
+        assert!(names.contains(&"NEW UNUSED".to_owned()), "{names:#?}");
+        assert!(!names.contains(&"LOOP START".to_owned()), "{names:#?}");
+
+        app.apply(Action::FocusNext);
+        let names = help_names(&app);
+        assert!(names.contains(&"LOOP START".to_owned()), "{names:#?}");
+
+        app.apply(Action::FocusPrevious);
+        assert_eq!(help_lines(&app), chain);
+
+        app.apply(Action::FocusPrevious);
+        assert_eq!(help_lines(&app), phrase);
+    }
+}
+
+#[test]
+fn help_shows_keys_rebound_in_config_ron_in_the_chain_and_song_panes() {
+    let config = r#"(version: 1, keys: {"Clone": "Ctrl+K", "ToggleLoopStart": "Ctrl+J"})"#;
+    for (in_the_pane, rebound) in [
+        (in_the_chain_pane as fn(&str) -> App, vec![("CLONE", "^K")]),
+        (
+            in_the_song_pane,
+            vec![("CLONE", "^K"), ("LOOP START", "^J")],
+        ),
+    ] {
+        let mut app = in_the_pane(config);
+
+        app.apply(Action::ToggleHelp);
+
+        assert_lists(&app, &rebound);
+        let lines = help_lines(&app);
+        for replaced in [" ^D", " ^R"] {
+            assert!(
+                lines.iter().all(|line| !line.ends_with(replaced)),
+                "{replaced} in {lines:#?}"
+            );
+        }
+    }
 }
