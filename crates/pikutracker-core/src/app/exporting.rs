@@ -1,8 +1,8 @@
 use super::App;
 use super::claim_text::named_slots;
 use super::files::{Accepted, OVERWRITE, Waiting, shown_name};
-use super::key_hints::edit_claim_hint;
-use super::messages::{LogItem, Report, Severity};
+use super::key_hints::{ExportFailureHints, export_failure_hints};
+use super::messages::{Location, LogItem, Report, Severity};
 use crate::cart::{Cart, Slots};
 use crate::export::{self, ExportFailure, Exported};
 use crate::project::{ChainRowPlace, Claim, SongPlace};
@@ -17,7 +17,7 @@ pub(super) struct FinishedExport {
     report: Report,
 }
 
-fn failure_location(failure: ExportFailure) -> Option<SongPlace> {
+const fn failure_location(failure: ExportFailure) -> Option<Location> {
     match failure {
         ExportFailure::NoteOutOfRange {
             step,
@@ -25,36 +25,42 @@ fn failure_location(failure: ExportFailure) -> Option<SongPlace> {
             song_row,
             chain_row,
             ..
-        } => Some(SongPlace {
+        } => Some(Location::Step(SongPlace {
             chain_row: ChainRowPlace {
                 song_row,
                 entry: chain_row,
             },
             track,
             step_index: step,
+        })),
+        ExportFailure::EmptySong => Some(Location::SongCell {
+            song_row: 0,
+            track: 0,
         }),
         _ => None,
     }
 }
 
-const fn is_about_the_claim(failure: ExportFailure) -> bool {
-    matches!(
-        failure,
+fn failure_hint(failure: ExportFailure, hints: &ExportFailureHints) -> Option<&str> {
+    match failure {
         ExportFailure::EmptyClaim
-            | ExportFailure::BadClaim
-            | ExportFailure::TooFewSfx { .. }
-            | ExportFailure::TooFewPatterns { .. }
-            | ExportFailure::MissingInstrumentSlot { .. }
-    )
+        | ExportFailure::BadClaim
+        | ExportFailure::TooFewSfx { .. }
+        | ExportFailure::TooFewPatterns { .. }
+        | ExportFailure::MissingInstrumentSlot { .. } => Some(&hints.edit_claim),
+        ExportFailure::NoteOutOfRange { .. } => Some(&hints.go_to_note),
+        ExportFailure::EmptySong => Some(&hints.go_to_song),
+        ExportFailure::UnreadableCart(_) => None,
+    }
 }
 
-fn failure_item(failure: ExportFailure, edit_claim_hint: &str) -> LogItem {
+fn failure_item(failure: ExportFailure, hints: &ExportFailureHints) -> LogItem {
     let mut item = LogItem::new(Severity::Failure, failure.to_string());
-    if is_about_the_claim(failure) {
-        item = item.with_hint(edit_claim_hint);
+    if let Some(hint) = failure_hint(failure, hints) {
+        item = item.with_hint(hint);
     }
     match failure_location(failure) {
-        Some(location) => item.at(location),
+        Some(location) => item.in_place(location),
         None => item,
     }
 }
@@ -90,7 +96,11 @@ fn changed_slots_text(changed: &Slots) -> String {
     .join(" AND ")
 }
 
-fn failure_report(cart_name: &str, failures: &[ExportFailure], edit_claim_hint: &str) -> Report {
+fn failure_report(
+    cart_name: &str,
+    failures: &[ExportFailure],
+    hints: &ExportFailureHints,
+) -> Report {
     let summary = if failures.contains(&ExportFailure::EmptyClaim) {
         format!("EXPORT FAILED: NO CLAIM IN {cart_name}")
     } else {
@@ -98,7 +108,7 @@ fn failure_report(cart_name: &str, failures: &[ExportFailure], edit_claim_hint: 
     };
     let items = failures
         .iter()
-        .map(|&failure| failure_item(failure, edit_claim_hint))
+        .map(|&failure| failure_item(failure, hints))
         .collect();
     Report::failure(summary).with_items(items)
 }
@@ -149,8 +159,8 @@ impl App {
                 );
             }
             Err(failures) => {
-                let hint = edit_claim_hint(self.keyboard.keymap());
-                self.report(failure_report(&cart_name, &failures, &hint));
+                let hints = export_failure_hints(self.keyboard.keymap());
+                self.report(failure_report(&cart_name, &failures, &hints));
             }
         }
     }

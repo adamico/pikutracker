@@ -23,7 +23,7 @@ pub use action::{Action, Direction, KeyContext};
 pub use files::{DirectoryEntry, FileRequest, FileResponse};
 use launching::HelpAnnouncement;
 pub use launching::{Launch, SettingsContents};
-pub use messages::{LogItem, Report, Severity};
+pub use messages::{Location, LogItem, Report, Severity};
 
 use crate::export;
 use crate::keymap::{Key, KeyPress, Keyboard};
@@ -663,10 +663,19 @@ impl App {
         if !self.log_has_focus() {
             return;
         }
-        if let Some(location) = self.log.picked_location() {
-            self.stop_following();
-            self.show_song_place(location);
-            self.set_focus(Focus::Phrase);
+        match self.log.picked_location() {
+            Some(Location::Step(step)) => {
+                self.stop_following();
+                self.show_song_place(step);
+                self.set_focus(Focus::Phrase);
+            }
+            Some(Location::SongCell { song_row, track }) => {
+                self.stop_following();
+                self.song.jump_to(song_row, track);
+                self.show_what_the_cursors_point_at();
+                self.set_focus(Focus::Song);
+            }
+            None => {}
         }
     }
 
