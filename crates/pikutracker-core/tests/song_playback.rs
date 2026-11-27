@@ -429,6 +429,7 @@ fn a_report_that_the_stopped_play_finished_does_not_stop_the_next_one() {
     app.take_audio_requests();
     player.render(5 * STEP_SAMPLES);
     let stopped_play_finished = player.report();
+    assert_eq!(stopped_play_finished.finished_play, Some(PlayId::FIRST));
 
     app.apply(SPACE);
     app.take_audio_requests();

@@ -108,6 +108,10 @@ _Avoid_: Full copy
 The position currently being played. It is separate from the cursor, which is where the user is editing.
 _Avoid_: Play cursor
 
+**Play**:
+One run of playback, started by Play or an Instrument audition and lasting until it stops or reaches its end. Each play carries its own PlayId, which the Player names in its report when that play has finished (ADR-0032).
+_Avoid_: Session, run
+
 **Transport**:
 Playing, stopping and previewing what the user hears, together with Mute and Solo. It knows the Playhead and which play is the latest, but not which pane asked to play.
 _Avoid_: Player (that is the audio thread's side)
