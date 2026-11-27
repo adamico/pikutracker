@@ -257,11 +257,11 @@ impl App {
     }
 
     pub fn show_playback(&mut self, report: &PlaybackReport) -> bool {
-        let moved = self.transport.receive(report);
-        if moved && self.selection_start.is_none() {
+        let playhead_moved = self.transport.playhead_moved_on(report);
+        if playhead_moved && self.selection_start.is_none() {
             self.follow_playhead();
         }
-        moved
+        playhead_moved
     }
 
     pub fn key_down(&mut self, press: KeyPress, pressed_at: Duration) -> Option<Action> {

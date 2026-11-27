@@ -358,7 +358,7 @@ pub struct Player {
     playback: Option<Playback>,
     track_mix: TrackMix,
     preview: Option<Preview>,
-    play: Option<PlayId>,
+    current_play: Option<PlayId>,
     finished_play: Option<PlayId>,
 }
 
@@ -369,7 +369,7 @@ impl Default for Player {
             playback: None,
             track_mix: TrackMix::default(),
             preview: None,
-            play: None,
+            current_play: None,
             finished_play: None,
         }
     }
@@ -460,7 +460,7 @@ impl Player {
 
     fn audition(&mut self, play: PlayId, project: &Project, instrument: u8) {
         self.cut();
-        self.play = Some(play);
+        self.current_play = Some(play);
         self.hear_instruments_of(project);
         let note = Note {
             pitch: i16::from(AUDITION_PITCH),
@@ -531,9 +531,9 @@ impl Player {
     ) {
         self.cut();
         self.hear_instruments_of(&project);
-        self.play = Some(play);
+        self.current_play = Some(play);
         let Some(k) = k else {
-            self.finished_play = self.play;
+            self.finished_play = self.current_play;
             return;
         };
         let playback = Playback {
@@ -581,7 +581,7 @@ impl Player {
             playback.waiting_for_edit = true;
             self.playback = Some(playback);
         } else {
-            self.finished_play = self.play;
+            self.finished_play = self.current_play;
         }
     }
 

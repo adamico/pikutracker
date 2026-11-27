@@ -115,7 +115,7 @@ impl Transport {
         }
     }
 
-    pub(super) fn receive(&mut self, report: &PlaybackReport) -> bool {
+    pub(super) fn playhead_moved_on(&mut self, report: &PlaybackReport) -> bool {
         if report.finished_play.is_some() && report.finished_play == self.latest_play {
             self.playing = false;
         }
