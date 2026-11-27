@@ -559,3 +559,15 @@ fn change_speed_is_one_undo_step_too() {
 
     assert!(app.project() == &before);
 }
+
+#[test]
+fn esc_on_the_quit_question_returns_to_the_speed_entry() {
+    let mut app = App::with_project(two_rows());
+    change_speed(&mut app, 0x2, 0x0);
+    apply(&mut app, &[SELECT_DOWN, Action::ChangeSpeed, Action::Quit]);
+
+    app.apply(Action::Cancel);
+
+    assert!(!app.wants_to_quit());
+    assert_eq!(app.key_context(), KeyContext::SpeedEntry);
+}

@@ -128,6 +128,10 @@ _Avoid_: Pattern view
 The view listing the keys of the focused pane, or of the open list or dialog when one is open, on the half of the screen away from it. It never takes focus, so editing and playback carry on while it is open.
 _Avoid_: Cheat sheet, help screen
 
+**Overlay**:
+A view or question that takes every key while it is open: Speed entry, a question on the status line, the MIDI Import dialog, the File list or the Instrument view. Overlays stack, newest on top, and closing one shows the one it opened over.
+_Avoid_: Modal, popup
+
 **Follow**:
 A mode in which the Chain and Phrase panes track the Playhead. Moving the cursor by hand turns it off until the next launch; the app remembers Follow as last set with the Follow key. The Song cursor and the Multitrack track the Playhead whenever the Song plays, with or without Follow.
 _Avoid_: Auto-scroll

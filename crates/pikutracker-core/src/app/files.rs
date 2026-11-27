@@ -328,7 +328,6 @@ impl App {
     }
 
     pub(super) fn quit(&mut self) {
-        self.selection_start = None;
         if self.has_unsaved_changes() {
             self.ask_about_unsaved_changes(Accepted::Quit);
         } else {

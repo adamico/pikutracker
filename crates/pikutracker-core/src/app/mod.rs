@@ -437,12 +437,6 @@ impl App {
                 self.transport.project_changed(&self.project);
                 return;
             }
-            _ => {}
-        }
-        if action == Action::Cancel && self.selection_start.take().is_some() {
-            return;
-        }
-        match self.overlays.top() {
             Some(Overlay::Question(_)) => {
                 self.answer_question(action);
                 self.transport.project_changed(&self.project);
@@ -457,7 +451,8 @@ impl App {
                 self.transport.project_changed(&self.project);
                 return;
             }
-            Some(Overlay::MidiDialog(_) | Overlay::SpeedEntry(_)) | None => {}
+            None if action == Action::Cancel && self.selection_start.take().is_some() => return,
+            None => {}
         }
         if self.cart_view_has_focus() && self.use_cart_view(action) {
             self.transport.project_changed(&self.project);
