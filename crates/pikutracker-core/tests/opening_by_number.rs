@@ -245,10 +245,7 @@ fn a_chain_opened_by_number_plays_its_entries_in_turn_and_starts_over() {
     );
 
     let mut player = Player::new();
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    let samples = player.render(6 * STEP_SAMPLES);
+    let samples = support::play_along(&mut app, &mut player, 6 * STEP_SAMPLES);
 
     let heard: Vec<f32> = (0..6).map(|step| step_frequency(&samples, step)).collect();
     let expected = [440.0, 440.0, 880.0, 880.0, 440.0, 440.0];
@@ -275,11 +272,7 @@ fn the_chain_pane_marks_the_entry_being_played_in_a_chain_opened_by_number() {
     );
 
     let mut player = Player::new();
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    player.render(2 * STEP_SAMPLES + 1);
-    app.show_playback(&player.report());
+    support::play_along(&mut app, &mut player, 2 * STEP_SAMPLES + 1);
 
     assert!(chain_text(&app, 2).starts_with("00"));
     assert!(chain_text(&app, 3).starts_with(">1"));

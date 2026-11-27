@@ -520,10 +520,7 @@ fn space_in_the_instrument_view_auditions_it_at_c2_until_pressed_again() {
     let mut player = Player::new();
 
     app.apply(SPACE);
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    let samples = player.render(20_000);
+    let samples = support::play_along(&mut app, &mut player, 20_000);
     assert_near(frequency(&samples[SETTLED..]), 261.63, 1.0);
     assert!(samples[18_000..].iter().any(|sample| sample.abs() > 0.05));
 

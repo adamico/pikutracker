@@ -42,10 +42,7 @@ fn phrase_app(transpose: i32) -> App {
 }
 
 fn render(app: &mut App, player: &mut Player, samples: usize) -> Vec<f32> {
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    player.render(samples)
+    support::play_along(app, player, samples)
 }
 
 fn frequency(samples: &[f32]) -> f32 {
@@ -232,5 +229,5 @@ fn a_preview_is_not_a_play() {
         app.take_audio_requests().as_slice(),
         [AudioRequest::PlayPhrase { .. }]
     ));
-    assert_eq!(player.finished_play(), 0);
+    assert_eq!(player.finished_play(), None);
 }

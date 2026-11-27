@@ -48,10 +48,7 @@ fn phrase_app() -> App {
 }
 
 fn render(app: &mut App, player: &mut Player, samples: usize) -> Vec<f32> {
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    player.render(samples)
+    support::play_along(app, player, samples)
 }
 
 fn frequency_at(samples: &[f32], rate: u32) -> f32 {

@@ -9,26 +9,45 @@ use crate::synth::{
 };
 use std::sync::Arc;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PlayId(u64);
+
+impl PlayId {
+    pub const FIRST: Self = Self(1);
+
+    pub const fn new(number: u64) -> Self {
+        Self(number)
+    }
+
+    pub const fn next(self) -> Self {
+        Self(self.0 + 1)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AudioRequest {
     PlayPhrase {
+        play: PlayId,
         project: Arc<Project>,
         phrase: PhraseId,
         transpose: i8,
         from_step: usize,
     },
     PlayChain {
+        play: PlayId,
         project: Arc<Project>,
         song_row: usize,
         track: usize,
         from_entry: usize,
     },
     PlayChainAlone {
+        play: PlayId,
         project: Arc<Project>,
         chain: ChainId,
         from_entry: usize,
     },
     PlaySong {
+        play: PlayId,
         project: Arc<Project>,
         from_row: usize,
     },
@@ -42,6 +61,7 @@ pub enum AudioRequest {
     },
     EndPreview,
     AuditionInstrument {
+        play: PlayId,
         project: Arc<Project>,
         instrument: u8,
     },
@@ -129,7 +149,7 @@ impl Playhead {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PlaybackReport {
     pub playhead: Option<Playhead>,
-    pub finished_play: u64,
+    pub finished_play: Option<PlayId>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -339,8 +359,8 @@ pub struct Player {
     playback: Option<Playback>,
     track_mix: TrackMix,
     preview: Option<Preview>,
-    plays: u64,
-    finished_play: u64,
+    play: Option<PlayId>,
+    finished_play: Option<PlayId>,
 }
 
 impl Default for Player {
@@ -350,8 +370,8 @@ impl Default for Player {
             playback: None,
             track_mix: TrackMix::default(),
             preview: None,
-            plays: 0,
-            finished_play: 0,
+            play: None,
+            finished_play: None,
         }
     }
 }
@@ -364,15 +384,17 @@ impl Player {
     pub fn handle(&mut self, request: AudioRequest) {
         match request {
             AudioRequest::PlayPhrase {
+                play,
                 project,
                 phrase,
                 transpose,
                 from_step,
             } => {
                 let route = Route::Phrase { phrase, transpose };
-                self.start(project, route, 0, Some(0), from_step);
+                self.start(play, project, route, 0, Some(0), from_step);
             }
             AudioRequest::PlayChain {
+                play,
                 project,
                 song_row,
                 track,
@@ -380,19 +402,24 @@ impl Player {
             } => {
                 let k =
                     first_from_or_wrapping(from_entry, |k| first_chain_row(&project, song_row, k));
-                self.start(project, Route::Chain { track }, song_row, k, 0);
+                self.start(play, project, Route::Chain { track }, song_row, k, 0);
             }
             AudioRequest::PlayChainAlone {
+                play,
                 project,
                 chain,
                 from_entry,
             } => {
                 let k = first_from_or_wrapping(from_entry, |k| first_entry(&project, chain, k));
-                self.start(project, Route::ChainAlone { chain }, 0, k, 0);
+                self.start(play, project, Route::ChainAlone { chain }, 0, k, 0);
             }
-            AudioRequest::PlaySong { project, from_row } => {
+            AudioRequest::PlaySong {
+                play,
+                project,
+                from_row,
+            } => {
                 let k = first_chain_row(&project, from_row, 0);
-                self.start(project, Route::Song, from_row, k, 0);
+                self.start(play, project, Route::Song, from_row, k, 0);
             }
             AudioRequest::UpdateProject(project) => self.update_project(project),
             AudioRequest::SetTrackMix(track_mix) => self.track_mix = track_mix,
@@ -412,14 +439,15 @@ impl Player {
                 }
             }
             AudioRequest::AuditionInstrument {
+                play,
                 project,
                 instrument,
-            } => self.audition(&project, instrument),
+            } => self.audition(play, &project, instrument),
             AudioRequest::Stop => self.cut(),
         }
     }
 
-    pub fn finished_play(&self) -> u64 {
+    pub fn finished_play(&self) -> Option<PlayId> {
         self.finished_play
     }
 
@@ -438,9 +466,9 @@ impl Player {
         }
     }
 
-    fn audition(&mut self, project: &Project, instrument: u8) {
+    fn audition(&mut self, play: PlayId, project: &Project, instrument: u8) {
         self.cut();
-        self.plays += 1;
+        self.play = Some(play);
         self.hear_instruments_of(project);
         let note = Note {
             pitch: i16::from(AUDITION_PITCH),
@@ -502,6 +530,7 @@ impl Player {
 
     fn start(
         &mut self,
+        play: PlayId,
         project: Arc<Project>,
         route: Route,
         row: usize,
@@ -510,9 +539,9 @@ impl Player {
     ) {
         self.cut();
         self.hear_instruments_of(&project);
-        self.plays += 1;
+        self.play = Some(play);
         let Some(k) = k else {
-            self.finished_play = self.plays;
+            self.finished_play = self.play;
             return;
         };
         let playback = Playback {
@@ -560,7 +589,7 @@ impl Player {
             playback.waiting_for_edit = true;
             self.playback = Some(playback);
         } else {
-            self.finished_play = self.plays;
+            self.finished_play = self.play;
         }
     }
 

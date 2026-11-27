@@ -47,10 +47,7 @@ fn place(project: &mut Project, row: usize, track: usize, chain: u8, phrase: Phr
 }
 
 fn render(app: &mut App, player: &mut Player, steps: usize) -> Vec<f32> {
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    player.render(steps * STEP_SAMPLES)
+    support::play_along(app, player, steps * STEP_SAMPLES)
 }
 
 fn step_frequency(samples: &[f32], step: usize) -> f32 {
@@ -290,7 +287,11 @@ fn a_chain_with_every_entry_cleared_keeps_playing_until_it_has_notes_again() {
 
     app.apply(Action::Clear);
     let silence = render(&mut app, &mut player, 4);
-    assert_eq!(player.finished_play(), 0, "the edit must not stop playback");
+    assert_eq!(
+        player.finished_play(),
+        None,
+        "the edit must not stop playback"
+    );
     assert!(step_peak(&silence, 3) < 0.01);
 
     app.apply(Action::HexDigit(1));

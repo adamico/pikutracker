@@ -2,7 +2,7 @@ use super::cases::Plays;
 use crate::support::{stored_instrument, stored_sound};
 use pikutracker_core::cart::Cart;
 use pikutracker_core::cart_import::import;
-use pikutracker_core::player::{AudioRequest, Player};
+use pikutracker_core::player::{AudioRequest, PlayId, Player};
 use pikutracker_core::synth::Voice;
 use std::sync::Arc;
 
@@ -22,6 +22,7 @@ pub fn render(cart: &Cart, plays: Plays, samples: usize) -> Vec<f32> {
         Plays::Music => {
             let mut player = Player::new();
             player.handle(AudioRequest::PlaySong {
+                play: PlayId::new(1),
                 project: Arc::new(import(cart, "reference.p8").project),
                 from_row: 0,
             });

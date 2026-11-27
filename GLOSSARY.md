@@ -108,6 +108,10 @@ _Avoid_: Full copy
 The position currently being played. It is separate from the cursor, which is where the user is editing.
 _Avoid_: Play cursor
 
+**Transport**:
+Playing, stopping and previewing what the user hears, together with Mute and Solo. It knows the Playhead and which play is the latest, but not which pane asked to play.
+_Avoid_: Player (that is the audio thread's side)
+
 **Selection**:
 A rectangle of cells in the focused pane, from the cell where it was started to the cursor. Copy, Cut, nudges, moving rows, Clone and Change Speed act on it instead of the cell under the cursor. Changing pane clears it.
 _Avoid_: Block, mark

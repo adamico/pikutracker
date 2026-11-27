@@ -2,7 +2,7 @@ mod support;
 
 use pikutracker_core::cart::Cart;
 use pikutracker_core::cart_import::import;
-use pikutracker_core::player::{AudioRequest, Player, TrackMix};
+use pikutracker_core::player::{AudioRequest, PlayId, Player, TrackMix};
 use pikutracker_core::project::Project;
 use pikutracker_core::project_file;
 use std::sync::Arc;
@@ -115,6 +115,7 @@ fn track_of_song(project: Project, track: usize, samples: usize) -> Vec<f32> {
     let mut player = Player::new();
     player.handle(AudioRequest::SetTrackMix(mix));
     player.handle(AudioRequest::PlaySong {
+        play: PlayId::new(1),
         project: Arc::new(project),
         from_row: 0,
     });

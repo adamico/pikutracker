@@ -55,10 +55,7 @@ fn hear(project: Project, actions: &[Action], steps: usize) -> Vec<f32> {
         app.apply(*action);
     }
     let mut player = Player::new();
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    player.render(steps * STEP_SAMPLES)
+    support::play_along(&mut app, &mut player, steps * STEP_SAMPLES)
 }
 
 fn step_peak(samples: &[f32], step: usize) -> f32 {
@@ -195,16 +192,10 @@ fn a_mute_during_playback_is_heard_without_changing_the_timing() {
     let mut app = App::with_project(two_tracks());
     let mut player = Player::new();
     app.apply(PLAY_SONG);
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    player.render(STEP_SAMPLES);
+    support::play_along(&mut app, &mut player, STEP_SAMPLES);
 
     app.apply(Action::Mute { track_number: 1 });
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    let samples = player.render(STEP_SAMPLES * 4);
+    let samples = support::play_along(&mut app, &mut player, STEP_SAMPLES * 4);
 
     assert_near(step_frequency(&samples, 0), 880.0);
     assert_near(step_frequency(&samples, 2), 880.0);

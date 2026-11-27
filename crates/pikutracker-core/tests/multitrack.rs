@@ -235,11 +235,7 @@ fn long_song() -> Project {
 }
 
 fn play_on(app: &mut App, player: &mut Player, ticks: usize) {
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    player.render(ticks * SAMPLES_PER_TICK as usize + 1);
-    app.show_playback(&player.report());
+    support::play_along(app, player, ticks * SAMPLES_PER_TICK as usize + 1);
 }
 
 #[test]
