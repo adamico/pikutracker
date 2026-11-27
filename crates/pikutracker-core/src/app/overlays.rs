@@ -1,10 +1,3 @@
-//! What sits over the panes, and so what is on top: who gets the key, which
-//! Help list shows, what fills the right-hand slot and where focus returns.
-//!
-//! Overlays that take every key stack up newest on top, so closing one shows
-//! the one it opened over. The Log and the Cart view only fill the right-hand
-//! slot; the Log covers the Cart view while both are open.
-
 use super::action::KeyContext;
 use super::change_speed::SpeedEntry;
 use super::files::Question;
@@ -17,7 +10,6 @@ use super::panes::instrument::InstrumentView;
 use super::panes::midi_dialog::MidiDialog;
 use crate::project::Project;
 
-/// An overlay that takes every key while it is on top.
 #[derive(Debug)]
 pub(super) enum Overlay {
     SpeedEntry(SpeedEntry),
@@ -32,21 +24,17 @@ impl Overlay {
         std::mem::discriminant(self) == std::mem::discriminant(other)
     }
 
-    /// Speed entry and questions sit on the status line and leave the screen
-    /// beneath them showing.
-    fn on_the_status_line(&self) -> bool {
+    fn sits_on_the_status_line(&self) -> bool {
         matches!(self, Overlay::SpeedEntry(_) | Overlay::Question(_))
     }
 }
 
-/// What fills the whole grid.
 pub(super) enum Screen<'a> {
     Panes,
     MidiDialog(&'a MidiDialog),
     InstrumentView(&'a InstrumentView),
 }
 
-/// What fills the right-hand slot when the panes show, Help aside.
 pub(super) enum RightSlotView<'a> {
     FileList(&'a FileList),
     Log,
@@ -57,8 +45,7 @@ pub(super) enum RightSlotView<'a> {
 #[derive(Debug, Default)]
 pub(super) struct Overlays {
     stack: Vec<Overlay>,
-    /// Where focus returns when the open Log closes.
-    log: Option<Focus>,
+    log_returns_to: Option<Focus>,
     cart_view: Option<CartView>,
     help_open: bool,
 }
@@ -88,7 +75,6 @@ macro_rules! overlay_access {
 }
 
 impl Overlays {
-    /// Puts `overlay` on top, in place of any open overlay of its kind.
     pub(super) fn open(&mut self, overlay: Overlay) {
         self.stack.retain(|open| !open.same_kind(&overlay));
         self.stack.push(overlay);
@@ -109,12 +95,10 @@ impl Overlays {
         instrument_view
     );
 
-    /// Opening another Project closes every overlay and the Cart view, and a
-    /// Log left open returns focus to the Song pane.
     pub(super) fn reset_for_new_project(&mut self) {
         self.stack.clear();
         self.cart_view = None;
-        if let Some(return_to) = self.log.as_mut() {
+        if let Some(return_to) = self.log_returns_to.as_mut() {
             *return_to = Focus::Song;
         }
     }
@@ -131,7 +115,7 @@ impl Overlays {
             .stack
             .iter()
             .rev()
-            .find(|overlay| !overlay.on_the_status_line());
+            .find(|overlay| !overlay.sits_on_the_status_line());
         match beneath_the_status_line {
             Some(Overlay::MidiDialog(dialog)) => Screen::MidiDialog(dialog),
             Some(Overlay::InstrumentView(view)) => Screen::InstrumentView(view),
@@ -142,7 +126,7 @@ impl Overlays {
     pub(super) fn right_slot(&self) -> RightSlotView<'_> {
         if let Some(list) = self.open_file_list() {
             RightSlotView::FileList(list)
-        } else if self.log.is_some() {
+        } else if self.log_returns_to.is_some() {
             RightSlotView::Log
         } else if let Some(view) = &self.cart_view {
             RightSlotView::CartView(view)
@@ -151,13 +135,10 @@ impl Overlays {
         }
     }
 
-    /// Whether the focused pane draws as focused: not while the File list
-    /// takes the keys.
-    pub(super) fn panes_have_focus(&self) -> bool {
+    pub(super) fn panes_show_focus(&self) -> bool {
         self.open_file_list().is_none()
     }
 
-    /// The keys an overlay takes, or None when the panes take them.
     pub(super) fn key_context(&self, project: &Project, focus: Focus) -> Option<KeyContext> {
         match self.top() {
             Some(Overlay::SpeedEntry(_)) => Some(KeyContext::SpeedEntry),
@@ -177,7 +158,6 @@ impl Overlays {
         self.help_open = !self.help_open;
     }
 
-    /// The Help list to draw and where, if Help is open and has one here.
     pub(super) fn help(&self, focus: Focus) -> Option<(HelpList, Area)> {
         if !self.help_open {
             return None;
@@ -223,31 +203,28 @@ impl Overlays {
     }
 
     pub(super) fn log_open(&self) -> bool {
-        self.log.is_some()
+        self.log_returns_to.is_some()
     }
 
     pub(super) fn log_has_focus(&self, focus: Focus) -> bool {
-        self.log.is_some() && focus == Focus::RightSlot
+        self.log_returns_to.is_some() && focus == Focus::RightSlot
     }
 
-    /// Opens the Log over the right-hand slot, remembering `focus` to return to.
     pub(super) fn open_log(&mut self, focus: Focus) {
-        if self.log.is_none() {
-            self.log = Some(focus);
+        if self.log_returns_to.is_none() {
+            self.log_returns_to = Some(focus);
         }
     }
 
-    /// A result with items opens the Log the same way and closes Help.
     pub(super) fn open_log_for_a_report(&mut self, focus: Focus) {
-        if self.log.is_none() {
-            self.log = Some(focus);
+        if self.log_returns_to.is_none() {
+            self.log_returns_to = Some(focus);
             self.help_open = false;
         }
     }
 
-    /// Closes the Log, giving the focus it was opened from.
     pub(super) fn close_log(&mut self) -> Option<Focus> {
-        self.log.take()
+        self.log_returns_to.take()
     }
 
     pub(super) fn cart_view(&mut self) -> Option<&mut CartView> {
@@ -259,12 +236,11 @@ impl Overlays {
     }
 
     pub(super) fn cart_view_has_focus(&self, focus: Focus) -> bool {
-        focus == Focus::RightSlot && self.log.is_none() && self.cart_view.is_some()
+        focus == Focus::RightSlot && self.log_returns_to.is_none() && self.cart_view.is_some()
     }
 
-    /// Shows the Cart view in the right-hand slot, closing the Log.
     pub(super) fn open_cart_view(&mut self, view: CartView) {
-        self.log = None;
+        self.log_returns_to = None;
         self.cart_view = Some(view);
     }
 

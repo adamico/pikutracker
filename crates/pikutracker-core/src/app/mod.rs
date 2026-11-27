@@ -950,7 +950,7 @@ impl App {
             }
             Screen::Panes => {}
         }
-        let focus = self.overlays.panes_have_focus().then_some(self.focus);
+        let focus = self.overlays.panes_show_focus().then_some(self.focus);
         let project = &self.project;
         self.song.draw(
             &mut grid,
