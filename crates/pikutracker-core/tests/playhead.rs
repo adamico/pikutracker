@@ -58,11 +58,7 @@ fn played(actions: &[Action], steps: usize) -> (App, Player) {
 }
 
 fn play_on(app: &mut App, player: &mut Player, steps: usize) {
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    player.render(steps * STEP_SAMPLES + 1);
-    app.show_playback(&player.report());
+    support::play_along(app, player, steps * STEP_SAMPLES + 1);
 }
 
 fn label(app: &App, area: Area, row: usize) -> String {

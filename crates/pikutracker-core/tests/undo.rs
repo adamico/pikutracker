@@ -233,11 +233,7 @@ fn a_cursor_moved_by_follow_ends_a_merge() {
             NUDGE_UP,
         ],
     );
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    player.render(12 * SAMPLES_PER_TICK as usize);
-    app.show_playback(&player.report());
+    support::play_along(&mut app, &mut player, 12 * SAMPLES_PER_TICK as usize);
     app.apply(NUDGE_UP);
 
     app.apply(Action::Undo);

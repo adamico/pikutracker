@@ -1,7 +1,7 @@
 mod support;
 
 use pikutracker_core::app::{Action, App, Direction};
-use pikutracker_core::player::{AudioRequest, Player};
+use pikutracker_core::player::{AudioRequest, PlayId, PlayTarget, Player};
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project, SongRowMarks};
 use pikutracker_core::synth::{SAMPLE_RATE, SAMPLES_PER_TICK};
 use support::status_line;
@@ -68,10 +68,7 @@ fn transposed(phrase: PhraseId, semitones: i32) -> Option<ChainEntry> {
 }
 
 fn render(app: &mut App, player: &mut Player, steps: usize) -> Vec<f32> {
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    player.render(steps * STEP_SAMPLES)
+    support::play_along(app, player, steps * STEP_SAMPLES)
 }
 
 fn hear(project: Project, actions: &[Action], steps: usize) -> Vec<f32> {
@@ -137,11 +134,11 @@ fn a_chain_row_lasts_exactly_its_ticks_at_183_samples_each() {
     let mut player = Player::new();
     app.apply(SPACE);
     render(&mut app, &mut player, 2);
-    assert_eq!(player.finished_play(), 0, "still inside the Chain row");
+    assert_eq!(player.finished_play(), None, "still inside the Chain row");
 
     player.next_sample();
 
-    assert_eq!(player.finished_play(), 1);
+    assert_eq!(player.finished_play(), Some(PlayId::FIRST));
 }
 
 #[test]
@@ -381,13 +378,29 @@ fn space_plays_again_after_the_song_has_stopped_by_itself() {
     app.apply(SPACE);
     render(&mut app, &mut player, 5);
 
-    app.playback_finished(player.finished_play());
     app.apply(SPACE);
 
     assert!(matches!(
         app.take_audio_requests().as_slice(),
-        [AudioRequest::PlaySong { from_row: 0, .. }]
+        [AudioRequest::Play {
+            target: PlayTarget::Song { from_row: 0 },
+            ..
+        }]
     ));
+}
+
+#[test]
+fn the_player_reports_a_play_as_finished_by_the_id_it_was_given() {
+    let mut player = Player::new();
+    assert_eq!(player.report().finished_play, None);
+
+    player.handle(AudioRequest::Play {
+        play: PlayId::FIRST.next(),
+        project: std::sync::Arc::new(Project::new()),
+        target: PlayTarget::Song { from_row: 0 },
+    });
+
+    assert_eq!(player.report().finished_play, Some(PlayId::FIRST.next()));
 }
 
 #[test]
@@ -396,10 +409,10 @@ fn a_report_about_an_earlier_play_does_not_stop_the_current_one() {
     let mut player = Player::new();
     app.apply(SPACE);
     render(&mut app, &mut player, 5);
-    let earlier = player.finished_play();
+    let earlier = player.report();
 
     app.apply(SHIFT_SPACE);
-    app.playback_finished(earlier);
+    app.show_playback(&earlier);
     app.take_audio_requests();
     app.apply(SPACE);
 
@@ -407,6 +420,26 @@ fn a_report_about_an_earlier_play_does_not_stop_the_current_one() {
         app.take_audio_requests().as_slice(),
         [AudioRequest::Stop]
     ));
+}
+
+#[test]
+fn a_report_that_the_stopped_play_finished_does_not_stop_the_next_one() {
+    let mut app = App::with_project(three_row_song());
+    let mut player = Player::new();
+    app.apply(SPACE);
+    render(&mut app, &mut player, 1);
+    app.apply(SPACE);
+    app.take_audio_requests();
+    player.render(5 * STEP_SAMPLES);
+    let stopped_play_finished = player.report();
+    assert_eq!(stopped_play_finished.finished_play, Some(PlayId::FIRST));
+
+    app.apply(SPACE);
+    app.take_audio_requests();
+    app.show_playback(&stopped_play_finished);
+    app.apply(SPACE);
+
+    assert_eq!(app.take_audio_requests(), [AudioRequest::Stop]);
 }
 
 #[test]
@@ -438,7 +471,10 @@ fn shift_space_during_playback_restarts_the_song_with_no_stop_between() {
 
     assert!(matches!(
         app.take_audio_requests().as_slice(),
-        [AudioRequest::PlaySong { from_row: 1, .. }]
+        [AudioRequest::Play {
+            target: PlayTarget::Song { from_row: 1 },
+            ..
+        }]
     ));
 }
 

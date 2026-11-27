@@ -4,7 +4,6 @@ use super::panes::file_list::{Choice, FileList, Purpose};
 use super::paths::{relative_path, resolved};
 use super::{Action, App, Focus};
 use crate::export::Exported;
-use crate::player::{AudioRequest, TrackMix};
 use crate::project::Project;
 use crate::project_file;
 use std::path::{Path, PathBuf};
@@ -285,17 +284,7 @@ impl App {
     }
 
     pub(super) fn replace_project(&mut self, project: Project, path: Option<PathBuf>) {
-        if self.playing || self.previewing {
-            self.playing = false;
-            self.previewing = false;
-            self.audio_requests.push(AudioRequest::Stop);
-        }
-        self.playhead = None;
-        if self.track_mix != TrackMix::default() {
-            self.track_mix = TrackMix::default();
-            self.audio_requests
-                .push(AudioRequest::SetTrackMix(self.track_mix));
-        }
+        self.transport.reset();
         self.saved_project = project.clone();
         self.project = project;
         self.history.clear();

@@ -1,3 +1,5 @@
+mod support;
+
 use pikutracker_core::app::{Action, App, layout};
 use pikutracker_core::player::Player;
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
@@ -62,11 +64,7 @@ fn played(actions: &[Action], steps: usize) -> (App, Player) {
 }
 
 fn play_on(app: &mut App, player: &mut Player, steps: usize) {
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    player.render(steps * STEP_SAMPLES + 1);
-    app.show_playback(&player.report());
+    support::play_along(app, player, steps * STEP_SAMPLES + 1);
 }
 
 fn bar(app: &App, song_row: usize, track: usize) -> Option<(Colour, usize)> {

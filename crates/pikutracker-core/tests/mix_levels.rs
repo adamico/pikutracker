@@ -1,3 +1,5 @@
+mod support;
+
 use pikutracker_core::app::{Action, App};
 use pikutracker_core::player::Player;
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
@@ -44,10 +46,7 @@ fn hear(project: Project, samples: usize) -> Vec<f32> {
     let mut app = App::with_project(project);
     let mut player = Player::new();
     app.apply(PLAY_SONG);
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    player.render(samples)
+    support::play_along(&mut app, &mut player, samples)
 }
 
 fn peak(samples: &[f32]) -> f32 {

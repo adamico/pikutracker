@@ -7,7 +7,7 @@ use pikutracker_core::app::{
     Action, App, Direction, DirectoryEntry, FileResponse, LogItem, Report, Severity,
 };
 use pikutracker_core::keymap::{Key, KeyPress, Modifiers};
-use pikutracker_core::player::AudioRequest;
+use pikutracker_core::player::{AudioRequest, PlayTarget};
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -314,7 +314,13 @@ fn the_player_keeps_playing_across_opening_and_closing_help() {
     );
     let requests = app.take_audio_requests();
     assert!(
-        matches!(requests.last(), Some(AudioRequest::PlayPhrase { .. })),
+        matches!(
+            requests.last(),
+            Some(AudioRequest::Play {
+                target: PlayTarget::Phrase { .. },
+                ..
+            })
+        ),
         "{requests:?}"
     );
 
@@ -677,7 +683,13 @@ fn the_player_keeps_playing_as_help_moves_between_halves() {
     app.apply(Action::PlayFocusedPane);
     let requests = app.take_audio_requests();
     assert!(
-        matches!(requests.last(), Some(AudioRequest::PlaySong { .. })),
+        matches!(
+            requests.last(),
+            Some(AudioRequest::Play {
+                target: PlayTarget::Song { .. },
+                ..
+            })
+        ),
         "{requests:?}"
     );
 

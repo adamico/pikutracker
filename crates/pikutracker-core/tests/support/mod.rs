@@ -3,7 +3,7 @@
 use pikutracker_core::app::layout::Area;
 use pikutracker_core::app::{Action, App, Launch, SettingsContents};
 use pikutracker_core::cart::Cart;
-use pikutracker_core::player::{AudioRequest, Player};
+use pikutracker_core::player::{AudioRequest, PlayId, PlayTarget, Player};
 use pikutracker_core::project::Project;
 use pikutracker_core::synth::{
     Instrument, Note, SAMPLES_PER_TICK, Sound, Voice, Waveform, packed_filters,
@@ -281,11 +281,21 @@ pub fn render_sounds(sounds: &[(Sound, &[usize])]) -> Vec<f32> {
     samples
 }
 
+pub fn play_along(app: &mut App, player: &mut Player, samples: usize) -> Vec<f32> {
+    for request in app.take_audio_requests() {
+        player.handle(request);
+    }
+    let rendered = player.render(samples);
+    app.show_playback(&player.report());
+    rendered
+}
+
 pub fn render_song(project: Project, samples: usize) -> Vec<f32> {
     let mut player = Player::new();
-    player.handle(AudioRequest::PlaySong {
+    player.handle(AudioRequest::Play {
+        play: PlayId::FIRST,
         project: Arc::new(project),
-        from_row: 0,
+        target: PlayTarget::Song { from_row: 0 },
     });
     player.render(samples)
 }

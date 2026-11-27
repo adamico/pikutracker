@@ -624,10 +624,7 @@ fn a_project_holding_custom_instruments_opens_and_plays() {
     app.apply(Action::PlayFocusedPane);
 
     let mut player = Player::new();
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    assert_eq!(player.render(1000).len(), 1000);
+    assert_eq!(support::play_along(&mut app, &mut player, 1000).len(), 1000);
 }
 
 #[test]

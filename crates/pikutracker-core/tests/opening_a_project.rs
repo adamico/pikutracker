@@ -3,7 +3,7 @@ mod support;
 use pikutracker_core::app::{
     Action, App, Direction, DirectoryEntry, FileRequest, FileResponse, layout,
 };
-use pikutracker_core::player::{AudioRequest, Player, TrackMix};
+use pikutracker_core::player::{AudioRequest, PlayTarget, Player, TrackMix};
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
 use pikutracker_core::project_file;
 use pikutracker_core::synth::SAMPLES_PER_TICK;
@@ -78,6 +78,31 @@ fn opening_a_project_stops_playback() {
 }
 
 #[test]
+fn opening_a_project_during_a_note_preview_silences_it_and_drops_mute_and_solo() {
+    let mut app = App::with_project(song());
+    app.apply(Action::Mute { track_number: 1 });
+    app.apply(Action::FocusPrevious);
+    app.apply(Action::FocusPrevious);
+    app.apply(Action::PianoKey(9));
+    app.apply(Action::Undo);
+    assert!(
+        app.take_audio_requests()
+            .iter()
+            .any(|request| matches!(request, AudioRequest::PreviewStep { .. }))
+    );
+
+    open(&mut app, &song());
+
+    assert_eq!(
+        app.take_audio_requests(),
+        [
+            AudioRequest::Stop,
+            AudioRequest::SetTrackMix(TrackMix::default())
+        ]
+    );
+}
+
+#[test]
 fn space_plays_again_after_opening_a_project() {
     let mut app = App::with_project(song());
     app.apply(Action::PlaySongFromCursor);
@@ -88,7 +113,10 @@ fn space_plays_again_after_opening_a_project() {
 
     assert!(matches!(
         app.take_audio_requests().as_slice(),
-        [AudioRequest::PlaySong { .. }]
+        [AudioRequest::Play {
+            target: PlayTarget::Song { .. },
+            ..
+        }]
     ));
 }
 
@@ -97,12 +125,8 @@ fn opening_a_project_clears_the_playhead_marker() {
     let mut app = App::with_project(song());
     let mut player = Player::new();
     app.apply(Action::PlaySongFromCursor);
-    for request in app.take_audio_requests() {
-        player.handle(request);
-    }
-    player.render(STEP_SAMPLES);
+    support::play_along(&mut app, &mut player, STEP_SAMPLES);
     let report = player.report();
-    app.show_playback(&report);
 
     open(&mut app, &song());
     app.show_playback(&report);
