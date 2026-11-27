@@ -4,6 +4,7 @@ mod change_speed;
 mod claim_text;
 mod claiming;
 mod exporting;
+mod file_conversations;
 mod files;
 mod focus;
 mod history;
@@ -40,7 +41,7 @@ use crate::screen::grid::Grid;
 use crate::settings::AppState;
 use cell_edits::Clipboard;
 use change_speed::SpeedChange;
-use files::Waiting;
+use file_conversations::FileConversations;
 use focus::Focus;
 use history::{CursorPlace, History, Merge};
 use layout::Area;
@@ -84,7 +85,6 @@ pub struct App {
     quitting: bool,
     app_state: AppState,
     state_file: Option<PathBuf>,
-    config_set_aside: Option<PathBuf>,
     keyboard: Keyboard,
     midi_table: MidiTable,
     focus: Focus,
@@ -103,8 +103,7 @@ pub struct App {
     log: LogPane,
     help_announcement: HelpAnnouncement,
     cart_visits: u32,
-    waiting: Option<Waiting>,
-    file_requests: Vec<FileRequest>,
+    files: FileConversations,
 }
 
 impl Default for App {
@@ -133,7 +132,6 @@ impl App {
             quitting: false,
             app_state: AppState::default(),
             state_file: None,
-            config_set_aside: None,
             keyboard: Keyboard::default(),
             midi_table: MidiTable::default(),
             focus: Focus::default(),
@@ -149,8 +147,7 @@ impl App {
             log: LogPane::default(),
             help_announcement: HelpAnnouncement::default(),
             cart_visits: 0,
-            waiting: None,
-            file_requests: Vec::new(),
+            files: FileConversations::default(),
         };
         app.show_what_the_cursors_point_at();
         app

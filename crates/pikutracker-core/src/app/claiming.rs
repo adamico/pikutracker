@@ -1,4 +1,5 @@
-use super::files::{Waiting, cannot_use, shown_name};
+use super::file_conversations::Asked;
+use super::files::{FileRequest, cannot_use, shown_name};
 use super::focus::Focus;
 use super::importing::TEXT_CART_EXTENSION;
 use super::messages::Report;
@@ -33,8 +34,8 @@ impl App {
         self.set_focus(Focus::RightSlot);
         if let Some(target) = self.project.target_cart() {
             let path = self.target_cart_path(&target.path);
-            self.request_bytes(path.clone());
-            self.waiting = Some(Waiting::CartViewReading(path));
+            self.files
+                .ask(FileRequest::ReadBytes { path }, Asked::CartViewReading);
         }
     }
 
@@ -181,8 +182,11 @@ impl App {
     }
 
     pub(super) fn make_new_cart(&mut self, path: PathBuf) {
-        self.request_write_bytes(path.clone(), Cart::new_cart_bytes());
-        self.waiting = Some(Waiting::MakingCart(path));
+        let contents = Cart::new_cart_bytes();
+        self.files.ask(
+            FileRequest::WriteBytes { path, contents },
+            Asked::MakingCart,
+        );
     }
 
     pub(super) fn finish_making_cart(&mut self, path: &Path) {
