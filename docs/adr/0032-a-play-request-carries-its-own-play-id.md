@@ -4,7 +4,7 @@ The Transport gives every play it starts a `PlayId` and puts it in the `AudioReq
 
 ## Consequences
 
-- Only the requests that start a play carry a `PlayId`: song, chain, chain on its own, phrase and instrument audition. A step preview, Stop, a resent Project and a Mute or Solo change carry none.
+- Every play is one `AudioRequest::Play` with its `PlayId`, its Project and a `PlayTarget`: a Song row, a Chain in its Song row, a Chain on its own, a Phrase, or an Instrument audition. A new kind of play is a new `PlayTarget`, and it gets its id for free. A step preview, Stop, a resent Project and a Mute or Solo change carry no id.
 - `finished_play` is `None` until the Player has finished a play.
 - A report from an older play never ends the latest one, however late it arrives.
 - The Window shell passes reports from the audio thread to the App core without reading them, so only the type changes there.

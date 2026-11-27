@@ -1,7 +1,7 @@
 mod support;
 
 use pikutracker_core::app::{Action, App, Direction};
-use pikutracker_core::player::{AudioRequest, Player, Resampler};
+use pikutracker_core::player::{AudioRequest, PlayTarget, Player, Resampler};
 use pikutracker_core::synth::{SAMPLE_RATE, SAMPLES_PER_TICK};
 use support::{apply, status_line};
 
@@ -147,7 +147,13 @@ fn space_after_stopping_plays_again() {
     let requests = app.take_audio_requests();
     assert_eq!(requests.len(), 3);
     assert!(matches!(requests[1], AudioRequest::Stop));
-    assert!(matches!(requests[2], AudioRequest::PlayPhrase { .. }));
+    assert!(matches!(
+        requests[2],
+        AudioRequest::Play {
+            target: PlayTarget::Phrase { .. },
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -184,7 +190,10 @@ fn space_in_the_right_hand_view_plays_the_last_focused_phrase_pane() {
 
     assert!(matches!(
         app.take_audio_requests().as_slice(),
-        [AudioRequest::PlayPhrase { from_step: 2, .. }]
+        [AudioRequest::Play {
+            target: PlayTarget::Phrase { from_step: 2, .. },
+            ..
+        }]
     ));
 }
 

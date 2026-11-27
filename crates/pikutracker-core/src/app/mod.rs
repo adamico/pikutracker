@@ -30,7 +30,7 @@ use crate::export;
 use crate::keymap::{Key, KeyPress, Keyboard};
 use crate::midi_import::MidiTable;
 use crate::multitrack::Timeline;
-use crate::player::{AudioRequest, PlaybackReport, Playhead};
+use crate::player::{AudioRequest, PlayTarget, PlaybackReport, Playhead};
 use crate::project::{CHAIN_ENTRIES, FIRST_CUSTOM_INSTRUMENT, LAST_CUSTOM_INSTRUMENT, SONG_ROWS};
 use crate::project::{
     Chain, ChainEntry, ChainId, Phrase, PhraseId, Project, SongPlace, SongRowMarks, Step, Track,
@@ -60,7 +60,7 @@ use status_line::StatusLine;
 use std::borrow::Cow;
 use std::path::PathBuf;
 use std::time::Duration;
-use transport::{PlayTarget, Transport};
+use transport::Transport;
 
 const SONG_JUMP_ROWS: usize = 16;
 const NOTHING_TO_PLAY: &str = "NOTHING TO PLAY";

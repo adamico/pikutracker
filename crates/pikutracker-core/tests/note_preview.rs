@@ -1,7 +1,7 @@
 mod support;
 
 use pikutracker_core::app::{Action, App, Direction};
-use pikutracker_core::player::{AudioRequest, Player};
+use pikutracker_core::player::{AudioRequest, PlayTarget, Player};
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
 use pikutracker_core::synth::{SAMPLE_RATE, SAMPLES_PER_TICK};
 use support::apply;
@@ -227,7 +227,10 @@ fn a_preview_is_not_a_play() {
 
     assert!(matches!(
         app.take_audio_requests().as_slice(),
-        [AudioRequest::PlayPhrase { .. }]
+        [AudioRequest::Play {
+            target: PlayTarget::Phrase { .. },
+            ..
+        }]
     ));
     assert_eq!(player.finished_play(), None);
 }

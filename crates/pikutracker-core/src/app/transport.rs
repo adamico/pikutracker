@@ -1,30 +1,6 @@
-use crate::player::{AudioRequest, PlayId, PlaybackReport, Playhead, TrackMix};
-use crate::project::{ChainId, Phrase, PhraseId, Project};
+use crate::player::{AudioRequest, PlayId, PlayTarget, PlaybackReport, Playhead, TrackMix};
+use crate::project::{Phrase, Project};
 use std::sync::Arc;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum PlayTarget {
-    Song {
-        from_row: usize,
-    },
-    ChainInSongRow {
-        song_row: usize,
-        track: usize,
-        from_entry: usize,
-    },
-    ChainAlone {
-        chain: ChainId,
-        from_entry: usize,
-    },
-    Phrase {
-        phrase: PhraseId,
-        transpose: i8,
-        from_step: usize,
-    },
-    Audition {
-        instrument: u8,
-    },
-}
 
 #[derive(Debug)]
 pub(super) struct Transport {
@@ -69,50 +45,14 @@ impl Transport {
     pub(super) fn play(&mut self, target: PlayTarget, project: &Project) {
         let play = self.latest_play.map_or(PlayId::FIRST, PlayId::next);
         let project = self.hear(project);
-        let request = match target {
-            PlayTarget::Song { from_row } => AudioRequest::PlaySong {
-                play,
-                project,
-                from_row,
-            },
-            PlayTarget::ChainInSongRow {
-                song_row,
-                track,
-                from_entry,
-            } => AudioRequest::PlayChain {
-                play,
-                project,
-                song_row,
-                track,
-                from_entry,
-            },
-            PlayTarget::ChainAlone { chain, from_entry } => AudioRequest::PlayChainAlone {
-                play,
-                project,
-                chain,
-                from_entry,
-            },
-            PlayTarget::Phrase {
-                phrase,
-                transpose,
-                from_step,
-            } => AudioRequest::PlayPhrase {
-                play,
-                project,
-                phrase,
-                transpose,
-                from_step,
-            },
-            PlayTarget::Audition { instrument } => AudioRequest::AuditionInstrument {
-                play,
-                project,
-                instrument,
-            },
-        };
         self.playing = true;
         self.previewing = false;
         self.latest_play = Some(play);
-        self.requests.push(request);
+        self.requests.push(AudioRequest::Play {
+            play,
+            project,
+            target,
+        });
     }
 
     pub(super) fn stop(&mut self) {

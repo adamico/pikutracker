@@ -3,7 +3,7 @@ mod support;
 use pikutracker_core::app::{
     Action, App, Direction, DirectoryEntry, FileRequest, FileResponse, layout,
 };
-use pikutracker_core::player::{AudioRequest, Player, TrackMix};
+use pikutracker_core::player::{AudioRequest, PlayTarget, Player, TrackMix};
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project};
 use pikutracker_core::project_file;
 use pikutracker_core::synth::SAMPLES_PER_TICK;
@@ -113,7 +113,10 @@ fn space_plays_again_after_opening_a_project() {
 
     assert!(matches!(
         app.take_audio_requests().as_slice(),
-        [AudioRequest::PlaySong { .. }]
+        [AudioRequest::Play {
+            target: PlayTarget::Song { .. },
+            ..
+        }]
     ));
 }
 

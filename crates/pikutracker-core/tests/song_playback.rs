@@ -1,7 +1,7 @@
 mod support;
 
 use pikutracker_core::app::{Action, App, Direction};
-use pikutracker_core::player::{AudioRequest, PlayId, Player};
+use pikutracker_core::player::{AudioRequest, PlayId, PlayTarget, Player};
 use pikutracker_core::project::{ChainEntry, ChainId, PhraseId, Project, SongRowMarks};
 use pikutracker_core::synth::{SAMPLE_RATE, SAMPLES_PER_TICK};
 use support::status_line;
@@ -382,7 +382,10 @@ fn space_plays_again_after_the_song_has_stopped_by_itself() {
 
     assert!(matches!(
         app.take_audio_requests().as_slice(),
-        [AudioRequest::PlaySong { from_row: 0, .. }]
+        [AudioRequest::Play {
+            target: PlayTarget::Song { from_row: 0 },
+            ..
+        }]
     ));
 }
 
@@ -391,10 +394,10 @@ fn the_player_reports_a_play_as_finished_by_the_id_it_was_given() {
     let mut player = Player::new();
     assert_eq!(player.report().finished_play, None);
 
-    player.handle(AudioRequest::PlaySong {
+    player.handle(AudioRequest::Play {
         play: PlayId::new(7),
         project: std::sync::Arc::new(Project::new()),
-        from_row: 0,
+        target: PlayTarget::Song { from_row: 0 },
     });
 
     assert_eq!(player.report().finished_play, Some(PlayId::new(7)));
@@ -468,7 +471,10 @@ fn shift_space_during_playback_restarts_the_song_with_no_stop_between() {
 
     assert!(matches!(
         app.take_audio_requests().as_slice(),
-        [AudioRequest::PlaySong { from_row: 1, .. }]
+        [AudioRequest::Play {
+            target: PlayTarget::Song { from_row: 1 },
+            ..
+        }]
     ));
 }
 
