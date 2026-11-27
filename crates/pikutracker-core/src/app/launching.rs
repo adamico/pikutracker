@@ -214,7 +214,7 @@ impl App {
             return;
         };
         self.app_state = self.state_to_remember();
-        self.files.tell(FileRequest::Write {
+        self.files.send_without_waiting(FileRequest::Write {
             path: state_file,
             contents: write_state(&self.app_state),
         });

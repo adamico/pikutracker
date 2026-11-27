@@ -3,7 +3,6 @@ use super::files::{FileRequest, FileResponse};
 use crate::project::Project;
 use std::path::PathBuf;
 
-/// What the App asked a file for, handed back with the answer.
 #[derive(Debug)]
 pub(super) enum Asked {
     Listing,
@@ -52,8 +51,6 @@ impl Conversation {
     }
 }
 
-/// The file requests the App has sent and is still waiting on. Any number
-/// can be outstanding; each response goes back with what its request was for.
 #[derive(Debug, Default)]
 pub(super) struct FileConversations {
     requests: Vec<FileRequest>,
@@ -80,8 +77,7 @@ impl FileConversations {
         self.requests.push(request);
     }
 
-    /// Sends a request whose answer nobody waits for.
-    pub(super) fn tell(&mut self, request: FileRequest) {
+    pub(super) fn send_without_waiting(&mut self, request: FileRequest) {
         self.requests.push(request);
     }
 
@@ -93,8 +89,6 @@ impl FileConversations {
         !self.open.is_empty()
     }
 
-    /// Ends the oldest conversation this response answers and says what it
-    /// was for, or `None` when nothing was waiting on it.
     pub(super) fn answer(&mut self, response: &FileResponse) -> Option<Asked> {
         let index = self
             .open
