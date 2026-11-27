@@ -549,7 +549,7 @@ impl App {
     }
 
     fn toggle_log(&mut self) {
-        if self.overlays.log_open() {
+        if self.overlays.log_on_top() {
             self.close_log();
         } else {
             self.overlays.open_log(self.focus);
@@ -558,11 +558,8 @@ impl App {
     }
 
     fn close_log(&mut self) {
-        let Some(return_to) = self.overlays.close_log() else {
-            return;
-        };
-        if self.focus == Focus::RightSlot {
-            self.set_focus(return_to);
+        if let Some(focus) = self.overlays.close_log(self.focus) {
+            self.set_focus(focus);
         }
     }
 
@@ -615,7 +612,7 @@ impl App {
         };
         match action {
             Action::Cancel => {
-                self.overlays.take_instrument_view();
+                self.overlays.close_instrument_view();
                 self.transport.stop_if_playing();
             }
             Action::PlayFocusedPane if self.transport.stop_if_playing() => {}
@@ -928,11 +925,10 @@ impl App {
                     layout::draw_the_right_separator(&mut grid);
                 }
                 let project = self.project_name();
-                let status = match self.overlays.top() {
-                    Some(Overlay::MidiDialog(_)) => {
-                        StatusLine::Hints(dialog.hints(self.keyboard.keymap()))
-                    }
-                    _ => self.status_line(&project),
+                let status = if self.overlays.midi_dialog_on_top() {
+                    StatusLine::Hints(dialog.hints(self.keyboard.keymap()))
+                } else {
+                    self.status_line(&project)
                 };
                 status_line::draw(&mut grid, &status);
                 return grid;
@@ -1035,22 +1031,8 @@ impl App {
 
     fn status_line<'a>(&'a self, project: &'a str) -> StatusLine<'a> {
         let keymap = self.keyboard.keymap();
-        match self.overlays.top() {
-            Some(Overlay::SpeedEntry(entry)) => {
-                let text = key_hints::asked(
-                    keymap,
-                    KeyContext::SpeedEntry,
-                    entry.text(),
-                    change_speed::APPLY,
-                );
-                return StatusLine::Question(text);
-            }
-            Some(Overlay::Question(question)) => {
-                let context = KeyContext::Navigation;
-                let text = key_hints::asked(keymap, context, &question.text, question.answer);
-                return StatusLine::Question(text);
-            }
-            _ => {}
+        if let Some(text) = self.overlays.asked(keymap) {
+            return StatusLine::Question(text);
         }
         let notice = self.notice.as_ref();
         if let Some(notice) = notice.filter(|notice| notice.is_persistent()) {

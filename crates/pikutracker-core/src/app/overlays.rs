@@ -1,13 +1,15 @@
 use super::action::KeyContext;
-use super::change_speed::SpeedEntry;
+use super::change_speed::{self, SpeedEntry};
 use super::files::Question;
 use super::focus::Focus;
+use super::key_hints;
 use super::layout::{self, Area};
 use super::panes::cart_view::CartView;
 use super::panes::file_list::FileList;
 use super::panes::help::HelpList;
 use super::panes::instrument::InstrumentView;
 use super::panes::midi_dialog::MidiDialog;
+use crate::keymap::Keymap;
 use crate::project::Project;
 
 #[derive(Debug)]
@@ -27,6 +29,55 @@ impl Overlay {
     fn sits_on_the_status_line(&self) -> bool {
         matches!(self, Overlay::SpeedEntry(_) | Overlay::Question(_))
     }
+
+    fn key_context(&self, project: &Project) -> KeyContext {
+        match self {
+            Overlay::SpeedEntry(_) => KeyContext::SpeedEntry,
+            Overlay::Question(_) => KeyContext::Navigation,
+            Overlay::MidiDialog(_) => KeyContext::MidiImport,
+            Overlay::FileList(list) if list.purpose().takes_a_name() => KeyContext::FileName,
+            Overlay::FileList(_) => KeyContext::Navigation,
+            Overlay::InstrumentView(view) => view.key_context(project),
+        }
+    }
+
+    fn help(&self, away_from_focus: Area) -> Option<(HelpList, Area)> {
+        match self {
+            Overlay::SpeedEntry(_) => Some((HelpList::SpeedEntry, away_from_focus)),
+            Overlay::Question(_) | Overlay::InstrumentView(_) => None,
+            Overlay::MidiDialog(dialog) => {
+                let keys = dialog.help_list();
+                let area = if keys == HelpList::MidiDrumKit {
+                    layout::LEFT_AREA
+                } else {
+                    layout::RIGHT_SLOT
+                };
+                Some((keys, area))
+            }
+            Overlay::FileList(list) if list.purpose().takes_a_name() => {
+                Some((HelpList::SaveList, layout::LEFT_AREA))
+            }
+            Overlay::FileList(_) => Some((HelpList::OpenList, layout::LEFT_AREA)),
+        }
+    }
+
+    fn asked(&self, keymap: &Keymap) -> Option<String> {
+        match self {
+            Overlay::SpeedEntry(entry) => Some(key_hints::asked(
+                keymap,
+                KeyContext::SpeedEntry,
+                entry.text(),
+                change_speed::APPLY,
+            )),
+            Overlay::Question(question) => Some(key_hints::asked(
+                keymap,
+                KeyContext::Navigation,
+                &question.text,
+                question.answer,
+            )),
+            Overlay::MidiDialog(_) | Overlay::FileList(_) | Overlay::InstrumentView(_) => None,
+        }
+    }
 }
 
 pub(super) enum Screen<'a> {
@@ -42,35 +93,98 @@ pub(super) enum RightSlotView<'a> {
     Multitrack,
 }
 
+#[derive(Debug)]
+enum SlotView {
+    Log,
+    CartView(CartView),
+}
+
+#[derive(Debug)]
+struct OpenSlotView {
+    view: SlotView,
+    focus_returns_to: Focus,
+}
+
+#[derive(Debug, Default)]
+struct SlotViews {
+    open: Vec<OpenSlotView>,
+}
+
+impl SlotViews {
+    fn top(&self) -> Option<&SlotView> {
+        self.open.last().map(|open| &open.view)
+    }
+
+    fn log_on_top(&self) -> bool {
+        matches!(self.top(), Some(SlotView::Log))
+    }
+
+    fn cart_view_on_top(&self) -> bool {
+        matches!(self.top(), Some(SlotView::CartView(_)))
+    }
+
+    fn open(&mut self, view: SlotView, focus_returns_to: Focus) {
+        let same_kind = std::mem::discriminant(&view);
+        self.open
+            .retain(|open| std::mem::discriminant(&open.view) != same_kind);
+        self.open.push(OpenSlotView {
+            view,
+            focus_returns_to,
+        });
+    }
+
+    fn close(&mut self, is_it: fn(&SlotView) -> bool, focus: Focus) -> Option<Focus> {
+        let index = self.open.iter().position(|open| is_it(&open.view))?;
+        let on_top = index + 1 == self.open.len();
+        let closed = self.open.remove(index);
+        (on_top && focus == Focus::RightSlot).then_some(closed.focus_returns_to)
+    }
+
+    fn cart_view(&mut self) -> Option<&mut CartView> {
+        self.open.iter_mut().find_map(|open| match &mut open.view {
+            SlotView::CartView(view) => Some(view),
+            SlotView::Log => None,
+        })
+    }
+
+    fn reset_for_new_project(&mut self) {
+        self.open.retain(|open| matches!(open.view, SlotView::Log));
+        for open in &mut self.open {
+            open.focus_returns_to = Focus::Song;
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub(super) struct Overlays {
     stack: Vec<Overlay>,
-    log_returns_to: Option<Focus>,
-    cart_view: Option<CartView>,
+    slot_views: SlotViews,
     help_open: bool,
 }
 
 macro_rules! overlay_access {
-    ($variant:ident, $ty:ty, $take:ident $(, $get:ident)?) => {
+    ($variant:ident, $ty:ty, close: $close:ident $(, take: $take:ident)? $(, get: $get:ident)?) => {
+        pub(super) fn $close(&mut self) {
+            self.remove(|overlay| matches!(overlay, Overlay::$variant(_)));
+        }
+
+        $(
+            pub(super) fn $take(&mut self) -> Option<$ty> {
+                match self.remove(|overlay| matches!(overlay, Overlay::$variant(_)))? {
+                    Overlay::$variant(inner) => Some(inner),
+                    _ => None,
+                }
+            }
+        )?
+
         $(
             pub(super) fn $get(&mut self) -> Option<&mut $ty> {
                 self.stack.iter_mut().rev().find_map(|overlay| match overlay {
-                    Overlay::$variant(it) => Some(it),
+                    Overlay::$variant(inner) => Some(inner),
                     _ => None,
                 })
             }
         )?
-
-        pub(super) fn $take(&mut self) -> Option<$ty> {
-            let index = self
-                .stack
-                .iter()
-                .rposition(|overlay| matches!(overlay, Overlay::$variant(_)))?;
-            match self.stack.remove(index) {
-                Overlay::$variant(it) => Some(it),
-                _ => None,
-            }
-        }
     };
 }
 
@@ -84,27 +198,28 @@ impl Overlays {
         self.stack.last()
     }
 
-    overlay_access!(SpeedEntry, SpeedEntry, take_speed_entry, speed_entry);
-    overlay_access!(Question, Question, take_question);
-    overlay_access!(MidiDialog, Box<MidiDialog>, take_midi_dialog, midi_dialog);
-    overlay_access!(FileList, FileList, take_file_list, file_list);
-    overlay_access!(
-        InstrumentView,
-        InstrumentView,
-        take_instrument_view,
-        instrument_view
-    );
+    pub(super) fn midi_dialog_on_top(&self) -> bool {
+        matches!(self.top(), Some(Overlay::MidiDialog(_)))
+    }
+
+    fn remove(&mut self, is_it: fn(&Overlay) -> bool) -> Option<Overlay> {
+        let index = self.stack.iter().rposition(is_it)?;
+        Some(self.stack.remove(index))
+    }
+
+    overlay_access!(SpeedEntry, SpeedEntry, close: close_speed_entry, take: take_speed_entry, get: speed_entry);
+    overlay_access!(Question, Question, close: close_question, take: take_question);
+    overlay_access!(MidiDialog, Box<MidiDialog>, close: close_midi_dialog, take: take_midi_dialog, get: midi_dialog);
+    overlay_access!(FileList, FileList, close: close_file_list, get: file_list);
+    overlay_access!(InstrumentView, InstrumentView, close: close_instrument_view, get: instrument_view);
 
     pub(super) fn reset_for_new_project(&mut self) {
         self.stack.clear();
-        self.cart_view = None;
-        if let Some(return_to) = self.log_returns_to.as_mut() {
-            *return_to = Focus::Song;
-        }
+        self.slot_views.reset_for_new_project();
     }
 
-    fn open_file_list(&self) -> Option<&FileList> {
-        self.stack.iter().find_map(|overlay| match overlay {
+    fn shown_file_list(&self) -> Option<&FileList> {
+        self.stack.iter().rev().find_map(|overlay| match overlay {
             Overlay::FileList(list) => Some(list),
             _ => None,
         })
@@ -124,34 +239,30 @@ impl Overlays {
     }
 
     pub(super) fn right_slot(&self) -> RightSlotView<'_> {
-        if let Some(list) = self.open_file_list() {
-            RightSlotView::FileList(list)
-        } else if self.log_returns_to.is_some() {
-            RightSlotView::Log
-        } else if let Some(view) = &self.cart_view {
-            RightSlotView::CartView(view)
-        } else {
-            RightSlotView::Multitrack
+        if let Some(list) = self.shown_file_list() {
+            return RightSlotView::FileList(list);
+        }
+        match self.slot_views.top() {
+            Some(SlotView::Log) => RightSlotView::Log,
+            Some(SlotView::CartView(view)) => RightSlotView::CartView(view),
+            None => RightSlotView::Multitrack,
         }
     }
 
     pub(super) fn panes_show_focus(&self) -> bool {
-        self.open_file_list().is_none()
+        self.shown_file_list().is_none()
     }
 
     pub(super) fn key_context(&self, project: &Project, focus: Focus) -> Option<KeyContext> {
         match self.top() {
-            Some(Overlay::SpeedEntry(_)) => Some(KeyContext::SpeedEntry),
-            Some(Overlay::Question(_)) => Some(KeyContext::Navigation),
-            Some(Overlay::MidiDialog(_)) => Some(KeyContext::MidiImport),
-            Some(Overlay::FileList(list)) if list.purpose().takes_a_name() => {
-                Some(KeyContext::FileName)
-            }
-            Some(Overlay::FileList(_)) => Some(KeyContext::Navigation),
-            Some(Overlay::InstrumentView(view)) => Some(view.key_context(project)),
+            Some(overlay) => Some(overlay.key_context(project)),
             None if self.cart_view_has_focus(focus) => Some(KeyContext::ClaimText),
             None => None,
         }
+    }
+
+    pub(super) fn asked(&self, keymap: &Keymap) -> Option<String> {
+        self.top()?.asked(keymap)
     }
 
     pub(super) fn toggle_help(&mut self) {
@@ -167,27 +278,8 @@ impl Overlays {
         } else {
             layout::RIGHT_SLOT
         };
-        match self.top() {
-            Some(Overlay::SpeedEntry(_)) => return Some((HelpList::SpeedEntry, away_from_focus)),
-            Some(Overlay::Question(_) | Overlay::InstrumentView(_)) => return None,
-            Some(Overlay::MidiDialog(dialog)) => {
-                let keys = dialog.help_list();
-                let area = if keys == HelpList::MidiDrumKit {
-                    layout::LEFT_AREA
-                } else {
-                    layout::RIGHT_SLOT
-                };
-                return Some((keys, area));
-            }
-            Some(Overlay::FileList(list)) => {
-                let keys = if list.purpose().takes_a_name() {
-                    HelpList::SaveList
-                } else {
-                    HelpList::OpenList
-                };
-                return Some((keys, layout::LEFT_AREA));
-            }
-            None => {}
+        if let Some(overlay) = self.top() {
+            return overlay.help(away_from_focus);
         }
         let keys = match (focus, self.right_slot()) {
             (Focus::Phrase, _) => HelpList::Phrase,
@@ -202,49 +294,49 @@ impl Overlays {
         Some((keys, away_from_focus))
     }
 
-    pub(super) fn log_open(&self) -> bool {
-        self.log_returns_to.is_some()
+    pub(super) fn log_on_top(&self) -> bool {
+        self.slot_views.log_on_top()
     }
 
     pub(super) fn log_has_focus(&self, focus: Focus) -> bool {
-        self.log_returns_to.is_some() && focus == Focus::RightSlot
+        focus == Focus::RightSlot && self.slot_views.log_on_top()
     }
 
-    pub(super) fn open_log(&mut self, focus: Focus) {
-        if self.log_returns_to.is_none() {
-            self.log_returns_to = Some(focus);
-        }
+    pub(super) fn open_log(&mut self, focus_returns_to: Focus) {
+        self.slot_views.open(SlotView::Log, focus_returns_to);
     }
 
     pub(super) fn open_log_for_a_report(&mut self, focus: Focus) {
-        if self.log_returns_to.is_none() {
-            self.log_returns_to = Some(focus);
+        if !self.slot_views.log_on_top() {
+            self.open_log(focus);
             self.help_open = false;
         }
     }
 
-    pub(super) fn close_log(&mut self) -> Option<Focus> {
-        self.log_returns_to.take()
+    pub(super) fn close_log(&mut self, focus: Focus) -> Option<Focus> {
+        let is_log: fn(&SlotView) -> bool = |view| matches!(view, SlotView::Log);
+        self.slot_views.close(is_log, focus)
     }
 
     pub(super) fn cart_view(&mut self) -> Option<&mut CartView> {
-        self.cart_view.as_mut()
+        self.slot_views.cart_view()
     }
 
-    pub(super) fn cart_view_open(&self) -> bool {
-        self.cart_view.is_some()
+    pub(super) fn cart_view_on_top(&self) -> bool {
+        self.slot_views.cart_view_on_top()
     }
 
     pub(super) fn cart_view_has_focus(&self, focus: Focus) -> bool {
-        focus == Focus::RightSlot && self.log_returns_to.is_none() && self.cart_view.is_some()
+        focus == Focus::RightSlot && self.slot_views.cart_view_on_top()
     }
 
-    pub(super) fn open_cart_view(&mut self, view: CartView) {
-        self.log_returns_to = None;
-        self.cart_view = Some(view);
+    pub(super) fn open_cart_view(&mut self, view: CartView, focus_returns_to: Focus) {
+        self.slot_views
+            .open(SlotView::CartView(view), focus_returns_to);
     }
 
-    pub(super) fn take_cart_view(&mut self) -> Option<CartView> {
-        self.cart_view.take()
+    pub(super) fn close_cart_view(&mut self, focus: Focus) -> Option<Focus> {
+        let is_cart_view: fn(&SlotView) -> bool = |view| matches!(view, SlotView::CartView(_));
+        self.slot_views.close(is_cart_view, focus)
     }
 }

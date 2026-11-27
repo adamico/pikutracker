@@ -238,7 +238,7 @@ impl App {
                 None => entry.refuse(),
             },
             Action::Cancel => {
-                self.overlays.take_speed_entry();
+                self.overlays.close_speed_entry();
                 self.selection_start = None;
             }
             _ => {}

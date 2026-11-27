@@ -1,7 +1,9 @@
 mod support;
 
 use pikutracker_core::app::layout;
-use pikutracker_core::app::{Action, App, Direction, DirectoryEntry, FileRequest, FileResponse};
+use pikutracker_core::app::{
+    Action, App, Direction, DirectoryEntry, FileRequest, FileResponse, KeyContext,
+};
 use pikutracker_core::cart::Cart;
 use pikutracker_core::player::AudioRequest;
 use pikutracker_core::project::{Claim, PhraseId, Project, TargetCart};
@@ -687,4 +689,21 @@ fn sfx_loops_import_as_phrase_loops_and_export_back_byte_for_byte() {
     for slot in 0..4 {
         assert_eq!(after.sfx_bytes(slot), before.sfx_bytes(slot), "SFX {slot}");
     }
+}
+
+#[test]
+fn a_late_not_found_question_goes_over_the_speed_entry_and_esc_returns_to_it() {
+    let mut app = imported(simple_cart().p8());
+    app.apply(Action::Export);
+    app.take_file_requests();
+    app.apply(Action::ChangeSpeed);
+
+    app.receive_file(FileResponse::Missing { path: cart_path() });
+    assert_eq!(
+        status_line(&app).trim_end(),
+        "GAME.P8 NOT FOUND  ENTER LOCATE  ESC CANCEL"
+    );
+    app.apply(Action::Cancel);
+
+    assert_eq!(app.key_context(), KeyContext::SpeedEntry);
 }

@@ -48,7 +48,7 @@ fn import_report(source: &str, warnings: Vec<LogItem>) -> Report {
 
 impl App {
     pub(super) fn finish_importing(&mut self, path: PathBuf, contents: &[u8]) {
-        self.overlays.take_file_list();
+        self.overlays.close_file_list();
         let file_name = path
             .file_name()
             .map_or_else(String::new, |name| name.to_string_lossy().into_owned());
@@ -79,7 +79,7 @@ impl App {
         match dialog.apply(action) {
             Outcome::Stay => {}
             Outcome::Cancel => {
-                self.overlays.take_midi_dialog();
+                self.overlays.close_midi_dialog();
             }
             Outcome::Import => {
                 if let Some(dialog) = self.overlays.take_midi_dialog() {

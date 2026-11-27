@@ -1,7 +1,9 @@
 mod support;
 
 use pikutracker_core::app::layout;
-use pikutracker_core::app::{Action, App, Direction, DirectoryEntry, FileRequest, FileResponse};
+use pikutracker_core::app::{
+    Action, App, Direction, DirectoryEntry, FileRequest, FileResponse, KeyContext,
+};
 use pikutracker_core::keymap::{Key, KeyPress, Keymap, Modifiers};
 use pikutracker_core::project::{Claim, Project, TargetCart};
 use std::path::{Path, PathBuf};
@@ -578,5 +580,36 @@ fn picking_the_target_cart_again_keeps_its_claimed_bytes_hash() {
     assert_eq!(
         app.project().target_cart().unwrap().claimed_bytes_hash,
         hash
+    );
+}
+
+#[test]
+fn esc_on_the_log_opened_over_the_cart_view_returns_to_the_cart_view() {
+    let mut app = App::new();
+    app.apply(Action::ToggleCart);
+    app.apply(Action::ToggleLog);
+    assert!(
+        right_slot(&app, 0).starts_with("LOG"),
+        "{}",
+        right_slot(&app, 0)
+    );
+
+    app.apply(Action::Cancel);
+
+    assert_eq!(app.key_context(), KeyContext::ClaimText);
+}
+
+#[test]
+fn closing_the_cart_view_opened_over_the_log_shows_the_log() {
+    let mut app = App::new();
+    app.apply(Action::ToggleLog);
+    app.apply(Action::ToggleCart);
+
+    app.apply(Action::ToggleCart);
+
+    assert!(
+        right_slot(&app, 0).starts_with("LOG"),
+        "{}",
+        right_slot(&app, 0)
     );
 }

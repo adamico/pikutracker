@@ -7,5 +7,5 @@ Speed entry, a question, the MIDI Import dialog, the File list and the Instrumen
 - Quit no longer closes what is open. Its question goes on top, and Esc returns to the overlay, and any Selection, beneath it.
 - While an overlay is on top, Esc goes to it. It clears a Selection only when no overlay is open.
 - A question that arrives late, such as an Export's NOT FOUND, goes on top of whatever is open, Speed entry included. Over the MIDI Import dialog it takes the status line from the dialog's key hints.
-- Opening another Project closes every overlay and the Cart view.
-- The Log and the Cart view are not overlays: they fill the right-hand slot and leave the keys to the panes until focused. The Log covers the Cart view while both are open.
+- Opening another Project closes every overlay and the Cart view, so an Instrument view left open closes too.
+- The Log and the Cart view are not overlays: they fill the right-hand slot and leave the keys to the panes until focused. They stack the same way, newest on top, so the Cart view opens over the Log and a result with items opens the Log over the Cart view. Closing the one on top while it has focus returns focus to where it was opened from, which is the right-hand slot when it was opened over the other.

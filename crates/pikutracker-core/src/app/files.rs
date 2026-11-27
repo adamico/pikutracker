@@ -161,7 +161,7 @@ impl App {
             return;
         }
         self.waiting = None;
-        self.overlays.take_file_list();
+        self.overlays.close_file_list();
         let name = shown_name(&path);
         match project_file::parse(contents) {
             Ok(project) => {
@@ -233,11 +233,11 @@ impl App {
                 format!("CANNOT LIST {}: {reason}", path.display())
             }
             Some(Waiting::Reading(read)) if read == path => {
-                self.overlays.take_file_list();
+                self.overlays.close_file_list();
                 format!("CANNOT OPEN {name}: {reason}")
             }
             Some(Waiting::Importing(read)) if read == path => {
-                self.overlays.take_file_list();
+                self.overlays.close_file_list();
                 format!("CANNOT IMPORT {name}: {reason}")
             }
             Some(Waiting::Writing(written, _)) if written == path => {
@@ -413,7 +413,7 @@ impl App {
     }
 
     fn write_project(&mut self, path: PathBuf) {
-        self.overlays.take_file_list();
+        self.overlays.close_file_list();
         let project = self.project_saved_in(&folder_of(&path));
         self.file_requests.push(FileRequest::Write {
             path: path.clone(),
@@ -425,7 +425,7 @@ impl App {
     pub(super) fn answer_question(&mut self, action: Action) {
         match action {
             Action::Cancel => {
-                self.overlays.take_question();
+                self.overlays.close_question();
             }
             Action::Confirm => {
                 if let Some(question) = self.overlays.take_question() {
@@ -456,7 +456,7 @@ impl App {
             Action::TypeChar(ch) => list.type_char(ch),
             Action::Backspace => list.backspace(),
             Action::Cancel => {
-                self.overlays.take_file_list();
+                self.overlays.close_file_list();
             }
             Action::Confirm => {
                 let choice = list.choose();
