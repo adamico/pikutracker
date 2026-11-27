@@ -161,7 +161,7 @@ impl App {
     }
 
     pub(super) fn locate_target_cart(&mut self, path: &Path) {
-        self.file_list = None;
+        self.overlays.take_file_list();
         let Some(mut target) = self.project.target_cart().cloned() else {
             return;
         };

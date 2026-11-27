@@ -90,3 +90,17 @@ fn quit_while_another_question_is_open_asks_about_quitting() {
 
     assert!(app.wants_to_quit());
 }
+
+#[test]
+fn esc_on_the_quit_question_returns_to_the_file_list() {
+    let mut app = App::new();
+    edit(&mut app);
+    app.apply(Action::SaveAs);
+    app.apply(Action::Quit);
+    assert_eq!(status_line(&app).trim_end(), UNSAVED_QUESTION);
+
+    app.apply(Action::Cancel);
+
+    assert!(!app.wants_to_quit());
+    assert_eq!(app.key_context(), KeyContext::FileName);
+}
