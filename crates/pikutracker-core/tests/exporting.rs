@@ -456,6 +456,107 @@ fn claim_failures_name_the_m8_style_cart_and_log_keys() {
     );
 }
 
+const CONFIRM_ON_F12: &str = r#"(version: 1, keys: {"Confirm": "F12"})"#;
+
+fn log_lines(app: &App) -> Vec<String> {
+    (0..10).map(|row| right_slot(app, row)).collect()
+}
+
+fn has_hint(app: &App, hint: &str) -> bool {
+    log_lines(app).iter().any(|line| line.trim() == hint)
+}
+
+fn empty_song_aimed_at_a_cart() -> Project {
+    let mut project = Project::new();
+    project.set_target_cart(Some(TargetCart {
+        path: CART_NAME.to_owned(),
+        claim: Claim {
+            sfx: vec![8],
+            first_and_last_pattern: Some((0, 0)),
+        },
+        claimed_bytes_hash: None,
+    }));
+    project
+}
+
+fn with_a_note_out_of_range(app: &App) -> Project {
+    let mut project = app.project().clone();
+    let chain = project.song_cell(0, 0).unwrap();
+    project
+        .chain_mut(chain)
+        .entry_mut(0)
+        .as_mut()
+        .unwrap()
+        .set_transpose(60);
+    project
+}
+
+#[test]
+fn an_empty_song_failure_points_to_the_song() {
+    let mut app = App::with_project(empty_song_aimed_at_a_cart());
+
+    export_with(&mut app, HEADER.as_bytes().to_vec());
+
+    assert!(has_hint(&app, "ENTER GO TO SONG"), "{:?}", log_lines(&app));
+}
+
+#[test]
+fn enter_on_the_empty_song_failure_puts_the_song_cursor_on_its_first_cell() {
+    let mut app = App::with_project(empty_song_aimed_at_a_cart());
+    for action in [DOWN, DOWN, DOWN, Action::Move(Direction::Right)] {
+        app.apply(action);
+    }
+    export_with(&mut app, HEADER.as_bytes().to_vec());
+    focus_right_slot(&mut app);
+
+    app.apply(Action::Confirm);
+
+    assert_eq!(pane_text(&app, layout::SONG, 2), "00 [--]-- -- --");
+    assert_eq!(right_slot(&app, 0), "LOG");
+}
+
+#[test]
+fn a_note_out_of_range_failure_points_to_the_note() {
+    let original = simple_cart().p8();
+    let mut app = App::with_project(with_a_note_out_of_range(&imported(original.clone())));
+
+    export_with(&mut app, original);
+
+    assert!(has_hint(&app, "ENTER GO TO NOTE"), "{:?}", log_lines(&app));
+    assert!(!has_hint(&app, "^T EDIT CLAIM"), "{:?}", log_lines(&app));
+}
+
+#[test]
+fn enter_on_a_note_out_of_range_failure_still_opens_the_phrase() {
+    let original = simple_cart().p8();
+    let mut app = App::with_project(with_a_note_out_of_range(&imported(original.clone())));
+    export_with(&mut app, original);
+    focus_right_slot(&mut app);
+
+    app.apply(Action::Confirm);
+
+    assert_eq!(
+        app.key_context(),
+        pikutracker_core::app::KeyContext::PhrasePitch
+    );
+}
+
+#[test]
+fn the_go_to_hints_name_a_rebound_confirm_key() {
+    let mut app = launched(
+        App::with_project(empty_song_aimed_at_a_cart()),
+        CONFIRM_ON_F12,
+    );
+    export_with(&mut app, HEADER.as_bytes().to_vec());
+    assert!(has_hint(&app, "F12 GO TO SONG"), "{:?}", log_lines(&app));
+
+    let original = simple_cart().p8();
+    let project = with_a_note_out_of_range(&imported(original.clone()));
+    let mut app = launched(App::with_project(project), CONFIRM_ON_F12);
+    export_with(&mut app, original);
+    assert!(has_hint(&app, "F12 GO TO NOTE"), "{:?}", log_lines(&app));
+}
+
 #[test]
 fn a_target_cart_that_cannot_be_read_is_reported() {
     let mut app = imported(simple_cart().p8());

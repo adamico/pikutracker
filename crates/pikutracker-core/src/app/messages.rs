@@ -12,12 +12,18 @@ pub enum Severity {
     Failure,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Location {
+    Step(SongPlace),
+    SongCell { song_row: usize, track: usize },
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LogItem {
     pub(super) severity: Severity,
     pub(super) text: String,
     pub(super) hint: Option<String>,
-    pub(super) location: Option<SongPlace>,
+    pub(super) location: Option<Location>,
 }
 
 impl LogItem {
@@ -37,7 +43,12 @@ impl LogItem {
     }
 
     #[must_use]
-    pub fn at(mut self, location: SongPlace) -> Self {
+    pub fn at(self, step: SongPlace) -> Self {
+        self.in_place(Location::Step(step))
+    }
+
+    #[must_use]
+    pub fn in_place(mut self, location: Location) -> Self {
         self.location = Some(location);
         self
     }

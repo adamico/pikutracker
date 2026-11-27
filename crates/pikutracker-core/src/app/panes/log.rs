@@ -1,8 +1,7 @@
 use super::{HEADING, VALUE, draw_title, stepped};
 use crate::app::Direction;
 use crate::app::layout::Area;
-use crate::app::messages::{LogItem, Severity};
-use crate::project::SongPlace;
+use crate::app::messages::{Location, LogItem, Severity};
 use crate::screen::grid::{Grid, Style};
 use crate::screen::palette::Colour;
 
@@ -35,7 +34,7 @@ impl LogPane {
         self.picked = stepped(self.picked, rows, self.items.len());
     }
 
-    pub fn picked_location(&self) -> Option<SongPlace> {
+    pub fn picked_location(&self) -> Option<Location> {
         self.items.get(self.picked)?.location
     }
 
