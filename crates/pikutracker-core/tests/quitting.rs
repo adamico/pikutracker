@@ -1,6 +1,6 @@
 mod support;
 
-use pikutracker_core::app::{Action, App, KeyContext};
+use pikutracker_core::app::{Action, App, Direction, KeyContext};
 use pikutracker_core::keymap::{Key, KeyPress, Keymap, Modifiers};
 use support::status_line;
 
@@ -89,4 +89,31 @@ fn quit_while_another_question_is_open_asks_about_quitting() {
     app.apply(Action::Confirm);
 
     assert!(app.wants_to_quit());
+}
+
+#[test]
+fn esc_on_the_quit_question_returns_to_the_file_list() {
+    let mut app = App::new();
+    edit(&mut app);
+    app.apply(Action::SaveAs);
+    app.apply(Action::Quit);
+    assert_eq!(status_line(&app).trim_end(), UNSAVED_QUESTION);
+
+    app.apply(Action::Cancel);
+
+    assert!(!app.wants_to_quit());
+    assert_eq!(app.key_context(), KeyContext::FileName);
+}
+
+#[test]
+fn esc_answers_the_unsaved_question_before_it_clears_a_selection() {
+    let mut app = App::new();
+    edit(&mut app);
+    app.apply(Action::Select(Direction::Down));
+    app.apply(Action::NewProject);
+    assert_eq!(status_line(&app).trim_end(), UNSAVED_QUESTION);
+
+    app.apply(Action::Cancel);
+
+    assert_ne!(status_line(&app).trim_end(), UNSAVED_QUESTION);
 }

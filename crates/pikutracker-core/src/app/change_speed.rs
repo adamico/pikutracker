@@ -1,4 +1,5 @@
 use super::messages::Report;
+use super::overlays::Overlay;
 use super::selection::{CellPosition, CellRange};
 use super::{Action, App, CHAIN_ENTRIES, Focus, NO_PHRASE_HERE};
 use crate::project::{ChainId, PhraseId, SONG_ROWS, TRACKS};
@@ -157,13 +158,13 @@ impl App {
         };
         let shown_speed = self.project.phrase(shown).speed();
         let (scope, in_selection) = self.speed_scope();
-        self.speed_entry = Some(SpeedEntry::new(
+        self.overlays.open(Overlay::SpeedEntry(SpeedEntry::new(
             change,
             shown,
             shown_speed,
             scope,
             in_selection,
-        ));
+        )));
     }
 
     fn speed_scope(&self) -> ((Vec<PhraseId>, usize), bool) {
@@ -226,7 +227,7 @@ impl App {
     }
 
     pub(super) fn use_speed_entry(&mut self, action: Action) {
-        let Some(entry) = self.speed_entry.as_mut() else {
+        let Some(entry) = self.overlays.speed_entry() else {
             return;
         };
         match action {
@@ -237,7 +238,7 @@ impl App {
                 None => entry.refuse(),
             },
             Action::Cancel => {
-                self.speed_entry = None;
+                self.overlays.close_speed_entry();
                 self.selection_start = None;
             }
             _ => {}
@@ -245,7 +246,7 @@ impl App {
     }
 
     fn apply_speed(&mut self, new: u8) {
-        let Some(entry) = self.speed_entry.take() else {
+        let Some(entry) = self.overlays.take_speed_entry() else {
             return;
         };
         let (mut changed, mut inexact, mut crossed) = (0, 0, 0);

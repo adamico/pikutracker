@@ -15,11 +15,11 @@ const PICK_A_CART_FIRST: &str = "PICK A TARGET CART FIRST";
 
 impl App {
     pub(super) fn cart_view_has_focus(&self) -> bool {
-        self.cart_view.is_some() && self.focus == Focus::RightSlot && !self.log_open
+        self.overlays.cart_view_has_focus(self.focus)
     }
 
     pub(super) fn toggle_cart(&mut self) {
-        if self.cart_view.is_some() {
+        if self.overlays.cart_view_on_top() {
             self.close_cart_view();
         } else {
             self.open_cart_view();
@@ -27,10 +27,9 @@ impl App {
     }
 
     pub(super) fn open_cart_view(&mut self) {
-        self.log_open = false;
         self.cart_visits += 1;
-        let view = CartView::new(self.project.target_cart(), self.played_pane);
-        self.cart_view = Some(view);
+        let view = CartView::new(self.project.target_cart());
+        self.overlays.open_cart_view(view, self.played_pane);
         self.set_focus(Focus::RightSlot);
         if let Some(target) = self.project.target_cart() {
             let path = self.target_cart_path(&target.path);
@@ -40,16 +39,13 @@ impl App {
     }
 
     pub(super) fn close_cart_view(&mut self) {
-        let Some(view) = self.cart_view.take() else {
-            return;
-        };
-        if self.focus == Focus::RightSlot && !self.log_open {
-            self.set_focus(view.focus_before());
+        if let Some(focus) = self.overlays.close_cart_view(self.focus) {
+            self.set_focus(focus);
         }
     }
 
     pub(super) fn use_cart_view(&mut self, action: Action) -> bool {
-        let Some(view) = self.cart_view.as_mut() else {
+        let Some(view) = self.overlays.cart_view() else {
             return false;
         };
         match action {
@@ -78,7 +74,7 @@ impl App {
     }
 
     fn edit_claim(&mut self, edit: impl FnOnce(&mut CartView)) {
-        let Some(view) = self.cart_view.as_mut() else {
+        let Some(view) = self.overlays.cart_view() else {
             return;
         };
         if view.field() == CartField::Cart {
@@ -102,7 +98,7 @@ impl App {
     }
 
     fn apply_suggestion(&mut self, mut target: TargetCart) {
-        let Some(view) = self.cart_view.as_mut() else {
+        let Some(view) = self.overlays.cart_view() else {
             return;
         };
         let needs = export::needs(&self.project);
@@ -120,19 +116,19 @@ impl App {
             .target_cart()
             .map(|target| target.claim.clone())
             .unwrap_or_default();
-        if let Some(view) = self.cart_view.as_mut() {
+        if let Some(view) = self.overlays.cart_view() {
             view.show_claim(&claim);
         }
     }
 
     pub(super) fn show_cart_in_view(&mut self, contents: &[u8]) {
-        if let Some(view) = self.cart_view.as_mut() {
+        if let Some(view) = self.overlays.cart_view() {
             view.show_contents(Cart::read(contents).map_err(|error| error.to_string()));
         }
     }
 
     pub(super) fn show_unreadable_cart_in_view(&mut self, reason: String) {
-        if let Some(view) = self.cart_view.as_mut() {
+        if let Some(view) = self.overlays.cart_view() {
             view.show_contents(Err(reason));
         }
     }
@@ -148,7 +144,7 @@ impl App {
         let cart = match Cart::read(contents) {
             Ok(cart) => cart,
             Err(error) => {
-                self.file_list = None;
+                self.overlays.close_file_list();
                 self.report(Report::failure(cannot_use(path, &error.to_string())));
                 return;
             }
@@ -162,13 +158,13 @@ impl App {
     }
 
     fn adopt_target_cart(&mut self, path: &Path, cart: Cart, claimed_bytes_hash: Option<String>) {
-        self.file_list = None;
+        self.overlays.close_file_list();
         let target = TargetCart {
             path: self.path_from_project(path),
             claim: Claim::default(),
             claimed_bytes_hash,
         };
-        if let Some(view) = self.cart_view.as_mut() {
+        if let Some(view) = self.overlays.cart_view() {
             view.show_contents(Ok(cart));
             view.move_cursor(Direction::Down);
         }

@@ -12,6 +12,7 @@ mod key_hints;
 mod launching;
 pub mod layout;
 mod messages;
+mod overlays;
 mod panes;
 mod paths;
 mod restructure;
@@ -38,19 +39,17 @@ use crate::project::{
 use crate::screen::grid::Grid;
 use crate::settings::AppState;
 use cell_edits::Clipboard;
-use change_speed::{SpeedChange, SpeedEntry};
-use files::{Question, Waiting};
+use change_speed::SpeedChange;
+use files::Waiting;
 use focus::Focus;
 use history::{CursorPlace, History, Merge};
 use layout::Area;
 use messages::Notice;
-use panes::cart_view::CartView;
+use overlays::{Overlay, Overlays, RightSlotView, Screen};
 use panes::chain::{ChainPane, ChainView};
-use panes::file_list::FileList;
 use panes::help::HelpList;
 use panes::instrument::InstrumentView;
 use panes::log::LogPane;
-use panes::midi_dialog::MidiDialog;
 use panes::multitrack::{MultitrackPane, MultitrackView};
 use panes::phrase::{PhrasePane, PhraseView};
 use panes::song::SongPane;
@@ -100,17 +99,9 @@ pub struct App {
     follow_set_by_key: bool,
     remark: Option<Cow<'static, str>>,
     notice: Option<Notice>,
-    question: Option<Question>,
-    speed_entry: Option<SpeedEntry>,
+    overlays: Overlays,
     log: LogPane,
-    log_open: bool,
-    help_open: bool,
     help_announcement: HelpAnnouncement,
-    focus_before_log: Focus,
-    file_list: Option<FileList>,
-    midi_dialog: Option<Box<MidiDialog>>,
-    instrument_view: Option<InstrumentView>,
-    cart_view: Option<CartView>,
     cart_visits: u32,
     waiting: Option<Waiting>,
     file_requests: Vec<FileRequest>,
@@ -154,17 +145,9 @@ impl App {
             played_pane: Focus::default(),
             remark: None,
             notice: None,
-            question: None,
-            speed_entry: None,
+            overlays: Overlays::default(),
             log: LogPane::default(),
-            log_open: false,
-            help_open: false,
             help_announcement: HelpAnnouncement::default(),
-            focus_before_log: Focus::default(),
-            file_list: None,
-            midi_dialog: None,
-            instrument_view: None,
-            cart_view: None,
             cart_visits: 0,
             waiting: None,
             file_requests: Vec::new(),
@@ -222,27 +205,8 @@ impl App {
     }
 
     pub fn key_context(&self) -> KeyContext {
-        if self.speed_entry.is_some() {
-            return KeyContext::SpeedEntry;
-        }
-        if self.question.is_some() {
-            return KeyContext::Navigation;
-        }
-        if self.midi_dialog.is_some() {
-            return KeyContext::MidiImport;
-        }
-        if let Some(list) = &self.file_list {
-            return if list.purpose().takes_a_name() {
-                KeyContext::FileName
-            } else {
-                KeyContext::Navigation
-            };
-        }
-        if let Some(view) = &self.instrument_view {
-            return view.key_context(&self.project);
-        }
-        if self.cart_view_has_focus() {
-            return KeyContext::ClaimText;
+        if let Some(context) = self.overlays.key_context(&self.project, self.focus) {
+            return context;
         }
         match self.focus {
             Focus::Song => KeyContext::ReferenceValue,
@@ -366,10 +330,8 @@ impl App {
         if self.help_announcement == HelpAnnouncement::Showing {
             self.help_announcement = HelpAnnouncement::Over;
         }
-        if !report.items.is_empty() && !self.log_open {
-            self.log_open = true;
-            self.help_open = false;
-            self.focus_before_log = self.focus;
+        if !report.items.is_empty() {
+            self.overlays.open_log_for_a_report(self.focus);
         }
         self.log.add(report.into_log_items());
     }
@@ -449,7 +411,7 @@ impl App {
 
     fn perform(&mut self, action: Action) {
         if action == Action::ToggleHelp {
-            self.help_open = !self.help_open;
+            self.overlays.toggle_help();
             return;
         }
         self.remark = None;
@@ -457,7 +419,7 @@ impl App {
             self.song.finish_typing();
             self.chain.finish_typing();
             self.phrase.finish_typing();
-            if let Some(view) = self.instrument_view.as_mut() {
+            if let Some(view) = self.overlays.instrument_view() {
                 view.finish_typing();
             }
         }
@@ -465,31 +427,32 @@ impl App {
             self.quit();
             return;
         }
-        if self.midi_dialog.is_some() {
-            self.use_midi_dialog(action);
-            return;
-        }
-        if self.speed_entry.is_some() {
-            self.use_speed_entry(action);
-            self.transport.project_changed(&self.project);
-            return;
-        }
-        if action == Action::Cancel && self.selection_start.take().is_some() {
-            return;
-        }
-        if self.question.is_some() {
-            self.answer_question(action);
-            self.transport.project_changed(&self.project);
-            return;
-        }
-        if self.file_list.is_some() {
-            self.use_file_list(action);
-            return;
-        }
-        if self.instrument_view.is_some() {
-            self.use_instrument_view(action);
-            self.transport.project_changed(&self.project);
-            return;
+        match self.overlays.top() {
+            Some(Overlay::MidiDialog(_)) => {
+                self.use_midi_dialog(action);
+                return;
+            }
+            Some(Overlay::SpeedEntry(_)) => {
+                self.use_speed_entry(action);
+                self.transport.project_changed(&self.project);
+                return;
+            }
+            Some(Overlay::Question(_)) => {
+                self.answer_question(action);
+                self.transport.project_changed(&self.project);
+                return;
+            }
+            Some(Overlay::FileList(_)) => {
+                self.use_file_list(action);
+                return;
+            }
+            Some(Overlay::InstrumentView(_)) => {
+                self.use_instrument_view(action);
+                self.transport.project_changed(&self.project);
+                return;
+            }
+            None if action == Action::Cancel && self.selection_start.take().is_some() => return,
+            None => {}
         }
         if self.cart_view_has_focus() && self.use_cart_view(action) {
             self.transport.project_changed(&self.project);
@@ -582,23 +545,21 @@ impl App {
     }
 
     fn log_has_focus(&self) -> bool {
-        self.log_open && self.focus == Focus::RightSlot
+        self.overlays.log_has_focus(self.focus)
     }
 
     fn toggle_log(&mut self) {
-        if self.log_open {
+        if self.overlays.log_on_top() {
             self.close_log();
         } else {
-            self.log_open = true;
-            self.focus_before_log = self.focus;
+            self.overlays.open_log(self.focus);
             self.set_focus(Focus::RightSlot);
         }
     }
 
     fn close_log(&mut self) {
-        self.log_open = false;
-        if self.focus == Focus::RightSlot {
-            self.set_focus(self.focus_before_log);
+        if let Some(focus) = self.overlays.close_log(self.focus) {
+            self.set_focus(focus);
         }
     }
 
@@ -650,16 +611,17 @@ impl App {
             return;
         }
         self.selection_start = None;
-        self.instrument_view = Some(InstrumentView::new(instrument));
+        self.overlays
+            .open(Overlay::InstrumentView(InstrumentView::new(instrument)));
     }
 
     fn use_instrument_view(&mut self, action: Action) {
-        let Some(view) = self.instrument_view.as_mut() else {
+        let Some(view) = self.overlays.instrument_view() else {
             return;
         };
         match action {
             Action::Cancel => {
-                self.instrument_view = None;
+                self.overlays.close_instrument_view();
                 self.transport.stop_if_playing();
             }
             Action::PlayFocusedPane if self.transport.stop_if_playing() => {}
@@ -683,7 +645,7 @@ impl App {
                     Direction::Up | Direction::Down => view.id(),
                 };
                 if id >= FIRST_CUSTOM_INSTRUMENT && id != view.id() {
-                    self.instrument_view = Some(InstrumentView::new(id));
+                    *view = InstrumentView::new(id);
                 }
             }
             _ => view.apply(action, &mut self.project, self.phrase.pen().octave()),
@@ -910,14 +872,16 @@ impl App {
             Focus::Chain => self.chain.move_cursor(direction),
             Focus::Phrase if self.selection_would_reach_phrase_header(direction) => {}
             Focus::Phrase => self.phrase.move_cursor(direction),
-            Focus::RightSlot if self.log_open => self.log.move_cursor(direction),
-            Focus::RightSlot if self.shows_multitrack() => {
-                self.stop_following();
-                let timeline = Timeline::of(&self.project);
-                self.multitrack.move_cursor(direction, &timeline);
-                self.show_what_the_multitrack_cursor_points_at(&timeline);
-            }
-            Focus::RightSlot => {}
+            Focus::RightSlot => match self.overlays.right_slot() {
+                RightSlotView::Log => self.log.move_cursor(direction),
+                RightSlotView::Multitrack => {
+                    self.stop_following();
+                    let timeline = Timeline::of(&self.project);
+                    self.multitrack.move_cursor(direction, &timeline);
+                    self.show_what_the_multitrack_cursor_points_at(&timeline);
+                }
+                RightSlotView::FileList(_) | RightSlotView::CartView(_) => {}
+            },
         }
     }
 
@@ -937,53 +901,7 @@ impl App {
     }
 
     fn shown_help(&self) -> Option<(HelpList, Area)> {
-        if !self.help_open {
-            return None;
-        }
-        if self.speed_entry.is_some() {
-            return Some((HelpList::SpeedEntry, self.help_area_away_from_focus()));
-        }
-        if self.question.is_some() {
-            return None;
-        }
-        if let Some(dialog) = &self.midi_dialog {
-            let keys = dialog.help_list();
-            let area = if keys == HelpList::MidiDrumKit {
-                layout::LEFT_AREA
-            } else {
-                layout::RIGHT_SLOT
-            };
-            return Some((keys, area));
-        }
-        if let Some(list) = &self.file_list {
-            let keys = if list.purpose().takes_a_name() {
-                HelpList::SaveList
-            } else {
-                HelpList::OpenList
-            };
-            return Some((keys, layout::LEFT_AREA));
-        }
-        let keys = match self.focus {
-            Focus::Phrase => HelpList::Phrase,
-            Focus::Chain => HelpList::Chain,
-            Focus::Song => HelpList::Song,
-            Focus::RightSlot if self.log_open => HelpList::Log,
-            Focus::RightSlot if self.cart_view.is_some() => HelpList::CartView,
-            Focus::RightSlot => return None,
-        };
-        Some((keys, self.help_area_away_from_focus()))
-    }
-
-    fn help_area_away_from_focus(&self) -> Area {
-        if self.focus == Focus::RightSlot {
-            layout::LEFT_AREA
-        } else {
-            layout::RIGHT_SLOT
-        }
-    }
-
-    fn shows_multitrack(&self) -> bool {
-        self.file_list.is_none() && !self.log_open && self.cart_view.is_none()
+        self.overlays.help(self.focus)
     }
 
     fn playing_entry_of_shown_chain(&self) -> Option<usize> {
@@ -1008,28 +926,31 @@ impl App {
 
     pub fn grid(&self) -> Grid {
         let mut grid = Grid::new();
-        if let Some(dialog) = &self.midi_dialog {
-            dialog.draw(&mut grid);
-            if let Some((keys, area)) = self.shown_help() {
-                panes::help::draw(&mut grid, area, self.keyboard.keymap(), keys);
-                layout::draw_the_right_separator(&mut grid);
+        match self.overlays.screen() {
+            Screen::MidiDialog(dialog) => {
+                dialog.draw(&mut grid);
+                if let Some((keys, area)) = self.shown_help() {
+                    panes::help::draw(&mut grid, area, self.keyboard.keymap(), keys);
+                    layout::draw_the_right_separator(&mut grid);
+                }
+                let project = self.project_name();
+                let status = if self.overlays.midi_dialog_on_top() {
+                    StatusLine::Hints(dialog.hints(self.keyboard.keymap()))
+                } else {
+                    self.status_line(&project)
+                };
+                status_line::draw(&mut grid, &status);
+                return grid;
             }
-            let hints = dialog.hints(self.keyboard.keymap());
-            status_line::draw(&mut grid, &StatusLine::Hints(hints));
-            return grid;
+            Screen::InstrumentView(view) => {
+                view.draw(&mut grid, &self.project);
+                let project = self.project_name();
+                status_line::draw(&mut grid, &self.status_line(&project));
+                return grid;
+            }
+            Screen::Panes => {}
         }
-        if let Some(view) = self
-            .instrument_view
-            .as_ref()
-            .filter(|_| self.file_list.is_none())
-        {
-            view.draw(&mut grid, &self.project);
-            let project = self.project_name();
-            status_line::draw(&mut grid, &self.status_line(&project));
-            return grid;
-        }
-        let takes_keys = self.file_list.is_some();
-        let focus = (!takes_keys).then_some(self.focus);
+        let focus = self.overlays.panes_show_focus().then_some(self.focus);
         let project = &self.project;
         self.song.draw(
             &mut grid,
@@ -1072,37 +993,40 @@ impl App {
         self.draw_selection(&mut grid);
         let right_slot_focused = focus == Some(Focus::RightSlot);
         let help = self.shown_help();
-        if let Some(list) = &self.file_list {
-            list.draw(&mut grid, layout::RIGHT_SLOT);
-        } else if let Some((keys, area)) = help.filter(|(_, area)| *area == layout::RIGHT_SLOT) {
-            panes::help::draw(&mut grid, area, self.keyboard.keymap(), keys);
-        } else if self.log_open {
-            self.log
-                .draw(&mut grid, layout::RIGHT_SLOT, right_slot_focused);
-        } else if let Some(view) = &self.cart_view {
-            view.draw(
+        let help_in_the_right_slot = help.filter(|(_, area)| *area == layout::RIGHT_SLOT);
+        match (self.overlays.right_slot(), help_in_the_right_slot) {
+            (RightSlotView::FileList(list), _) => list.draw(&mut grid, layout::RIGHT_SLOT),
+            (_, Some((keys, area))) => {
+                panes::help::draw(&mut grid, area, self.keyboard.keymap(), keys);
+            }
+            (RightSlotView::Log, None) => {
+                self.log
+                    .draw(&mut grid, layout::RIGHT_SLOT, right_slot_focused);
+            }
+            (RightSlotView::CartView(view), None) => view.draw(
                 &mut grid,
                 layout::RIGHT_SLOT,
                 right_slot_focused,
                 self.project.target_cart(),
                 &export::needs(&self.project),
                 &key_hints::picks_one(self.keyboard.keymap()),
-            );
-        } else {
-            let timeline = Timeline::of(&self.project);
-            self.multitrack.draw(
-                &mut grid,
-                layout::RIGHT_SLOT,
-                right_slot_focused,
-                &MultitrackView {
-                    project: &self.project,
-                    timeline: &timeline,
-                    playhead_tick: self
-                        .transport
-                        .playhead()
-                        .and_then(|playhead| playhead_tick(&timeline, &playhead)),
-                },
-            );
+            ),
+            (RightSlotView::Multitrack, None) => {
+                let timeline = Timeline::of(&self.project);
+                self.multitrack.draw(
+                    &mut grid,
+                    layout::RIGHT_SLOT,
+                    right_slot_focused,
+                    &MultitrackView {
+                        project: &self.project,
+                        timeline: &timeline,
+                        playhead_tick: self
+                            .transport
+                            .playhead()
+                            .and_then(|playhead| playhead_tick(&timeline, &playhead)),
+                    },
+                );
+            }
         }
         layout::draw_separators(&mut grid);
         if let Some((keys, area)) = help.filter(|(_, area)| *area == layout::LEFT_AREA) {
@@ -1116,18 +1040,7 @@ impl App {
 
     fn status_line<'a>(&'a self, project: &'a str) -> StatusLine<'a> {
         let keymap = self.keyboard.keymap();
-        if let Some(entry) = &self.speed_entry {
-            let text = key_hints::asked(
-                keymap,
-                KeyContext::SpeedEntry,
-                entry.text(),
-                change_speed::APPLY,
-            );
-            return StatusLine::Question(text);
-        }
-        if let Some(question) = &self.question {
-            let context = KeyContext::Navigation;
-            let text = key_hints::asked(keymap, context, &question.text, question.answer);
+        if let Some(text) = self.overlays.asked(keymap) {
             return StatusLine::Question(text);
         }
         let notice = self.notice.as_ref();
@@ -1140,12 +1053,12 @@ impl App {
         if let Some(notice) = notice {
             return StatusLine::Notice(notice);
         }
-        match self.file_list.as_ref().map(FileList::purpose) {
-            Some(purpose) if purpose.takes_a_name() => {
+        match self.overlays.right_slot() {
+            RightSlotView::FileList(list) if list.purpose().takes_a_name() => {
                 StatusLine::Hints(key_hints::save_list_keys(keymap))
             }
-            Some(_) => StatusLine::Hints(key_hints::open_list_keys(keymap)),
-            None => StatusLine::Idle {
+            RightSlotView::FileList(_) => StatusLine::Hints(key_hints::open_list_keys(keymap)),
+            _ => StatusLine::Idle {
                 project,
                 unsaved: self.has_unsaved_changes(),
             },

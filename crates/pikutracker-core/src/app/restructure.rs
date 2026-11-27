@@ -1,6 +1,7 @@
 use super::cell_edits::NO_STEP_HERE;
 use super::files::Question;
 use super::messages::Report;
+use super::overlays::Overlay;
 use super::selection::CellRange;
 use super::{App, CHAIN_ENTRIES, Chain, Focus, NO_CHAIN_HERE, NO_PHRASE_HERE, Phrase, Project};
 use crate::project::{ChainEntry, ChainId, PhraseId, UnusedItems};
@@ -222,10 +223,10 @@ impl App {
             count => format!(" ({count} LOOSE)"),
         };
         self.selection_start = None;
-        self.question = Some(Question::purge_unused(
+        self.overlays.open(Overlay::Question(Question::purge_unused(
             format!("PURGE {}{loose}", counted_items(&unused)),
             PURGE,
-        ));
+        )));
     }
 
     pub(super) fn purge_unused(&mut self) {

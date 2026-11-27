@@ -1,5 +1,6 @@
 use super::exporting::FinishedExport;
 use super::messages::Report;
+use super::overlays::Overlay;
 use super::panes::file_list::{Choice, FileList, Purpose};
 use super::paths::{relative_path, resolved};
 use super::{Action, App, Focus};
@@ -138,7 +139,7 @@ impl App {
             FileResponse::Listed { directory, entries } => {
                 if matches!(&self.waiting, Some(Waiting::Listing(listed)) if *listed == directory) {
                     self.waiting = None;
-                    if let Some(list) = self.file_list.as_mut() {
+                    if let Some(list) = self.overlays.file_list() {
                         list.show(directory, entries);
                     }
                 }
@@ -160,7 +161,7 @@ impl App {
             return;
         }
         self.waiting = None;
-        self.file_list = None;
+        self.overlays.close_file_list();
         let name = shown_name(&path);
         match project_file::parse(contents) {
             Ok(project) => {
@@ -232,11 +233,11 @@ impl App {
                 format!("CANNOT LIST {}: {reason}", path.display())
             }
             Some(Waiting::Reading(read)) if read == path => {
-                self.file_list = None;
+                self.overlays.close_file_list();
                 format!("CANNOT OPEN {name}: {reason}")
             }
             Some(Waiting::Importing(read)) if read == path => {
-                self.file_list = None;
+                self.overlays.close_file_list();
                 format!("CANNOT IMPORT {name}: {reason}")
             }
             Some(Waiting::Writing(written, _)) if written == path => {
@@ -276,11 +277,11 @@ impl App {
     }
 
     pub(super) fn ask(&mut self, text: String, answer: &'static str, accepted: Accepted) {
-        self.question = Some(Question {
+        self.overlays.open(Overlay::Question(Question {
             text,
             answer,
             accepted,
-        });
+        }));
     }
 
     pub(super) fn replace_project(&mut self, project: Project, path: Option<PathBuf>) {
@@ -288,7 +289,7 @@ impl App {
         self.saved_project = project.clone();
         self.project = project;
         self.history.clear();
-        self.speed_entry = None;
+        self.overlays.reset_for_new_project();
         self.selection_start = None;
         self.clipboard = None;
         self.project_path = path;
@@ -298,10 +299,8 @@ impl App {
         self.multitrack = Default::default();
         self.shown = Default::default();
         self.show_what_the_cursors_point_at();
-        self.cart_view = None;
         self.focus = Focus::Song;
         self.played_pane = Focus::Song;
-        self.focus_before_log = Focus::Song;
     }
 
     pub(super) fn new_project(&mut self) {
@@ -329,11 +328,6 @@ impl App {
     }
 
     pub(super) fn quit(&mut self) {
-        self.midi_dialog = None;
-        self.speed_entry = None;
-        self.file_list = None;
-        self.question = None;
-        self.selection_start = None;
         if self.has_unsaved_changes() {
             self.ask_about_unsaved_changes(Accepted::Quit);
         } else {
@@ -346,11 +340,7 @@ impl App {
     }
 
     fn ask_about_unsaved_changes(&mut self, accepted: Accepted) {
-        self.question = Some(Question {
-            text: UNSAVED_QUESTION.to_owned(),
-            answer: DISCARD,
-            accepted,
-        });
+        self.ask(UNSAVED_QUESTION.to_owned(), DISCARD, accepted);
     }
 
     pub(super) fn save(&mut self) {
@@ -390,7 +380,7 @@ impl App {
             }
         };
         let list = FileList::new(purpose, directory.clone(), name).with_recent(recent);
-        self.file_list = Some(list);
+        self.overlays.open(Overlay::FileList(list));
         self.list_folder(directory);
     }
 
@@ -423,7 +413,7 @@ impl App {
     }
 
     fn write_project(&mut self, path: PathBuf) {
-        self.file_list = None;
+        self.overlays.close_file_list();
         let project = self.project_saved_in(&folder_of(&path));
         self.file_requests.push(FileRequest::Write {
             path: path.clone(),
@@ -434,9 +424,11 @@ impl App {
 
     pub(super) fn answer_question(&mut self, action: Action) {
         match action {
-            Action::Cancel => self.question = None,
+            Action::Cancel => {
+                self.overlays.close_question();
+            }
             Action::Confirm => {
-                if let Some(question) = self.question.take() {
+                if let Some(question) = self.overlays.take_question() {
                     match question.accepted {
                         Accepted::NewProject => self.replace_project(Project::new(), None),
                         Accepted::BrowseToOpen => self.browse(Purpose::Open),
@@ -456,14 +448,16 @@ impl App {
     }
 
     pub(super) fn use_file_list(&mut self, action: Action) {
-        let Some(list) = self.file_list.as_mut() else {
+        let Some(list) = self.overlays.file_list() else {
             return;
         };
         match action {
             Action::Move(direction) => list.move_cursor(direction),
             Action::TypeChar(ch) => list.type_char(ch),
             Action::Backspace => list.backspace(),
-            Action::Cancel => self.file_list = None,
+            Action::Cancel => {
+                self.overlays.close_file_list();
+            }
             Action::Confirm => {
                 let choice = list.choose();
                 self.follow_choice(choice);
@@ -494,11 +488,8 @@ impl App {
             Choice::NewCart(path) => self.make_new_cart(path),
             Choice::RefusedPngNewCart => self.remark = Some(ONLY_P8_NEW_CARTS.into()),
             Choice::Save { path, exists: true } => {
-                self.question = Some(Question {
-                    text: format!("{} EXISTS", shown_name(&path)),
-                    answer: OVERWRITE,
-                    accepted: Accepted::SaveOver(path),
-                });
+                let text = format!("{} EXISTS", shown_name(&path));
+                self.ask(text, OVERWRITE, Accepted::SaveOver(path));
             }
             Choice::Save {
                 path,

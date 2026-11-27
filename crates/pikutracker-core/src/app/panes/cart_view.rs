@@ -2,7 +2,6 @@ use super::log::{TAG_COLUMN, TEXT_COLUMN, TEXT_WIDTH, tag, tag_style, wrapped};
 use super::{EMPTY, HEADING, VALUE, draw_title, stepped};
 use crate::app::Direction;
 use crate::app::claim_text::{ClaimText, named_slots};
-use crate::app::focus::Focus;
 use crate::app::layout::Area;
 use crate::app::messages::Severity;
 use crate::cart::{Cart, SLOTS, Slots};
@@ -175,11 +174,10 @@ pub struct CartView {
     patterns: ClaimText,
     opened_with: Option<TargetCart>,
     contents: TargetCartContents,
-    focus_before: Focus,
 }
 
 impl CartView {
-    pub fn new(target: Option<&TargetCart>, focus_before: Focus) -> Self {
+    pub fn new(target: Option<&TargetCart>) -> Self {
         let claim = target
             .map(|target| target.claim.clone())
             .unwrap_or_default();
@@ -193,7 +191,6 @@ impl CartView {
             patterns: ClaimText::patterns(claim.first_and_last_pattern),
             opened_with: target.cloned(),
             contents: TargetCartContents::Unknown,
-            focus_before,
         }
     }
 
@@ -203,10 +200,6 @@ impl CartView {
 
     pub fn opened_with(&self) -> Option<&TargetCart> {
         self.opened_with.as_ref()
-    }
-
-    pub fn focus_before(&self) -> Focus {
-        self.focus_before
     }
 
     pub fn move_cursor(&mut self, direction: Direction) {

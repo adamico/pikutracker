@@ -1,5 +1,6 @@
 use super::files::{folder_of, shown_name};
 use super::messages::{LogItem, Report, Severity};
+use super::overlays::Overlay;
 use super::panes::midi_dialog::{MidiDialog, Outcome};
 use super::{Action, App};
 use crate::cart::Cart;
@@ -47,7 +48,7 @@ fn import_report(source: &str, warnings: Vec<LogItem>) -> Report {
 
 impl App {
     pub(super) fn finish_importing(&mut self, path: PathBuf, contents: &[u8]) {
-        self.file_list = None;
+        self.overlays.close_file_list();
         let file_name = path
             .file_name()
             .map_or_else(String::new, |name| name.to_string_lossy().into_owned());
@@ -65,21 +66,23 @@ impl App {
             Ok(analysis) => {
                 let table = self.midi_table.clone();
                 let dialog = MidiDialog::new(name, folder_of(path), analysis, table);
-                self.midi_dialog = Some(Box::new(dialog));
+                self.overlays.open(Overlay::MidiDialog(Box::new(dialog)));
             }
             Err(error) => self.report(Report::failure(format!("CANNOT IMPORT {name}: {error}"))),
         }
     }
 
     pub(super) fn use_midi_dialog(&mut self, action: Action) {
-        let Some(dialog) = self.midi_dialog.as_mut() else {
+        let Some(dialog) = self.overlays.midi_dialog() else {
             return;
         };
         match dialog.apply(action) {
             Outcome::Stay => {}
-            Outcome::Cancel => self.midi_dialog = None,
+            Outcome::Cancel => {
+                self.overlays.close_midi_dialog();
+            }
             Outcome::Import => {
-                if let Some(dialog) = self.midi_dialog.take() {
+                if let Some(dialog) = self.overlays.take_midi_dialog() {
                     let (name, folder, imported, table) = dialog.finish();
                     self.midi_table = table;
                     self.directory = folder;

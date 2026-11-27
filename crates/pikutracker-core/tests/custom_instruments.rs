@@ -602,3 +602,14 @@ fn letters_type_into_an_instrument_name_and_space_still_auditions() {
     assert_eq!(in_name(Key::Space), Some(SPACE));
     assert_eq!(in_name(Key::Escape), Some(ESC));
 }
+
+#[test]
+fn esc_in_the_file_list_returns_to_the_instrument_view() {
+    let mut app = instrument_view(0x08);
+    app.apply(Action::Save);
+    assert_eq!(app.key_context(), KeyContext::FileName);
+
+    app.apply(ESC);
+
+    assert_eq!(lines(&app)[0], "INSTRUMENT 8");
+}
