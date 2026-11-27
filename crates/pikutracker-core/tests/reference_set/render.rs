@@ -22,7 +22,7 @@ pub fn render(cart: &Cart, plays: Plays, samples: usize) -> Vec<f32> {
         Plays::Music => {
             let mut player = Player::new();
             player.handle(AudioRequest::Play {
-                play: PlayId::new(1),
+                play: PlayId::FIRST,
                 project: Arc::new(import(cart, "reference.p8").project),
                 target: PlayTarget::Song { from_row: 0 },
             });

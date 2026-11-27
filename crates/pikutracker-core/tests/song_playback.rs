@@ -138,7 +138,7 @@ fn a_chain_row_lasts_exactly_its_ticks_at_183_samples_each() {
 
     player.next_sample();
 
-    assert_eq!(player.finished_play(), Some(PlayId::new(1)));
+    assert_eq!(player.finished_play(), Some(PlayId::FIRST));
 }
 
 #[test]
@@ -395,12 +395,12 @@ fn the_player_reports_a_play_as_finished_by_the_id_it_was_given() {
     assert_eq!(player.report().finished_play, None);
 
     player.handle(AudioRequest::Play {
-        play: PlayId::new(7),
+        play: PlayId::FIRST.next(),
         project: std::sync::Arc::new(Project::new()),
         target: PlayTarget::Song { from_row: 0 },
     });
 
-    assert_eq!(player.report().finished_play, Some(PlayId::new(7)));
+    assert_eq!(player.report().finished_play, Some(PlayId::FIRST.next()));
 }
 
 #[test]

@@ -26,10 +26,6 @@ impl Transport {
         }
     }
 
-    pub(super) fn is_playing(&self) -> bool {
-        self.playing
-    }
-
     pub(super) fn playhead(&self) -> Option<Playhead> {
         self.playhead
     }
@@ -53,6 +49,14 @@ impl Transport {
             project,
             target,
         });
+    }
+
+    pub(super) fn stop_if_playing(&mut self) -> bool {
+        let was_playing = self.playing;
+        if was_playing {
+            self.stop();
+        }
+        was_playing
     }
 
     pub(super) fn stop(&mut self) {
@@ -116,7 +120,7 @@ impl Transport {
     }
 
     pub(super) fn playhead_moved_on(&mut self, report: &PlaybackReport) -> bool {
-        if report.finished_play.is_some() && report.finished_play == self.latest_play {
+        if matches!(report.finished_play, Some(play) if Some(play) == self.latest_play) {
             self.playing = false;
         }
         let playhead = report.playhead.filter(|_| self.playing);

@@ -471,7 +471,7 @@ impl App {
         }
         if self.speed_entry.is_some() {
             self.use_speed_entry(action);
-            self.settle_after_edit();
+            self.transport.project_changed(&self.project);
             return;
         }
         if action == Action::Cancel && self.selection_start.take().is_some() {
@@ -479,7 +479,7 @@ impl App {
         }
         if self.question.is_some() {
             self.answer_question(action);
-            self.settle_after_edit();
+            self.transport.project_changed(&self.project);
             return;
         }
         if self.file_list.is_some() {
@@ -488,11 +488,11 @@ impl App {
         }
         if self.instrument_view.is_some() {
             self.use_instrument_view(action);
-            self.settle_after_edit();
+            self.transport.project_changed(&self.project);
             return;
         }
         if self.cart_view_has_focus() && self.use_cart_view(action) {
-            self.settle_after_edit();
+            self.transport.project_changed(&self.project);
             return;
         }
         if self.use_title(action) {
@@ -578,10 +578,6 @@ impl App {
         if let Some((index, before)) = before_edit {
             self.preview_edit(action, index, before);
         }
-        self.settle_after_edit();
-    }
-
-    fn settle_after_edit(&mut self) {
         self.transport.project_changed(&self.project);
     }
 
@@ -655,11 +651,9 @@ impl App {
         match action {
             Action::Cancel => {
                 self.instrument_view = None;
-                if self.transport.is_playing() {
-                    self.transport.stop();
-                }
+                self.transport.stop_if_playing();
             }
-            Action::PlayFocusedPane if self.transport.is_playing() => self.transport.stop(),
+            Action::PlayFocusedPane if self.transport.stop_if_playing() => {}
             Action::PlayFocusedPane => {
                 let instrument = view.id();
                 self.transport
@@ -797,8 +791,7 @@ impl App {
     }
 
     fn play_or_stop(&mut self) {
-        if self.transport.is_playing() {
-            self.transport.stop();
+        if self.transport.stop_if_playing() {
             return;
         }
         match self.played_pane {
@@ -828,7 +821,7 @@ impl App {
         let target = if in_song_row {
             PlayTarget::ChainInSongRow {
                 song_row: self.song.row(),
-                track: self.song.track(),
+                track: Track::from_index(self.song.track()),
                 from_entry,
             }
         } else {

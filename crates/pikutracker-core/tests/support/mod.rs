@@ -293,7 +293,7 @@ pub fn play_along(app: &mut App, player: &mut Player, samples: usize) -> Vec<f32
 pub fn render_song(project: Project, samples: usize) -> Vec<f32> {
     let mut player = Player::new();
     player.handle(AudioRequest::Play {
-        play: PlayId::new(1),
+        play: PlayId::FIRST,
         project: Arc::new(project),
         target: PlayTarget::Song { from_row: 0 },
     });

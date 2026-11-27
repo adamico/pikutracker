@@ -1,6 +1,6 @@
 use crate::project::{
     CHAIN_ENTRIES, ChainEntry, ChainId, ChainRowPlace, FIRST_CUSTOM_INSTRUMENT, Filters,
-    InstrumentSound, MAX_STEPS, Phrase, PhraseId, Project, SfxInstrument, Step, TRACKS,
+    InstrumentSound, MAX_STEPS, Phrase, PhraseId, Project, SfxInstrument, Step, TRACKS, Track,
     WaveformInstrument,
 };
 use crate::synth::{
@@ -15,10 +15,6 @@ pub struct PlayId(u64);
 impl PlayId {
     pub const FIRST: Self = Self(1);
 
-    pub const fn new(number: u64) -> Self {
-        Self(number)
-    }
-
     pub const fn next(self) -> Self {
         Self(self.0 + 1)
     }
@@ -31,7 +27,7 @@ pub enum PlayTarget {
     },
     ChainInSongRow {
         song_row: usize,
-        track: usize,
+        track: Track,
         from_entry: usize,
     },
     ChainAlone {
@@ -425,6 +421,7 @@ impl Player {
             } => {
                 let k =
                     first_from_or_wrapping(from_entry, |k| first_chain_row(&project, song_row, k));
+                let track = track.index();
                 self.start(play, project, Route::Chain { track }, song_row, k, 0);
             }
             PlayTarget::ChainAlone { chain, from_entry } => {

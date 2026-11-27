@@ -115,7 +115,7 @@ fn track_of_song(project: Project, track: usize, samples: usize) -> Vec<f32> {
     let mut player = Player::new();
     player.handle(AudioRequest::SetTrackMix(mix));
     player.handle(AudioRequest::Play {
-        play: PlayId::new(1),
+        play: PlayId::FIRST,
         project: Arc::new(project),
         target: PlayTarget::Song { from_row: 0 },
     });
