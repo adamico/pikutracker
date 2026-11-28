@@ -26,3 +26,21 @@ impl Focus {
         }
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EditPane {
+    Song,
+    Chain,
+    Phrase,
+}
+
+impl Focus {
+    pub const fn edit_pane(self) -> Option<EditPane> {
+        match self {
+            Focus::Song => Some(EditPane::Song),
+            Focus::Chain => Some(EditPane::Chain),
+            Focus::Phrase => Some(EditPane::Phrase),
+            Focus::RightSlot => None,
+        }
+    }
+}

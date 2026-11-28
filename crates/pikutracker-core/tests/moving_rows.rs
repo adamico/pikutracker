@@ -215,6 +215,23 @@ fn each_press_is_one_undo_entry_in_every_pane() {
 }
 
 #[test]
+fn the_chain_and_phrase_panes_need_a_chain_or_phrase_to_move_rows_in() {
+    let cases = [
+        (vec![SHIFT_TAB, SELECT_DOWN], "NO CHAIN HERE"),
+        (vec![SHIFT_TAB, SHIFT_TAB, SELECT_DOWN], "NO PHRASE HERE"),
+    ];
+    for (moves, remark) in cases {
+        let mut app = App::new();
+        apply(&mut app, &moves);
+
+        app.apply(ROWS_DOWN);
+
+        assert!(app.project() == &Project::new(), "{moves:?}");
+        assert!(support::status_line(&app).contains(remark), "{moves:?}");
+    }
+}
+
+#[test]
 fn without_a_selection_nothing_moves() {
     let mut app = App::with_project(song());
 

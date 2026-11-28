@@ -1,9 +1,10 @@
-use super::cell_edits::NO_STEP_HERE;
+use super::edit_target::{EditTarget, NO_CHAIN_HERE, NO_PHRASE_HERE};
 use super::files::Question;
+use super::focus::EditPane;
 use super::messages::Report;
 use super::overlays::Overlay;
 use super::selection::CellRange;
-use super::{App, CHAIN_ENTRIES, Chain, Focus, NO_CHAIN_HERE, NO_PHRASE_HERE, Phrase, Project};
+use super::{App, CHAIN_ENTRIES, Chain, Phrase, Project};
 use crate::project::{ChainEntry, ChainId, PhraseId, UnusedItems};
 use crate::wording::counted;
 use std::collections::HashMap;
@@ -27,11 +28,11 @@ impl App {
         let Some(cells) = self.target_cells() else {
             return;
         };
-        match self.focus {
-            Focus::Song => self.clone_chains(cells, deep),
-            Focus::Chain => self.clone_phrases(cells),
-            Focus::Phrase => self.remark = Some(NEEDS_A_REFERENCE.into()),
-            Focus::RightSlot => {}
+        match self.focus.edit_pane() {
+            Some(EditPane::Song) => self.clone_chains(cells, deep),
+            Some(EditPane::Chain) => self.clone_phrases(cells),
+            Some(EditPane::Phrase) => self.remark = Some(NEEDS_A_REFERENCE.into()),
+            None => {}
         }
     }
 
@@ -80,8 +81,7 @@ impl App {
     }
 
     fn clone_phrases(&mut self, cells: CellRange) {
-        let Some(chain) = self.shown_chain_id() else {
-            self.remark = Some(NO_CHAIN_HERE.into());
+        let Some(EditTarget::Chain(chain)) = self.edit_target_or_remark() else {
             return;
         };
         let mut phrases = Vec::new();
@@ -187,27 +187,18 @@ impl App {
         shift_chain: fn(&mut Chain, usize),
         shift_phrase: fn(&mut Phrase, usize),
     ) {
-        match self.focus {
-            Focus::Song => shift_song(&mut self.project, self.song.row()),
-            Focus::Chain => {
-                let Some(chain) = self.shown_chain_id() else {
-                    self.remark = Some(NO_CHAIN_HERE.into());
-                    return;
-                };
+        match self.edit_target_or_remark() {
+            Some(EditTarget::Song) => shift_song(&mut self.project, self.song.row()),
+            Some(EditTarget::Chain(chain)) => {
                 shift_chain(self.project.chain_mut(chain), self.chain.entry());
             }
-            Focus::Phrase => {
-                let Some(phrase) = self.shown_phrase_id() else {
-                    self.remark = Some(NO_PHRASE_HERE.into());
+            Some(EditTarget::Phrase(phrase)) => {
+                let Some(step) = self.phrase_step_or_remark() else {
                     return;
                 };
-                let Some(cell) = self.phrase.cell() else {
-                    self.remark = Some(NO_STEP_HERE.into());
-                    return;
-                };
-                shift_phrase(self.project.phrase_mut(phrase), cell.row);
+                shift_phrase(self.project.phrase_mut(phrase), step.row);
             }
-            Focus::RightSlot => return,
+            None => return,
         }
         self.selection_start = None;
     }
@@ -236,22 +227,21 @@ impl App {
     }
 
     pub(super) fn new_unused(&mut self) {
-        match self.focus {
-            Focus::Song => {
+        match self.focus.edit_pane() {
+            Some(EditPane::Song) => {
                 if let Some(slots) = self.free_chain_slots(1) {
                     let (row, track) = (self.song.row(), self.song.track());
                     self.project.set_song_cell(row, track, Some(slots[0]));
                 }
             }
-            Focus::Chain => self.new_unused_phrase(),
-            Focus::Phrase => self.remark = Some(NEEDS_A_REFERENCE.into()),
-            Focus::RightSlot => {}
+            Some(EditPane::Chain) => self.new_unused_phrase(),
+            Some(EditPane::Phrase) => self.remark = Some(NEEDS_A_REFERENCE.into()),
+            None => {}
         }
     }
 
     fn new_unused_phrase(&mut self) {
-        let Some(chain) = self.shown_chain_id() else {
-            self.remark = Some(NO_CHAIN_HERE.into());
+        let Some(EditTarget::Chain(chain)) = self.edit_target_or_remark() else {
             return;
         };
         let Some(slots) = self.free_phrase_slots(1) else {
