@@ -1,6 +1,7 @@
 use super::App;
 use super::claim_text::named_slots;
-use super::files::{Accepted, OVERWRITE, Waiting, shown_name};
+use super::file_conversations::Asked;
+use super::files::{Accepted, FileRequest, OVERWRITE, shown_name};
 use super::key_hints::{ExportFailureHints, export_failure_hints};
 use super::messages::{Location, LogItem, Report, Severity};
 use crate::cart::{Cart, Slots};
@@ -133,8 +134,8 @@ impl App {
             return;
         };
         let path = self.target_cart_path(&target.path);
-        self.request_bytes(path.clone());
-        self.waiting = Some(Waiting::ExportReading(path));
+        self.files
+            .ask(FileRequest::ReadBytes { path }, Asked::ExportReading);
     }
 
     pub(super) fn finish_reading_target(&mut self, path: PathBuf, original: &[u8]) {
@@ -186,14 +187,17 @@ impl App {
             "EXPORTED TO {cart_name}: {} SFX, {} PATTERNS.",
             exported.sfx_count, exported.pattern_count,
         ));
-        self.request_write_bytes(path.clone(), exported.cart_bytes);
-        self.waiting = Some(Waiting::ExportWriting(
-            path,
-            FinishedExport {
-                claimed_bytes_hash: exported.claimed_bytes_hash,
-                report,
+        let finished = FinishedExport {
+            claimed_bytes_hash: exported.claimed_bytes_hash,
+            report,
+        };
+        self.files.ask(
+            FileRequest::WriteBytes {
+                path,
+                contents: exported.cart_bytes,
             },
-        ));
+            Asked::ExportWriting(finished),
+        );
     }
 
     pub(super) fn finish_writing_target(&mut self, finished: FinishedExport) {

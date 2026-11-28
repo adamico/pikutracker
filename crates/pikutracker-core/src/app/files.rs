@@ -1,4 +1,4 @@
-use super::exporting::FinishedExport;
+use super::file_conversations::Asked;
 use super::messages::Report;
 use super::overlays::Overlay;
 use super::panes::file_list::{Choice, FileList, Purpose};
@@ -90,23 +90,6 @@ impl Question {
     }
 }
 
-#[derive(Debug)]
-pub(super) enum Waiting {
-    Listing(PathBuf),
-    Reading(PathBuf),
-    Importing(PathBuf),
-    Writing(PathBuf, Box<Project>),
-    ExportReading(PathBuf),
-    ExportWriting(PathBuf, FinishedExport),
-    CartViewReading(PathBuf),
-    PickingCart(PathBuf),
-    MakingCart(PathBuf),
-    SettingAside {
-        state_file: PathBuf,
-        bad_file: PathBuf,
-    },
-}
-
 pub(super) fn cannot_use(path: &Path, reason: &str) -> String {
     format!("CANNOT USE {}: {reason}", shown_name(path))
 }
@@ -131,36 +114,52 @@ impl App {
     }
 
     pub fn take_file_requests(&mut self) -> Vec<FileRequest> {
-        std::mem::take(&mut self.file_requests)
+        self.files.take_requests()
     }
 
     pub fn receive_file(&mut self, response: FileResponse) {
-        match response {
-            FileResponse::Listed { directory, entries } => {
-                if matches!(&self.waiting, Some(Waiting::Listing(listed)) if *listed == directory) {
-                    self.waiting = None;
-                    if let Some(list) = self.overlays.file_list() {
-                        list.show(directory, entries);
-                    }
-                }
-            }
-            FileResponse::Read { path, contents } => self.finish_reading(path, &contents),
-            FileResponse::BytesRead { path, contents } => {
-                self.finish_reading_bytes(path, &contents)
-            }
-            FileResponse::Written { path } => self.finish_writing(&path),
-            FileResponse::Renamed { path } => self.finish_setting_aside(&path),
-            FileResponse::Missing { path } => self.file_missing(&path),
-            FileResponse::Failed { path, reason } => self.file_failed(&path, &reason),
+        if let Some(asked) = self.files.answer(&response) {
+            self.hear_back(response, asked);
         }
         self.announce_help_when_free();
     }
 
-    fn finish_reading(&mut self, path: PathBuf, contents: &str) {
-        if !matches!(&self.waiting, Some(Waiting::Reading(read)) if *read == path) {
-            return;
+    fn hear_back(&mut self, response: FileResponse, asked: Asked) {
+        match (response, asked) {
+            (FileResponse::Listed { directory, entries }, Asked::Listing) => {
+                if let Some(list) = self.overlays.file_list() {
+                    list.show(directory, entries);
+                }
+            }
+            (FileResponse::Read { path, contents }, Asked::Opening) => {
+                self.finish_opening(path, &contents);
+            }
+            (FileResponse::BytesRead { path, contents }, asked) => match asked {
+                Asked::Importing => self.finish_importing(path, &contents),
+                Asked::ExportReading => self.finish_reading_target(path, &contents),
+                Asked::CartViewReading => self.show_cart_in_view(&contents),
+                Asked::PickingCart => self.finish_picking_cart(&path, &contents),
+                _ => {}
+            },
+            (FileResponse::Written { path }, asked) => match asked {
+                Asked::Saving(project) => self.finish_saving(path, *project),
+                Asked::ExportWriting(finished) => self.finish_writing_target(finished),
+                Asked::MakingCart => self.finish_making_cart(&path),
+                _ => {}
+            },
+            (FileResponse::Renamed { .. }, Asked::SettingAsideState { state_file }) => {
+                self.state_file = Some(state_file);
+            }
+            (FileResponse::Missing { path }, Asked::ExportReading) => self.ask_to_locate(&path),
+            (FileResponse::Missing { path }, asked) => self.file_failed(&path, NOT_FOUND, asked),
+            (FileResponse::Failed { path, reason }, asked) => {
+                self.file_failed(&path, &reason, asked);
+            }
+            _ => {}
         }
-        self.waiting = None;
+    }
+
+    fn finish_opening(&mut self, path: PathBuf, contents: &str) {
         self.overlays.close_file_list();
         let name = shown_name(&path);
         match project_file::parse(contents) {
@@ -177,103 +176,44 @@ impl App {
         }
     }
 
-    fn finish_reading_bytes(&mut self, path: PathBuf, contents: &[u8]) {
-        match self.waiting.take() {
-            Some(Waiting::Importing(read)) if read == path => self.finish_importing(path, contents),
-            Some(Waiting::ExportReading(read)) if read == path => {
-                self.finish_reading_target(path, contents);
-            }
-            Some(Waiting::CartViewReading(read)) if read == path => {
-                self.show_cart_in_view(contents);
-            }
-            Some(Waiting::PickingCart(read)) if read == path => {
-                self.finish_picking_cart(&path, contents)
-            }
-            other => self.waiting = other,
-        }
+    fn finish_saving(&mut self, path: PathBuf, project: Project) {
+        self.adopt_saved_cart_path(&project);
+        self.saved_project = project;
+        self.directory = folder_of(&path);
+        self.report(Report::info(format!("SAVED {}", shown_name(&path))));
+        self.project_path = Some(path.clone());
+        self.remember_project(path);
     }
 
-    pub(super) fn request_bytes(&mut self, path: PathBuf) {
-        self.file_requests.push(FileRequest::ReadBytes { path });
-    }
-
-    pub(super) fn request_write_bytes(&mut self, path: PathBuf, contents: Vec<u8>) {
-        self.file_requests
-            .push(FileRequest::WriteBytes { path, contents });
-    }
-
-    fn finish_writing(&mut self, path: &Path) {
-        match self.waiting.take() {
-            Some(Waiting::Writing(written, project)) if written == path => {
-                self.adopt_saved_cart_path(&project);
-                self.saved_project = *project;
-                self.directory = folder_of(&written);
-                self.report(Report::info(format!("SAVED {}", shown_name(&written))));
-                self.project_path = Some(written.clone());
-                self.remember_project(written);
-            }
-            Some(Waiting::ExportWriting(written, finished)) if written == path => {
-                self.finish_writing_target(finished);
-            }
-            Some(Waiting::MakingCart(written)) if written == path => {
-                self.finish_making_cart(&written);
-            }
-            other => self.waiting = other,
-        }
-    }
-
-    fn file_failed(&mut self, path: &Path, reason: &str) {
-        if self.config_not_set_aside(path, reason) {
-            return;
-        }
+    fn file_failed(&mut self, path: &Path, reason: &str, asked: Asked) {
         let reason = reason.to_uppercase();
         let name = shown_name(path);
-        let summary = match self.waiting.take() {
-            Some(Waiting::Listing(listed)) if listed == path => {
-                format!("CANNOT LIST {}: {reason}", path.display())
-            }
-            Some(Waiting::Reading(read)) if read == path => {
+        let summary = match asked {
+            Asked::Listing => format!("CANNOT LIST {}: {reason}", path.display()),
+            Asked::Opening => {
                 self.overlays.close_file_list();
                 format!("CANNOT OPEN {name}: {reason}")
             }
-            Some(Waiting::Importing(read)) if read == path => {
+            Asked::Importing => {
                 self.overlays.close_file_list();
                 format!("CANNOT IMPORT {name}: {reason}")
             }
-            Some(Waiting::Writing(written, _)) if written == path => {
-                format!("CANNOT SAVE {name}: {reason}")
-            }
-            Some(Waiting::ExportReading(target) | Waiting::ExportWriting(target, _))
-                if target == path =>
-            {
+            Asked::Saving(_) => format!("CANNOT SAVE {name}: {reason}"),
+            Asked::ExportReading | Asked::ExportWriting(_) => {
                 format!("CANNOT EXPORT TO {name}: {reason}")
             }
-            Some(Waiting::CartViewReading(target)) if target == path => {
+            Asked::CartViewReading => {
                 self.show_unreadable_cart_in_view(reason);
                 return;
             }
-            Some(Waiting::PickingCart(picked)) if picked == path => cannot_use(path, &reason),
-            Some(Waiting::MakingCart(made)) if made == path => {
-                format!("CANNOT CREATE {name}: {reason}")
-            }
-            Some(Waiting::SettingAside { state_file, .. }) if state_file == path => format!(
+            Asked::PickingCart => cannot_use(path, &reason),
+            Asked::MakingCart => format!("CANNOT CREATE {name}: {reason}"),
+            Asked::SettingAsideState { .. } => format!(
                 "CANNOT RENAME {name} TO {name}.BAD: {reason}. RECENT PROJECTS ARE NOT SAVED THIS SESSION"
             ),
-            other => {
-                self.waiting = other;
-                return;
-            }
+            Asked::SettingAsideConfig => format!("CANNOT RENAME {name} TO {name}.BAD: {reason}"),
         };
         self.report(Report::failure(summary));
-    }
-
-    fn file_missing(&mut self, path: &Path) {
-        if matches!(&self.waiting, Some(Waiting::ExportReading(target)) if target == path) {
-            self.waiting = None;
-            self.ask_to_locate(path);
-        } else {
-            self.file_failed(path, NOT_FOUND);
-        }
     }
 
     pub(super) fn ask(&mut self, text: String, answer: &'static str, accepted: Accepted) {
@@ -385,10 +325,8 @@ impl App {
     }
 
     fn list_folder(&mut self, directory: PathBuf) {
-        self.file_requests.push(FileRequest::List {
-            directory: directory.clone(),
-        });
-        self.waiting = Some(Waiting::Listing(directory));
+        self.files
+            .ask(FileRequest::List { directory }, Asked::Listing);
     }
 
     fn project_saved_in(&self, folder: &Path) -> Project {
@@ -415,11 +353,11 @@ impl App {
     fn write_project(&mut self, path: PathBuf) {
         self.overlays.close_file_list();
         let project = self.project_saved_in(&folder_of(&path));
-        self.file_requests.push(FileRequest::Write {
-            path: path.clone(),
-            contents: project_file::write(&project),
-        });
-        self.waiting = Some(Waiting::Writing(path, Box::new(project)));
+        let contents = project_file::write(&project);
+        self.files.ask(
+            FileRequest::Write { path, contents },
+            Asked::Saving(Box::new(project)),
+        );
     }
 
     pub(super) fn answer_question(&mut self, action: Action) {
@@ -470,20 +408,13 @@ impl App {
         match choice {
             Choice::Stay => {}
             Choice::Folder(directory) => self.list_folder(directory),
-            Choice::Open(path) => {
-                self.file_requests
-                    .push(FileRequest::Read { path: path.clone() });
-                self.waiting = Some(Waiting::Reading(path));
-            }
-            Choice::Import(path) => {
-                self.file_requests
-                    .push(FileRequest::ReadBytes { path: path.clone() });
-                self.waiting = Some(Waiting::Importing(path));
-            }
-            Choice::TargetCart(path) => {
-                self.request_bytes(path.clone());
-                self.waiting = Some(Waiting::PickingCart(path));
-            }
+            Choice::Open(path) => self.files.ask(FileRequest::Read { path }, Asked::Opening),
+            Choice::Import(path) => self
+                .files
+                .ask(FileRequest::ReadBytes { path }, Asked::Importing),
+            Choice::TargetCart(path) => self
+                .files
+                .ask(FileRequest::ReadBytes { path }, Asked::PickingCart),
             Choice::LocatedCart(path) => self.locate_target_cart(&path),
             Choice::NewCart(path) => self.make_new_cart(path),
             Choice::RefusedPngNewCart => self.remark = Some(ONLY_P8_NEW_CARTS.into()),

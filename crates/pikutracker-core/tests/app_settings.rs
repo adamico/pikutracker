@@ -209,6 +209,31 @@ fn a_damaged_config_file_that_cannot_be_renamed_says_so() {
 }
 
 #[test]
+fn damaged_config_and_state_files_are_each_set_aside_whatever_order_the_answers_come_in() {
+    let mut app = launch(Some("nonsense"), Some("nonsense"));
+    let renames = app.take_file_requests();
+    assert_eq!(renames.len(), 2, "{renames:?}");
+
+    app.receive_file(FileResponse::Renamed {
+        path: PathBuf::from(format!("{STATE_FILE}.bad")),
+    });
+    app.receive_file(FileResponse::Failed {
+        path: PathBuf::from(CONFIG_FILE),
+        reason: "Read-only file system".to_owned(),
+    });
+
+    assert!(
+        status_line(&app)
+            .starts_with("! CANNOT RENAME CONFIG.RON TO CONFIG.RON.BAD: READ-ONLY FILE SYSTEM")
+    );
+    app.apply(Action::ToggleFollow);
+    assert!(
+        state_written(&app.take_file_requests()).is_some(),
+        "state.ron was set aside, so a new one is written"
+    );
+}
+
+#[test]
 fn a_config_file_from_a_newer_version_is_left_alone_and_the_defaults_apply() {
     let mut app = launch(Some("(version: 9, preset: M8Style, shiny: true)"), None);
 

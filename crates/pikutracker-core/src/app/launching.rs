@@ -1,4 +1,5 @@
-use super::files::{FileRequest, Waiting};
+use super::file_conversations::Asked;
+use super::files::FileRequest;
 use super::key_hints;
 use super::messages::{LogItem, Notice, Report, Severity};
 use super::{Action, App};
@@ -109,7 +110,7 @@ impl App {
     }
 
     pub(super) fn announce_help_when_free(&mut self) {
-        let free = !self.persistent_notice_showing() && self.waiting.is_none();
+        let free = !self.persistent_notice_showing() && !self.files.waiting();
         if self.help_announcement != HelpAnnouncement::Due || !free {
             return;
         }
@@ -135,11 +136,14 @@ impl App {
             Err(reason) => self.report(cannot_read(CONFIG_RON, &reason)),
             Ok(SettingsRead::Loaded(config)) => self.use_config(&config),
             Ok(SettingsRead::Damaged) => {
-                self.file_requests.push(FileRequest::Rename {
-                    from: config_file.clone(),
-                    to: set_aside_path(&config_file),
-                });
-                self.config_set_aside = Some(config_file);
+                let to = set_aside_path(&config_file);
+                self.files.ask(
+                    FileRequest::Rename {
+                        from: config_file,
+                        to,
+                    },
+                    Asked::SettingAsideConfig,
+                );
                 self.report(damaged(CONFIG_RON));
             }
             Ok(SettingsRead::Newer { .. }) => self.report(newer(CONFIG_RON)),
@@ -165,58 +169,22 @@ impl App {
                 self.state_file = Some(state_file);
                 if let Some(last) = state.last_project() {
                     let path = last.to_path_buf();
-                    self.file_requests
-                        .push(FileRequest::Read { path: path.clone() });
-                    self.waiting = Some(Waiting::Reading(path));
+                    self.files.ask(FileRequest::Read { path }, Asked::Opening);
                 }
                 self.app_state = state;
             }
             Ok(SettingsRead::Damaged) => {
-                let bad = set_aside_path(&state_file);
-                self.file_requests.push(FileRequest::Rename {
-                    from: state_file.clone(),
-                    to: bad.clone(),
-                });
-                self.waiting = Some(Waiting::SettingAside {
-                    state_file,
-                    bad_file: bad,
-                });
+                self.files.ask(
+                    FileRequest::Rename {
+                        from: state_file.clone(),
+                        to: set_aside_path(&state_file),
+                    },
+                    Asked::SettingAsideState { state_file },
+                );
                 self.report(damaged(STATE_RON));
             }
             Ok(SettingsRead::Newer { .. }) => self.report(newer(STATE_RON)),
         }
-    }
-
-    pub(super) fn finish_setting_aside(&mut self, renamed: &Path) {
-        if self
-            .config_set_aside
-            .take_if(|config| set_aside_path(config) == renamed)
-            .is_some()
-        {
-            return;
-        }
-        match self.waiting.take() {
-            Some(Waiting::SettingAside {
-                state_file,
-                bad_file,
-            }) if bad_file == renamed => self.state_file = Some(state_file),
-            other => self.waiting = other,
-        }
-    }
-
-    pub(super) fn config_not_set_aside(&mut self, path: &Path, reason: &str) -> bool {
-        if self
-            .config_set_aside
-            .take_if(|config| config == path)
-            .is_none()
-        {
-            return false;
-        }
-        let reason = reason.to_uppercase();
-        self.report(Report::failure(format!(
-            "CANNOT RENAME {CONFIG_RON} TO {CONFIG_RON}.BAD: {reason}"
-        )));
-        true
     }
 
     fn state_to_remember(&self) -> AppState {
@@ -246,7 +214,7 @@ impl App {
             return;
         };
         self.app_state = self.state_to_remember();
-        self.file_requests.push(FileRequest::Write {
+        self.files.send_without_waiting(FileRequest::Write {
             path: state_file,
             contents: write_state(&self.app_state),
         });
