@@ -1,7 +1,8 @@
+use super::edit_target::NO_PHRASE_HERE;
 use super::messages::Report;
 use super::overlays::Overlay;
 use super::selection::{CellPosition, CellRange};
-use super::{Action, App, CHAIN_ENTRIES, Focus, NO_PHRASE_HERE};
+use super::{Action, App, CHAIN_ENTRIES, Focus};
 use crate::project::{ChainId, PhraseId, SONG_ROWS, TRACKS};
 use crate::wording::counted;
 

@@ -1,11 +1,12 @@
+use super::edit_target::{EditTarget, NO_STEP_HERE};
+use super::focus::EditPane;
 use super::messages::Report;
 use super::selection::{CellPosition, CellRange};
-use super::{App, Chain, ChainPane, Direction, Focus, NO_CHAIN_HERE, NO_PHRASE_HERE};
+use super::{App, Chain, ChainPane, Direction, Focus};
 use crate::project::{ChainEntry, ChainId, Step};
 use crate::screen::grid::Grid;
 use std::ops::RangeInclusive;
 
-pub(super) const NO_STEP_HERE: &str = "NO STEP HERE";
 const NOTHING_TO_PASTE: &str = "NOTHING TO PASTE";
 
 #[derive(Clone, Debug)]
@@ -42,11 +43,10 @@ const fn pane_name(focus: Focus) -> &'static str {
 
 impl App {
     fn cursor_cell(&self) -> Option<CellPosition> {
-        match self.focus {
-            Focus::Song => Some(self.song.cell()),
-            Focus::Chain => self.chain.position(),
-            Focus::Phrase => self.phrase.cell(),
-            Focus::RightSlot => None,
+        match self.focus.edit_pane()? {
+            EditPane::Song => Some(self.song.cell()),
+            EditPane::Chain => self.chain.position(),
+            EditPane::Phrase => self.phrase.cell(),
         }
     }
 
@@ -80,9 +80,8 @@ impl App {
     }
 
     fn edit_selected_chain(&mut self, edit: impl FnOnce(&ChainPane, &mut Chain)) {
-        match self.shown_chain_id() {
-            Some(id) => edit(&self.chain, self.project.chain_mut(id)),
-            None => self.remark = Some(NO_CHAIN_HERE.into()),
+        if let Some(EditTarget::Chain(id)) = self.edit_target_or_remark() {
+            edit(&self.chain, self.project.chain_mut(id));
         }
     }
 
@@ -90,15 +89,15 @@ impl App {
         let Some(cells) = self.selected_cells() else {
             return;
         };
-        match self.focus {
-            Focus::Song => self.song.nudge_cells(&mut self.project, cells, up, coarse),
-            Focus::Chain => {
+        match self.focus.edit_pane() {
+            Some(EditPane::Song) => self.song.nudge_cells(&mut self.project, cells, up, coarse),
+            Some(EditPane::Chain) => {
                 self.edit_selected_chain(|pane, chain| pane.nudge_cells(chain, cells, up, coarse));
             }
-            Focus::Phrase => {
+            Some(EditPane::Phrase) => {
                 self.edit_phrase(|pane, phrase| pane.nudge_cells(phrase, cells, up, coarse));
             }
-            Focus::RightSlot => {}
+            None => {}
         }
     }
 
@@ -106,17 +105,18 @@ impl App {
         let Some(cells) = self.selected_cells() else {
             return;
         };
-        let moved = match self.focus {
-            Focus::Song => self
-                .project
-                .move_song_cells(cells.rows(), cells.columns(), up),
-            Focus::Chain => self
-                .shown_chain_id()
-                .is_some_and(|id| self.project.chain_mut(id).move_entries(cells.rows(), up)),
-            Focus::Phrase => self
-                .shown_phrase_id()
-                .is_some_and(|id| self.project.phrase_mut(id).move_steps(cells.rows(), up)),
-            Focus::RightSlot => false,
+        let moved = match self.edit_target_or_remark() {
+            Some(EditTarget::Song) => {
+                self.project
+                    .move_song_cells(cells.rows(), cells.columns(), up)
+            }
+            Some(EditTarget::Chain(id)) => {
+                self.project.chain_mut(id).move_entries(cells.rows(), up)
+            }
+            Some(EditTarget::Phrase(id)) => {
+                self.project.phrase_mut(id).move_steps(cells.rows(), up)
+            }
+            None => false,
         };
         if moved {
             self.move_selection_with_rows(up);
@@ -128,61 +128,50 @@ impl App {
         if let Some(start) = self.selection_start.as_mut() {
             start.row = if up { start.row - 1 } else { start.row + 1 };
         }
-        match self.focus {
-            Focus::Song => self.song.move_cursor(direction),
-            Focus::Chain => self.chain.move_cursor(direction),
-            Focus::Phrase => self.phrase.move_cursor(direction),
-            Focus::RightSlot => {}
+        match self.focus.edit_pane() {
+            Some(EditPane::Song) => self.song.move_cursor(direction),
+            Some(EditPane::Chain) => self.chain.move_cursor(direction),
+            Some(EditPane::Phrase) => self.phrase.move_cursor(direction),
+            None => {}
         }
     }
 
     pub(super) fn clear_cells(&mut self) {
-        match (self.focus, self.selected_cells()) {
-            (Focus::Song, Some(cells)) => self.song.clear_cells(&mut self.project, cells),
-            (Focus::Song, None) => self.song.clear(&mut self.project),
-            (Focus::Chain, Some(cells)) => {
+        match (self.focus.edit_pane(), self.selected_cells()) {
+            (Some(EditPane::Song), Some(cells)) => self.song.clear_cells(&mut self.project, cells),
+            (Some(EditPane::Song), None) => self.song.clear(&mut self.project),
+            (Some(EditPane::Chain), Some(cells)) => {
                 self.edit_selected_chain(|pane, chain| pane.clear_cells(chain, cells));
             }
-            (Focus::Chain, None) => self.edit_chain(|pane, chain| pane.clear(chain)),
-            (Focus::Phrase, _) => {
+            (Some(EditPane::Chain), None) => self.edit_chain(|pane, chain| pane.clear(chain)),
+            (Some(EditPane::Phrase), _) => {
                 if let Some(cells) = self.target_cells() {
                     self.edit_phrase(|pane, phrase| pane.clear_cells(phrase, cells));
                 }
             }
-            (Focus::RightSlot, _) => {}
+            (None, _) => {}
         }
     }
 
     fn copied_cells(&mut self) -> Option<Clipboard> {
         let cells = self.target_cells();
-        match self.focus {
-            Focus::Song => Some(Clipboard::Song(self.song.copy(&self.project, cells?))),
-            Focus::Chain => {
-                let Some(id) = self.shown_chain_id() else {
-                    self.remark = Some(NO_CHAIN_HERE.into());
-                    return None;
-                };
+        match self.edit_target_or_remark()? {
+            EditTarget::Song => Some(Clipboard::Song(self.song.copy(&self.project, cells?))),
+            EditTarget::Chain(id) => {
                 let cells = cells?;
                 Some(Clipboard::Chain {
                     columns: cells.columns(),
                     rows: self.chain.copy(self.project.chain(id), cells),
                 })
             }
-            Focus::Phrase => {
-                let Some(id) = self.shown_phrase_id() else {
-                    self.remark = Some(NO_PHRASE_HERE.into());
-                    return None;
-                };
-                let Some(cells) = cells else {
-                    self.remark = Some(NO_STEP_HERE.into());
-                    return None;
-                };
+            EditTarget::Phrase(id) => {
+                self.phrase_step_or_remark()?;
+                let cells = cells?;
                 Some(Clipboard::Phrase {
                     columns: cells.columns(),
                     rows: self.phrase.copy(self.project.phrase(id), cells),
                 })
             }
-            Focus::RightSlot => None,
         }
     }
 
@@ -241,8 +230,7 @@ impl App {
         columns: &RangeInclusive<usize>,
         rows: &[Option<ChainEntry>],
     ) -> Option<usize> {
-        let Some(id) = self.shown_chain_id() else {
-            self.remark = Some(NO_CHAIN_HERE.into());
+        let Some(EditTarget::Chain(id)) = self.edit_target_or_remark() else {
             return None;
         };
         Some(self.chain.paste(self.project.chain_mut(id), columns, rows))
@@ -253,14 +241,10 @@ impl App {
         columns: &RangeInclusive<usize>,
         rows: &[Step],
     ) -> Option<usize> {
-        let Some(id) = self.shown_phrase_id() else {
-            self.remark = Some(NO_PHRASE_HERE.into());
+        let Some(EditTarget::Phrase(id)) = self.edit_target_or_remark() else {
             return None;
         };
-        if self.phrase.cell().is_none() {
-            self.remark = Some(NO_STEP_HERE.into());
-            return None;
-        }
+        self.phrase_step_or_remark()?;
         Some(
             self.phrase
                 .paste(self.project.phrase_mut(id), columns, rows),
@@ -271,13 +255,14 @@ impl App {
         let Some(cells) = self.selected_cells() else {
             return;
         };
-        match self.focus {
-            Focus::Song => self.song.draw_selection(grid, super::layout::SONG, cells),
-            Focus::Chain => self.chain.draw_selection(grid, super::layout::CHAIN, cells),
-            Focus::Phrase => self
-                .phrase
-                .draw_selection(grid, super::layout::PHRASE, cells),
-            Focus::RightSlot => {}
+        match self.focus.edit_pane() {
+            Some(EditPane::Song) => self.song.draw_selection(grid, super::layout::SONG, cells),
+            Some(EditPane::Chain) => self.chain.draw_selection(grid, super::layout::CHAIN, cells),
+            Some(EditPane::Phrase) => {
+                self.phrase
+                    .draw_selection(grid, super::layout::PHRASE, cells)
+            }
+            None => {}
         }
     }
 }

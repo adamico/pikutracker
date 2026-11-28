@@ -3,6 +3,7 @@ mod cell_edits;
 mod change_speed;
 mod claim_text;
 mod claiming;
+mod edit_target;
 mod exporting;
 mod file_conversations;
 mod files;
@@ -41,8 +42,9 @@ use crate::screen::grid::Grid;
 use crate::settings::AppState;
 use cell_edits::Clipboard;
 use change_speed::SpeedChange;
+use edit_target::{EditTarget, NO_PHRASE_HERE};
 use file_conversations::FileConversations;
-use focus::Focus;
+use focus::{EditPane, Focus};
 use history::{CursorPlace, History, Merge};
 use layout::Area;
 use messages::Notice;
@@ -64,8 +66,6 @@ use transport::Transport;
 
 const SONG_JUMP_ROWS: usize = 16;
 const NOTHING_TO_PLAY: &str = "NOTHING TO PLAY";
-const NO_CHAIN_HERE: &str = "NO CHAIN HERE";
-const NO_PHRASE_HERE: &str = "NO PHRASE HERE";
 const NOTHING_TO_UNDO: &str = "NOTHING TO UNDO";
 const NOTHING_TO_REDO: &str = "NOTHING TO REDO";
 const FOLLOW_ON: &str = "FOLLOW ON";
@@ -676,18 +676,18 @@ impl App {
     }
 
     fn type_digit(&mut self, digit: u8) {
-        match self.focus {
-            Focus::Song => self.song.type_digit(&mut self.project, digit),
-            Focus::Chain => self.edit_chain(|pane, chain| pane.type_digit(chain, digit)),
-            Focus::Phrase if self.phrase.is_on_the_pen() => {
+        match self.focus.edit_pane() {
+            Some(EditPane::Song) => self.song.type_digit(&mut self.project, digit),
+            Some(EditPane::Chain) => self.edit_chain(|pane, chain| pane.type_digit(chain, digit)),
+            Some(EditPane::Phrase) if self.phrase.is_on_the_pen() => {
                 self.phrase.type_pen_digit(digit);
                 self.remark_an_undefined_instrument();
             }
-            Focus::Phrase => {
+            Some(EditPane::Phrase) => {
                 self.edit_phrase(|pane, phrase| pane.type_digit(phrase, digit));
                 self.remark_an_undefined_instrument();
             }
-            Focus::RightSlot => {}
+            None => {}
         }
     }
 
@@ -707,21 +707,21 @@ impl App {
             self.nudge_selection(up, coarse);
             return;
         }
-        match self.focus {
-            Focus::Song => self.song.nudge(&mut self.project, up, coarse),
-            Focus::Chain => self.edit_chain(|pane, chain| pane.nudge(chain, up, coarse)),
-            Focus::Phrase if up && self.goes_past_the_last_instrument() => {
+        match self.focus.edit_pane() {
+            Some(EditPane::Song) => self.song.nudge(&mut self.project, up, coarse),
+            Some(EditPane::Chain) => self.edit_chain(|pane, chain| pane.nudge(chain, up, coarse)),
+            Some(EditPane::Phrase) if up && self.goes_past_the_last_instrument() => {
                 self.remark = Some(CUSTOM_INSTRUMENTS_END_AT_F.into());
             }
-            Focus::Phrase if self.phrase.is_on_the_pen() => {
+            Some(EditPane::Phrase) if self.phrase.is_on_the_pen() => {
                 self.phrase.nudge_pen(up);
                 self.remark_an_undefined_instrument();
             }
-            Focus::Phrase => {
+            Some(EditPane::Phrase) => {
                 self.edit_phrase(|pane, phrase| pane.nudge(phrase, up, coarse));
                 self.remark_an_undefined_instrument();
             }
-            Focus::RightSlot => {}
+            None => {}
         }
     }
 
@@ -730,8 +730,7 @@ impl App {
     }
 
     fn edit_chain(&mut self, edit: impl FnOnce(&mut ChainPane, &mut Chain)) {
-        let Some(id) = self.shown_chain_id() else {
-            self.remark = Some(NO_CHAIN_HERE.into());
+        let Some(EditTarget::Chain(id)) = self.edit_target_or_remark() else {
             return;
         };
         if self.entry_under_chain_cursor().is_none() && !self.chain.edits_empty_entries() {
@@ -742,9 +741,8 @@ impl App {
     }
 
     fn edit_phrase(&mut self, edit: impl FnOnce(&mut PhrasePane, &mut Phrase)) {
-        match self.shown_phrase_id() {
-            Some(id) => edit(&mut self.phrase, self.project.phrase_mut(id)),
-            None => self.remark = Some(NO_PHRASE_HERE.into()),
+        if let Some(EditTarget::Phrase(id)) = self.edit_target_or_remark() {
+            edit(&mut self.phrase, self.project.phrase_mut(id));
         }
     }
 
